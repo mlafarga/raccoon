@@ -27,8 +27,8 @@ setup(
     ],
     keywords='CCF spectroscopy RV activity',
     # package_dir={'': 'raccoon'},
-    packages=['raccoon'],
-    # packages=setuptools.find_packages(),
+    # packages=['raccoon'],
+    packages=setuptools.find_packages(),
     # python_requires='>=3.6',
     setup_requires=['numpy', 'scipy'],  # need for fortran
     install_requires=['numpy', 'scipy', 'astropy', 'pandas', 'lmfit', 'progress', 'matplotlib'],

@@ -105,13 +105,13 @@ Output:
 
 Mask available for CARMENES VIS and NIR:
 
-| Mask ID            | SpT     | vsini [km/s] | Mask file                                                                                       |
-| ------------------ | ------- | ------------ | ----------------------------------------------------------------------------------------------- |
-| J12123+544Sdefault | M0.0\,V |       <= 2.0 | J12123+544Sserval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas |
-| J11033+359default  | M1.5\,V |       <= 2.0 | J11033+359serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas  |
-| J19169+051Ndefault | M2.5\,V |       <= 2.0 | J19169+051Nserval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas |
-| J07274+052default  | M3.5\,V |       <= 2.0 | J07274+052serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas  |
-| J13229+244default  | M4.0\,V |       <= 2.0 | J13229+244serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas  |
-| J20260+585default  | M5.0\,V |       <= 2.0 | J20260+585serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas  |
-| J10564+070default  | M6.0\,V |          2.9 | J10564+070serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas  |
-| J02530+168default  | M7.0\,V |       <= 2.0 | J02530+168serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas  |
+| Mask ID            | SpT    | vsini [km/s] | Mask file                                                                                       |
+| ------------------ | ------ | ------------ | ----------------------------------------------------------------------------------------------- |
+| J12123+544Sdefault | M0.0 V |       <= 2.0 | J12123+544Sserval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas |
+| J11033+359default  | M1.5 V |       <= 2.0 | J11033+359serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas  |
+| J19169+051Ndefault | M2.5 V |       <= 2.0 | J19169+051Nserval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas |
+| J07274+052default  | M3.5 V |       <= 2.0 | J07274+052serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas  |
+| J13229+244default  | M4.0 V |       <= 2.0 | J13229+244serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas  |
+| J20260+585default  | M5.0 V |       <= 2.0 | J20260+585serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas  |
+| J10564+070default  | M6.0 V |          2.9 | J10564+070serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas  |
+| J02530+168default  | M7.0 V |       <= 2.0 | J02530+168serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas  |
