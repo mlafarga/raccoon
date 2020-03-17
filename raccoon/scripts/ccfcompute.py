@@ -448,7 +448,7 @@ def main():
                 'sptmask': args.sptmask,
                 'vsinimask': args.vsinimask,
             }
-
+            verboseprint('\nMask: ', datamask['filmask'])
         # Mask-selection file
         else:
             verboseprint('\nSelecting mask from list in: {}'.format(args.filmask))

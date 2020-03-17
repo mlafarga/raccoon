@@ -28,14 +28,16 @@ setup(
     keywords='CCF spectroscopy RV activity',
     # package_dir={'': 'raccoon'},
     # packages=['raccoon'],
-    packages=setuptools.find_packages(),
+    packages=setuptools.find_packages(),  # better for scripts
     # python_requires='>=3.6',
     setup_requires=['numpy', 'scipy'],  # need for fortran
     install_requires=['numpy', 'scipy', 'astropy', 'pandas', 'lmfit', 'progress', 'matplotlib'],
 
     package_data={
-        "raccoon": ["data/tellurics/*.dat", "data/mask/*.mas", "data/mask/*.pkl", "data/mask/*.dat", "data/phoenix/*.fits", ],
+        # 'raccoon': ["data/*.dat", "data/*.mas", "data/*.fits", ],
+        'raccoon': ['data/*.dat', "data/tellurics/*.dat", "data/mask/*.mas", "data/mask/*.pkl", "data/mask/*.dat", "data/phoenix/*.fits", ],
     },
+    include_package_data=True,  #  get data from MANIFEST.in
 
     # scripts=['scripts/ccf_compute.py', 'scripts/mask_compute.py'],
     entry_points={
