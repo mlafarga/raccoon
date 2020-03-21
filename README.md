@@ -74,7 +74,6 @@ raccoonccf -h
 
 Here is a basic example of how to run the script with recommended options:
 ```bash
-cd raccoon
 raccoonccf PATH/TO/OBS/car*vis_A.fits CARM_VIS J07274+052default --obj OBJ --filtell default --rvshift header --fcorrorders obshighsnr --ords_use 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 --plot_sv --verbose
 ```
 
@@ -88,7 +87,6 @@ Outputs:
 Example for CARMENES VIS data:
 
 ```bash
-cd raccoon
 raccoonmask PATH/TO/TPL.fits TPL_TYPE OBJ --inst CARM_VIS --tplrv 10. --cont poly --contfiltmed 1 --contfiltmax 400 --contpolyord 2 -line_fwhmmin 2.00 --line_fwhmmax 30.00 --line_contrastminmin 0.06 --line_depthw_percentdeepest 0.10 --line_depthw_depthmaxquantile 0.6 --verbose
 ```
 

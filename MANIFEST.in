@@ -1,6 +1,2 @@
-graft raccoon/data/
-graft raccoon/data/tellurics/
-graft raccoon/data/mask/
-graft raccoon/data/mask/CARM_VIS/
-graft raccoon/data/mask/CARM_NIR/
-graft raccoon/data/phoenix/
+include README.md LICENSE
+graft raccoon/data

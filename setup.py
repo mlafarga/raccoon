@@ -11,7 +11,8 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 # Fortran module
 ccflibfort = Extension(name='raccoon.ccflibfort', sources=['raccoon/ccflibfort.f'])
 
-setup(
+# setup(
+setuptools.setup(
     name='raccoon',
     version="0.0.1",
     description='Radial velocities and Activity indicators from Cross-COrrelatiON with masks',
@@ -24,20 +25,22 @@ setup(
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3.6',
+        "Intended Audience :: Science/Research",
+        "Topic :: Scientific/Engineering :: Astronomy",
     ],
     keywords='CCF spectroscopy RV activity',
-    # package_dir={'': 'raccoon'},
+    package_dir={'raccoon': 'raccoon'},
     # packages=['raccoon'],
     packages=setuptools.find_packages(),  # better for scripts
     # python_requires='>=3.6',
     setup_requires=['numpy', 'scipy'],  # need for fortran
     install_requires=['numpy', 'scipy', 'astropy', 'pandas', 'lmfit', 'progress', 'matplotlib'],
 
-    package_data={
-        # 'raccoon': ["data/*.dat", "data/*.mas", "data/*.fits", ],
-        'raccoon': ['data/*.dat', "data/tellurics/*.dat", "data/mask/*.mas", "data/mask/*.pkl", "data/mask/*.dat", "data/phoenix/*.fits", ],
-    },
-    include_package_data=True,  #  get data from MANIFEST.in
+    # package_data={
+    #     # 'raccoon': ["data/*.dat", "data/*.mas", "data/*.fits", ],
+    #     'raccoon': ['data/*.dat', "data/tellurics/*.dat", "data/mask/*.mas", "data/mask/*.pkl", "data/mask/*.dat", "data/phoenix/*.fits", ],
+    # },
+    include_package_data=True,  # get data from MANIFEST.in
 
     # scripts=['scripts/ccf_compute.py', 'scripts/mask_compute.py'],
     entry_points={

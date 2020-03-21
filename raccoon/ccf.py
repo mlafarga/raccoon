@@ -24,10 +24,11 @@ from . import ccflibfort
 # elif 'debian' in distro: from raccoon import ccflibfort77debian as ccflibfort
 # else: import ccflibfort77 as ccflibfort
 
-# here = os.path.dirname(os.path.realpath(__file__))
-import pkg_resources
-# here = pkg_resources.resource_filename(__name__, 'data/mask/CARM_VIS/')
-here = pkg_resources.resource_filename('raccoon', 'data/')
+# dirhere = os.path.dirname(os.path.realpath(__file__))
+dirhere = os.path.abspath(os.path.dirname(__file__))
+# import pkg_resources
+# # dirhere = pkg_resources.resource_filename(__name__, 'data/mask/CARM_VIS/')
+# dirhere = pkg_resources.resource_filename('raccoon', 'data/')
 
 ###############################################################################
 
@@ -618,8 +619,7 @@ def selectmask_carmenesgto(filmask, spt, vsini, sptdefault='M3.5', vsinidefault=
 
 def showmask_default():
     """List avalilable masks"""
-    # lisinst = glob.glob(os.path.join(here, 'data/mask/*'))
-    lisinst = glob.glob(os.path.join(here, 'mask/*'))
+    lisinst = glob.glob(os.path.join(dirhere, 'data/mask/*'))
     print('List available masks for different instruments')
     for inst in lisinst:
         print(os.path.basename(inst))
@@ -634,28 +634,28 @@ def listmask_default():
     dictmask = {
         'CARM_VIS': {
             # Mask ID, SpT, vsini [km/s], Mask file
-            'J12123+544Sdefault': {'sptmask': 'M0.0V', 'vsinimask': '2.0', 'objmask': 'J12123+544S', 'filmask': os.path.join(here, 'mask/CARM_VIS/', 'J12123+544Sserval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
-            'J11033+359default': {'sptmask': 'M1.5V', 'vsinimask': '2.0', 'objmask': 'J11033+359', 'filmask': os.path.join(here, 'mask/CARM_VIS/', 'J11033+359serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
-            'J19169+051Ndefault': {'sptmask': 'M2.5V', 'vsinimask': '2.0', 'objmask': 'J19169+051N', 'filmask': os.path.join(here, 'mask/CARM_VIS/', 'J19169+051Nserval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
-            'J07274+052default': {'sptmask': 'M3.5V', 'vsinimask': '2.0', 'objmask': 'J07274+052', 'filmask': os.path.join(here, 'mask/CARM_VIS/', 'J07274+052serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
-            # 'J13229+244default': {'sptmask': 'M4.0V', 'vsinimask': '2.0', 'objmask': 'J13229+244', 'filmask': os.path.join(here, 'mask/CARM_VIS/', 'J13229+244serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
-            'J13229+244default': {'sptmask': 'M4.0V', 'vsinimask': '2.0', 'objmask': 'J13229+244', 'filmask': pkg_resources.resource_filename('raccoon', 'data/mask/CARM_VIS/J13229+244serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
+            'J12123+544Sdefault': {'sptmask': 'M0.0V', 'vsinimask': '2.0', 'objmask': 'J12123+544S', 'filmask': os.path.join(dirhere, 'data/mask/CARM_VIS/', 'J12123+544Sserval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
+            'J11033+359default': {'sptmask': 'M1.5V', 'vsinimask': '2.0', 'objmask': 'J11033+359', 'filmask': os.path.join(dirhere, 'data/mask/CARM_VIS/', 'J11033+359serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
+            'J19169+051Ndefault': {'sptmask': 'M2.5V', 'vsinimask': '2.0', 'objmask': 'J19169+051N', 'filmask': os.path.join(dirhere, 'data/mask/CARM_VIS/', 'J19169+051Nserval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
+            'J07274+052default': {'sptmask': 'M3.5V', 'vsinimask': '2.0', 'objmask': 'J07274+052', 'filmask': os.path.join(dirhere, 'data/mask/CARM_VIS/', 'J07274+052serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
+            'J13229+244default': {'sptmask': 'M4.0V', 'vsinimask': '2.0', 'objmask': 'J13229+244', 'filmask': os.path.join(dirhere, 'data/mask/CARM_VIS/', 'J13229+244serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
+            # 'J13229+244default': {'sptmask': 'M4.0V', 'vsinimask': '2.0', 'objmask': 'J13229+244', 'filmask': pkg_resources.resource_filename('raccoon', 'data/mask/CARM_VIS/J13229+244serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
             # 'J13229+244default': {'sptmask': 'M4.0V', 'vsinimask': '2.0', 'objmask': 'J13229+244', 'filmask': pkg_resources.resource_filename('raccoon', 'data/J13229+244serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
             # 'J13229+244default': {'sptmask': 'M4.0V', 'vsinimask': '2.0', 'objmask': 'J13229+244', 'filmask': pkg_resources.resource_filename(pkg_resources.Requirement.parse("raccoon"), 'data/mask/CARM_VIS/J13229+244serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
-            'J20260+585default': {'sptmask': 'M5.0V', 'vsinimask': '2.0', 'objmask': 'J20260+585', 'filmask': os.path.join(here, 'mask/CARM_VIS/', 'J20260+585serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
-            'J10564+070default': {'sptmask': 'M6.0V', 'vsinimask': '2.9', 'objmask': 'J10564+070', 'filmask': os.path.join(here, 'mask/CARM_VIS/', 'J10564+070serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
-            'J02530+168default': {'sptmask': 'M7.0V', 'vsinimask': '2.0', 'objmask': 'J02530+168', 'filmask': os.path.join(here, 'mask/CARM_VIS/', 'J02530+168serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
+            'J20260+585default': {'sptmask': 'M5.0V', 'vsinimask': '2.0', 'objmask': 'J20260+585', 'filmask': os.path.join(dirhere, 'data/mask/CARM_VIS/', 'J20260+585serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
+            'J10564+070default': {'sptmask': 'M6.0V', 'vsinimask': '2.9', 'objmask': 'J10564+070', 'filmask': os.path.join(dirhere, 'data/mask/CARM_VIS/', 'J10564+070serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
+            'J02530+168default': {'sptmask': 'M7.0V', 'vsinimask': '2.0', 'objmask': 'J02530+168', 'filmask': os.path.join(dirhere, 'data/mask/CARM_VIS/', 'J02530+168serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
         },
         'CARM_NIR': {
             # Mask ID, SpT, vsini [km/s], Mask file
-            'J12123+544Sdefault': {'sptmask': 'M0.0V', 'vsinimask': '2.0', 'objmask': 'J12123+544S', 'filmask': os.path.join(here, 'mask/CARM_NIR/', 'J12123+544Sserval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
-            'J11033+359default': {'sptmask': 'M1.5V', 'vsinimask': '2.0', 'objmask': 'J11033+359', 'filmask': os.path.join(here, 'mask/CARM_NIR/', 'J11033+359serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
-            'J19169+051Ndefault': {'sptmask': 'M2.5V', 'vsinimask': '2.0', 'objmask': 'J19169+051N', 'filmask': os.path.join(here, 'mask/CARM_NIR/', 'J19169+051Nserval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
-            'J07274+052default': {'sptmask': 'M3.5V', 'vsinimask': '2.0', 'objmask': 'J07274+052', 'filmask': os.path.join(here, 'mask/CARM_NIR/', 'J07274+052serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
-            'J13229+244default': {'sptmask': 'M4.0V', 'vsinimask': '2.0', 'objmask': 'J13229+244', 'filmask': os.path.join(here, 'mask/CARM_NIR/', 'J13229+244serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
-            'J20260+585default': {'sptmask': 'M5.0V', 'vsinimask': '2.0', 'objmask': 'J20260+585', 'filmask': os.path.join(here, 'mask/CARM_NIR/', 'J20260+585serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
-            'J10564+070default': {'sptmask': 'M6.0V', 'vsinimask': '2.9', 'objmask': 'J10564+070', 'filmask': os.path.join(here, 'mask/CARM_NIR/', 'J10564+070serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
-            'J02530+168default': {'sptmask': 'M7.0V', 'vsinimask': '2.0', 'objmask': 'J02530+168', 'filmask': os.path.join(here, 'mask/CARM_NIR/', 'J02530+168serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
+            'J12123+544Sdefault': {'sptmask': 'M0.0V', 'vsinimask': '2.0', 'objmask': 'J12123+544S', 'filmask': os.path.join(dirhere, 'data/mask/CARM_NIR/', 'J12123+544Sserval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
+            'J11033+359default': {'sptmask': 'M1.5V', 'vsinimask': '2.0', 'objmask': 'J11033+359', 'filmask': os.path.join(dirhere, 'data/mask/CARM_NIR/', 'J11033+359serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
+            'J19169+051Ndefault': {'sptmask': 'M2.5V', 'vsinimask': '2.0', 'objmask': 'J19169+051N', 'filmask': os.path.join(dirhere, 'data/mask/CARM_NIR/', 'J19169+051Nserval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
+            'J07274+052default': {'sptmask': 'M3.5V', 'vsinimask': '2.0', 'objmask': 'J07274+052', 'filmask': os.path.join(dirhere, 'data/mask/CARM_NIR/', 'J07274+052serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
+            'J13229+244default': {'sptmask': 'M4.0V', 'vsinimask': '2.0', 'objmask': 'J13229+244', 'filmask': os.path.join(dirhere, 'data/mask/CARM_NIR/', 'J13229+244serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
+            'J20260+585default': {'sptmask': 'M5.0V', 'vsinimask': '2.0', 'objmask': 'J20260+585', 'filmask': os.path.join(dirhere, 'data/mask/CARM_NIR/', 'J20260+585serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
+            'J10564+070default': {'sptmask': 'M6.0V', 'vsinimask': '2.9', 'objmask': 'J10564+070', 'filmask': os.path.join(dirhere, 'data/mask/CARM_NIR/', 'J10564+070serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
+            'J02530+168default': {'sptmask': 'M7.0V', 'vsinimask': '2.0', 'objmask': 'J02530+168', 'filmask': os.path.join(dirhere, 'data/mask/CARM_NIR/', 'J02530+168serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
         }
     }
     return dictmask
@@ -670,14 +670,14 @@ def selectmask_default(maskid, inst):
 
 def selecttell_default(inst):
     dicttell = {
-        'CARM_VIS': os.path.join(here, 'tellurics/CARM_VIS/telluric_mask_carm_short.dat'),
-        'CARM_NIR': os.path.join(here, 'tellurics/CARM_NIR/telluric_mask_nir4.dat'),
+        'CARM_VIS': os.path.join(dirhere, 'data/tellurics/CARM_VIS/telluric_mask_carm_short.dat'),
+        'CARM_NIR': os.path.join(dirhere, 'data/tellurics/CARM_NIR/telluric_mask_nir4.dat'),
     }
     tell = dicttell[inst]
     return tell
 
 
-def selectfilphoenixf(spt, dirin=os.path.join(here, 'phoenix/')):
+def selectfilphoenixf(spt, dirin=os.path.join(dirhere, 'data/phoenix/')):
     """
     - lte02900-5.00-0.0.PHOENIX-ACES-AGSS-COND-2011-HiRes.fits
     - lte03000-5.00-0.0.PHOENIX-ACES-AGSS-COND-2011-HiRes.fits
