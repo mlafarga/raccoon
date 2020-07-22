@@ -231,7 +231,7 @@ def main():
         lisfilobs = args.fil_or_list_spec
     # - file with list in input
     else:
-        # Read names of the files to be downloaded
+        # Read names of the files
         args.fil_or_list_spec = os.path.expanduser(args.fil_or_list_spec[0])
         lisfilobs = np.loadtxt(args.fil_or_list_spec, dtype='str', usecols=[0])
 
@@ -972,7 +972,6 @@ def main():
         if args.inst == 'CARM_VIS' or args.inst == 'CARM_NIR':
             c = [np.ones(len(w[o])) for o in ords]
 
-        # Check HARPS scripts!!!!!!!!!!!!!!!!!!!!!!!!!
         # HARPS correct order slope with a line
         if args.inst == 'HARPS' or args.inst == 'HARPN':
             # TODO: fit only line max

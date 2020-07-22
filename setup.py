@@ -11,8 +11,8 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 # Fortran module
 ccflibfort = Extension(name='raccoon.ccflibfort', sources=['raccoon/ccflibfort.f'])
 
-# setup(
-setuptools.setup(
+setup(
+# setuptools.setup(
     name='raccoon',
     version="0.0.1",
     description='Radial velocities and Activity indicators from Cross-COrrelatiON with masks',
