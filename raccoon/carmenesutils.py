@@ -372,7 +372,8 @@ def caracal_rvcorrection(filin, use_berv=True, use_drift=True, notfound=np.nan):
         if np.isfinite(v):
             shifterr += v**2
         else:
-            print('Warning: {}={}. No {} correction error applied!'.format(k, v, k))
+            if k != 'berverr':
+                print('Warning: {}={}. No {} correction error applied!'.format(k, v, k))
     shifterr = np.sqrt(shifterr)
 
     dicshift.update(dicshifterr)  # Merge dictionaries
@@ -577,7 +578,7 @@ def caracal_exptime(filin, notfound=np.nan, ext=0, outfmt='single'):
 
 
 def caracal_exptime_lisobs(lisobs, notfound=np.nan, ext=0):
-    """Get the readout noise from FITS header ('EXPTIME') [s] for the observations in `lisobs`.
+    """Get the exposure time from FITS header ('EXPTIME') [s] for the observations in `lisobs`.
 
     Returns
     -------

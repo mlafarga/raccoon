@@ -14,6 +14,7 @@ import pandas as pd
 
 from . import carmenesutils
 from . import harpsutils
+from . import expresutils
 
 ###############################################################################
 
@@ -26,6 +27,7 @@ dicres = {
     'CARM_NIR': 80400,
     'HARPS': 115000,
     'HARPN': 115000,
+    'EXPRES': 150000,
 }
 
 # Number of orders
@@ -34,6 +36,7 @@ dicnord = {
     'CARM_NIR': 28,
     'HARPS': 72,
     'HARPN': 69,
+    'EXPRES': 86,
 }
 
 
@@ -66,6 +69,7 @@ dicoref = {
    'CARM_NIR': 11,  # This is the double already
    'HARPS': 55,
    'HARPN': 55,
+   'EXPRES': 65,  # ?
 }
 
 
@@ -91,13 +95,14 @@ def inst_oref(inst, carmnirsplit=True, notfound=None, verb=True):
     return oref
 
 
-# RV per pixel
+# RV per pixel [km/s]
 
 dicrvpixmed = {
     'CARM_VIS': 1.258,
     'CARM_NIR': 1.356,
     'HARPS': 0.820,
     'HARPN': 0.820,
+    'EXPRES': 0.500,
 }
 
 
@@ -126,7 +131,14 @@ def inst_rvpixmed(inst, notfound=None, verb=True):
 # ---------------
 
 # Read reduced spectrum
-def fitsred_read(filin, inst, carmnirdiv=True, harpblaze=True, dirblaze=None, filblaze=None):
+def fitsred_read(filin, inst, 
+    # CARMENES
+    carmnirdiv=True, 
+    # HARPS/N
+    harpblaze=True, dirblaze=None, filblaze=None,
+    # EXPRES
+    expresw='bary_excalibur',
+    ):
     """
     Parameters
     ----------
@@ -144,17 +156,33 @@ def fitsred_read(filin, inst, carmnirdiv=True, harpblaze=True, dirblaze=None, fi
     """
     if inst == 'CARM_VIS':
         w, f, sf, c, header = carmenesutils.caracal_fitsred_read(filin)
+        dataextra = {}
     elif inst == 'CARM_NIR':
         w, f, sf, c, header = carmenesutils.caracal_fitsred_read(filin)
+        dataextra = {}
         if carmnirdiv:
             # w, f, sf, c = carmenesutils.caracal_fitsrednir_divide_ords(w=w, f=f, sf=sf, c=c)
             a = carmenesutils.caracal_fitsrednir_divide_ords(w=w, f=f, sf=sf, c=c)
             w, f, sf, c = a['w'], a['f'], a['sf'], a['c']
+
     elif inst == 'HARPS' or inst == 'HARPN':
         w, f, c, header, _ = harpsutils.drs_e2dsred_read(filin, readblaze=harpblaze, dirblaze=dirblaze, filblaze=filblaze, inst=inst)
         sf = np.zeros_like(w)
+        dataextra = {}
 
-    return w, f, sf, c, header
+    elif inst == 'EXPRES':
+        w, wcb, we, wecb, mwecb, f, sf, c, b, mf, header, header1, header2 = expresutils.drs_fitsred_read(filin)
+        if expresw == 'bary_excalibur':
+            w = wecb
+        elif expresw == 'excalibur':
+            w = we
+        elif expresw == 'bary_wavelength':
+            w = w
+        elif expresw == 'wavelength':
+            w = wcb
+        dataextra = {'blaze': b, 'pixel_mask': mf, 'excalibur_mask': mwecb, 'header1': header1, 'header2': header2}
+
+    return w, f, sf, c, header, dataextra
 
 # -----------------------------------------------------------------------------
 
@@ -177,13 +205,14 @@ def header_bjd_lisobs(lisobs, inst, name='bjd', notfound=np.nan, ext=0):
         # # Change column names
         # if name is not None:
         #     lisbjd.rename(columns={'HIERARCH CARACAL BJD': name}, inplace=True)
-
     elif inst == 'HARPS' or inst == 'HARPN':
         lisbjd = harpsutils.drs_bjd_lisobs(lisobs, inst, notfound=notfound, ext=ext, name=name)
         # # Change column names
         # if name is not None:
         #     kwinst = harpsutils.headerkwinst(inst, outfail=np.nan)
         #     lisbjd.rename(columns={kwinst + 'DRS BJD': name}, inplace=True)
+    elif inst == 'EXPRES':
+        lisbjd = expresutils.drs_bjd_lisobs(lisobs, notfound=notfound, ext=ext, name=name)
     return lisbjd
 
 
@@ -216,6 +245,10 @@ def header_ron_lisobs(lisobs, inst, name='ron', notfound=np.nan, ext=0):
             kwinst = harpsutils.headerkwinst(inst, outfail=np.nan)
             lisron.rename(columns={kwinst + 'DRS CCD SIGDET': name}, inplace=True)
 
+    elif inst == 'EXPRES':
+        # TODO: set to 0 for now
+        lisron = pd.DataFrame(np.zeros_like(lisobs, dtype=float), columns=[name], index=lisobs)
+
     return lisron
 
 
@@ -232,6 +265,9 @@ def header_exptime_lisobs(lisobs, inst, name='exptime', notfound=np.nan, ext=0):
         # Change column names
         if name is not None:
             lisexptime.rename(columns={'EXPTIME': name}, inplace=True)
+
+    if inst == 'EXPRES':
+        lisexptime = expresutils.drs_exptime_lisobs(lisobs, notfound=notfound, ext=ext, name=name)
 
     return lisexptime
 
@@ -250,6 +286,9 @@ def header_airmass_lisobs(lisobs, inst, name='airmass', notfound=np.nan, ext=0):
         if name is not None:
             lisairmass.rename(columns={'AIRMASS': name}, inplace=True)
 
+    elif inst == 'EXPRES':
+        lisairmass = expresutils.drs_airmass_lisobs(lisobs, notfound=notfound, ext=ext, name=name)
+
     return lisairmass
 
 
@@ -260,7 +299,7 @@ def header_snr_lisobs(lisobs, inst, name='snro', ords=None, notfound=np.nan, ext
 
     Parameters
     ----------
-    name : {'ord', snro'} or None
+    name : {'ord', 'snro'} or None
         Change to pandas dataframe column name. If `ord`, change to the order number (an int, e.g. 36). If `snro`, change to e.g. `snro36`. If None, keep the header keyword as the column name.
     """
     if inst == 'CARM_VIS' or inst == 'CARM_NIR':
@@ -283,6 +322,10 @@ def header_snr_lisobs(lisobs, inst, name='snro', ords=None, notfound=np.nan, ext
             elif name == 'snro':
                 changecol = {i: i.replace('{}DRS SPE EXT SN'.format(kwinst), 'snro') for i in lissnr.columns}
             lissnr.rename(columns=changecol, inplace=True)
+
+    elif inst == 'EXPRES':
+        # EXPRES S/N not in FITS header, get from spectrum
+        lissnr = expresutils.drs_snr_lisobs(lisobs, ords, name=name)
 
     return lissnr
 
