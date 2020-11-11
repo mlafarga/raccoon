@@ -868,6 +868,17 @@ def main():
     # f = f[:, args.pmin:pmaxp]
     # sf = sf[:, args.pmin:pmaxp]
     # c = c[:, args.pmin:pmaxp]
+    # if args.inst == 'EXPRES':
+    #     dataextra['pixel_mask'] = dataextra['pixel_mask'][:, args.pmin:pmaxp]
+    #     dataextra['excalibur_mask'] = dataextra['excalibur_mask'][:, args.pmin:pmaxp]
+
+    # # EXPRES use own mask to remove bad pixels
+    # if args.inst == 'EXPRES':
+    #     w = expresutils.apply_expres_masks_array(w, dataextra['pixel_mask'], excalibur_mask=dataextra['excalibur_mask'] if args.expresw == 'bary_excalibur' or args.expresw == 'excalibur' else None)
+
+    # EXPRES change w=0 to w=nan
+    if args.inst == 'EXPRES':
+        w[w == 0.] = np.nan
 
     womin = np.nanmin(w, axis=1)
     womax = np.nanmax(w, axis=1)
@@ -909,6 +920,15 @@ def main():
 
     # Number of lines per order
     nlinords = [len(o) for o in wmords]
+
+    # fig, ax = plt.subplots()
+    # for o in args.ords_use:
+    #     ax.plot(w[o], f[o])
+    #     ax.vlines(wmords[o], 0, fmords[o])
+    # plt.tight_layout()
+    # plt.show()
+    # plt.close()
+    # sys.exit()
 
     # Total number of lines (including duplicates due to order overlap)
     nlin = len(wmall)
