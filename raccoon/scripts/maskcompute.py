@@ -65,7 +65,7 @@ def parse_args():
 
     parser.add_argument('obj', help='ID', type=str)
 
-    parser.add_argument('--inst', choices=['CARM_VIS', 'CARM_NIR', 'HARPS'])
+    parser.add_argument('--inst', choices=['CARM_VIS', 'CARM_NIR', 'HARPS', 'HARPN'])
 
     # Mask shift to RV 0
     # Shift mask by `--tplrv`.
@@ -281,8 +281,8 @@ def main():
         nord = 1
         ords = np.array([0])
 
-        ###### TEST
-        w, f = [w[0][760000:810000]], [f[0][760000:810000]]
+        # ###### TEST
+        # w, f = [w[0][760000:810000]], [f[0][760000:810000]]
 
     if args.ords_use is None: args.ords_use = ords
     else: args.ords_use = np.asarray(args.ords_use, dtype=int)
