@@ -10,6 +10,7 @@ import os
 import sys
 import textwrap
 
+import ipdb
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
@@ -17,6 +18,7 @@ import pandas as pd
 
 from raccoon import ccf as ccflib
 from raccoon import carmenesutils
+from raccoon import expresutils
 from raccoon import peakutils
 from raccoon import plotutils
 from raccoon import pyutils
@@ -52,10 +54,12 @@ def parse_args():
 
     # Spectra
     parser.add_argument('fil_or_list_spec', help='File with the names of the reduced FITS spectra or directly the file names (names must include the absolute path to the files). The file with the list cannot end in `.fits`.', nargs='+', type=str)
-    parser.add_argument('inst', choices=['HARPS', 'HARPN', 'CARM_VIS', 'CARM_NIR'], help='Instrument.')
+    parser.add_argument('inst', choices=['HARPS', 'HARPN', 'CARM_VIS', 'CARM_NIR', 'EXPRES'], help='Instrument.')
 
     parser.add_argument('--filobs2blaze', help='List of blaze file corresponding to each observation. Format: Column 1) filspec (e2ds), Column 2) filblaze. Full paths. For HARPS/N data. Needed if do not want to use the default from the header. If None, get file names from each observation header.', type=str, default=None)
     # parser.add_argument('--dirblaze', help='Directory containing blaze files. For HARPS/N data.', type=str, default=None)
+
+    parser.add_argument('--expresw', choices=['wavelength', 'bary_wavelength', 'excalibur', 'bary_excalibur'], help='EXPRES wavelength.', default='bary_excalibur')
 
     # Mask
     parser.add_argument('filmask', help='Path to custom mask file (file with extension `.mas`), or mask ID to use one of the default masks, or (CARM GTO) path to "mask selection file" (file with any other extension that specifies the masks available to choose from). Mask file format: Columns: 0) w (wavelengths), 1) f (weights), separated by whitespaces. Mask-selection file format: Columns: 0) object used to make the mask `objmask`, 1) spectral type of `objmask`, 2) `vsini` of `objmask`, 3) path to mask file (`.mas` extension). There can only be one mask file for each combination of spt-vsini. TODO: Only spt is used to select the mask (not the vsini).', type=str)
@@ -190,7 +194,9 @@ def main():
         # pixmin = 0
         # pixmax = 4096
         npix = 4096
-        pix = np.arange(0, npix, 1)
+    elif args.inst == 'EXPRES':
+        npix = 7920
+    pix = np.arange(0, npix, 1)
 
     # Check extreme pixels to remove inside limits
     if args.pmin is not None:
@@ -290,7 +296,7 @@ def main():
 
     # BJD
     if args.bjd == 'header':
-        lisbjd = spectrographutils.header_bjd_lisobs(lisfilobs, args.inst, name='bjd', notfound=np.nan, ext=0)
+        lisbjd = spectrographutils.header_bjd_lisobs(lisfilobs, args.inst, name='bjd', notfound=np.nan, ext=2 if args.inst == 'EXPRES' else 0)
     elif args.bjd == 'serval':
         # Read SERVAL data
         dataserval = carmenesutils.serval_get(args.dirserval, obj=args.obj, lisdataid=['rvc', 'info'], inst=args.inst)
@@ -307,13 +313,14 @@ def main():
     # elif args.bjd == 'serval_header':
     #     pass
 
+
     # RV corrections
     if args.rvshift is not None:
         _, _, lisshift = spectrographutils.serval_header_rvcorrection_lisobs(lisfilobs, args.inst, source=args.rvshift, servalin=args.dirserval, obj=args.obj, notfound=np.nan, ext=0)
     else:
-        # TODO: Return Dataframe with all necessary shift columns or make sure function above works for source=None
-        lisshift = np.zeros_like(lisfilobs, dtype=float)
-        sys.exit('RV shift. Not implemented yet!')
+        # lisshift = np.zeros_like(lisfilobs, dtype=float)
+        shiftcols = ['berv', 'drift', 'berverr', 'drifterr', 'shift', 'shifterr', 'obs', 'sa', 'saerr', 'otherdrift', 'otherdrifterr']
+        lisshift = pd.DataFrame(0, columns=shiftcols, index=lisfilobs)
 
     # Make sure index is lisfilobs
     lisshift['filobs'] = lisfilobs
@@ -502,9 +509,13 @@ def main():
 
         # Spectrum
         filblaze = lisobs2blaze[filobsref] if args.filobs2blaze is not None else None
-        w, f, sf, c, header = spectrographutils.fitsred_read(filobsref, args.inst, carmnirdiv=carmnirordssplit, harpblaze=True, dirblaze=None, filblaze=filblaze)
+        w, f, sf, c, header, dataextra = spectrographutils.fitsred_read(filobsref, args.inst, carmnirdiv=carmnirordssplit, harpblaze=True, dirblaze=None, filblaze=filblaze, expresw=args.expresw)
         # nord = len(w)
         # ords = np.arange(0, nord, 1)
+
+        # EXPRES use own mask to remove bad pixels
+        if args.inst == 'EXPRES':
+            w, f, sf, c = expresutils.apply_expres_masks_spec(w, f, sf, c, dataextra['pixel_mask'], excalibur_mask=dataextra['excalibur_mask'] if args.expresw == 'bary_excalibur' or args.expresw == 'excalibur' else None)
 
         # Transform spectra to vacuum (only HARPS/N)
         if args.inst == 'HARPS' or args.inst == 'HARPN':
@@ -513,6 +524,7 @@ def main():
         # Remove pixels with nan or negative wavelengths
         spec_removenan, masknan = spectrumutils.remove_nan_echelle(w, f, sf, c, ords_use=args.ords_use, returntype='original')
         w, f, sf, c = spec_removenan
+
 
         # Correct spectrum wavelength
         shift = dataobs.loc[filobsref]['shift']
@@ -692,7 +704,12 @@ def main():
 
     if args.fcorrorders == 'obshighsnr':
         filblaze = lisobs2blaze[filobsref] if args.filobs2blaze is not None else None
-        w, f, sf, c, header = spectrographutils.fitsred_read(filobsref, args.inst, carmnirdiv=carmnirordssplit, harpblaze=True, dirblaze=None, filblaze=filblaze)
+        w, f, sf, c, header, dataextra = spectrographutils.fitsred_read(filobsref, args.inst, carmnirdiv=carmnirordssplit, harpblaze=True, dirblaze=None, filblaze=filblaze, expresw=args.expresw)
+
+        # EXPRES use own mask to remove bad pixels
+        if args.inst == 'EXPRES':
+            w, f, sf, c = expresutils.apply_expres_masks_spec(w, f, sf, c, dataextra['pixel_mask'], excalibur_mask=dataextra['excalibur_mask'] if args.expresw == 'bary_excalibur' or args.expresw == 'excalibur' else None)
+
         # Cont
         f = [f[o]/c[o] for o in ords]
         # flux_ratios2 = [np.nanmedian(f[o]) / np.nanmedian(f[oref]) for o in ords]
@@ -750,7 +767,7 @@ def main():
             wspecmin, wspecmax = min(np.concatenate(w)), max(np.concatenate(w))
         except:
             filblaze = lisobs2blaze[filobsref] if args.filobs2blaze is not None else None
-            w, f, sf, c, header = spectrographutils.fitsred_read(filobsref, args.inst, carmnirdiv=carmnirordssplit, harpblaze=True, dirblaze=None, filblaze=filblaze)
+            w, f, sf, c, header, dataextra = spectrographutils.fitsred_read(filobsref, args.inst, carmnirdiv=carmnirordssplit, harpblaze=True, dirblaze=None, filblaze=filblaze, expresw=args.expresw)
             # Transform spectra to vacuum (only HARPS/N)
             if args.inst == 'HARPS' or args.inst == 'HARPN':
                 w = spectrumutils.wair2vac(w)
@@ -830,13 +847,13 @@ def main():
     #   or
 
     #   Get them from obsref
-    # w, f, sf, c, header = spectrographutils.fitsred_read(filobsref, args.inst, carmnirdiv=carmnirordssplit, harpblaze=True, dirblaze=None, filblaze=None)
+    # w, f, sf, c, header, dataextra = spectrographutils.fitsred_read(filobsref, args.inst, carmnirdiv=carmnirordssplit, harpblaze=True, dirblaze=None, filblaze=None, expresw=args.expresw)
     filblaze = lisobs2blaze[filobsref] if args.filobs2blaze is not None else None
     # if args.filobs2blaze is not None:
     # filblaze = lisobs2blaze[filobs]
     # else:
     # filblaze = None
-    w, _, _, _, _ = spectrographutils.fitsred_read(filobsref, args.inst, carmnirdiv=carmnirordssplit, harpblaze=True, dirblaze=None, filblaze=filblaze)
+    w, _, _, _, _, _ = spectrographutils.fitsred_read(filobsref, args.inst, carmnirdiv=carmnirordssplit, harpblaze=True, dirblaze=None, filblaze=filblaze, expresw=args.expresw)
     # Transform spectra to vacuum (only HARPS/N)
     if args.inst == 'HARPS' or args.inst == 'HARPN':
         w = spectrumutils.wair2vac(w)
@@ -851,6 +868,17 @@ def main():
     # f = f[:, args.pmin:pmaxp]
     # sf = sf[:, args.pmin:pmaxp]
     # c = c[:, args.pmin:pmaxp]
+    # if args.inst == 'EXPRES':
+    #     dataextra['pixel_mask'] = dataextra['pixel_mask'][:, args.pmin:pmaxp]
+    #     dataextra['excalibur_mask'] = dataextra['excalibur_mask'][:, args.pmin:pmaxp]
+
+    # # EXPRES use own mask to remove bad pixels
+    # if args.inst == 'EXPRES':
+    #     w = expresutils.apply_expres_masks_array(w, dataextra['pixel_mask'], excalibur_mask=dataextra['excalibur_mask'] if args.expresw == 'bary_excalibur' or args.expresw == 'excalibur' else None)
+
+    # EXPRES change w=0 to w=nan
+    if args.inst == 'EXPRES':
+        w[w == 0.] = np.nan
 
     womin = np.nanmin(w, axis=1)
     womax = np.nanmax(w, axis=1)
@@ -893,6 +921,15 @@ def main():
     # Number of lines per order
     nlinords = [len(o) for o in wmords]
 
+    # fig, ax = plt.subplots()
+    # for o in args.ords_use:
+    #     ax.plot(w[o], f[o])
+    #     ax.vlines(wmords[o], 0, fmords[o])
+    # plt.tight_layout()
+    # plt.show()
+    # plt.close()
+    # sys.exit()
+
     # Total number of lines (including duplicates due to order overlap)
     nlin = len(wmall)
     nlin_use = len(wmall_use)
@@ -931,7 +968,7 @@ def main():
             filblaze = None
 
         # Read spectrum
-        w, f, sf, c, header = spectrographutils.fitsred_read(filobs, args.inst, carmnirdiv=True, harpblaze=True, dirblaze=None, filblaze=filblaze)
+        w, f, sf, c, header, dataextra = spectrographutils.fitsred_read(filobs, args.inst, carmnirdiv=True, harpblaze=True, dirblaze=None, filblaze=filblaze, expresw=args.expresw)
         # Transform spectra to vacuum (only HARPS/N)
         if args.inst == 'HARPS' or args.inst == 'HARPN':
             w = spectrumutils.wair2vac(w)
@@ -956,6 +993,10 @@ def main():
         sf = sf[:, args.pmin:pmaxp]
         c = c[:, args.pmin:pmaxp]
 
+        # EXPRES use own mask to remove bad pixels
+        if args.inst == 'EXPRES':
+            w, f, sf, c = expresutils.apply_expres_masks_spec(w, f, sf, c, dataextra['pixel_mask'], excalibur_mask=dataextra['excalibur_mask'] if args.expresw == 'bary_excalibur' or args.expresw == 'excalibur' else None)
+
         # Remove pixels with nan or negative wavelengths
         spec_removenan, masknan = spectrumutils.remove_nan_echelle(w, f, sf, c, ords_use=args.ords_use, returntype='original')
         w, f, sf, c = spec_removenan
@@ -969,7 +1010,7 @@ def main():
         sf = [sf[o]/c[o] for o in ords]
 
         # CARMENES: c = 1
-        if args.inst == 'CARM_VIS' or args.inst == 'CARM_NIR':
+        if args.inst == 'CARM_VIS' or args.inst == 'CARM_NIR' or args.inst == 'EXPRES':
             c = [np.ones(len(w[o])) for o in ords]
 
         # HARPS correct order slope with a line
@@ -993,7 +1034,7 @@ def main():
         # - Flux spikes
 
         # CARMENES (CARACAL) FOX: Reweight flux so that <counts> = SNR^2
-        if args.inst == 'CARM_VIS' or args.inst == 'CARM_NIR':
+        if args.inst == 'CARM_VIS' or args.inst == 'CARM_NIR' or args.inst == 'EXPRES':
             f = [f[o] * dataobs.loc[filobs]['snro{:d}'.format(o)]**2 / np.mean(f[o]) for o in ords]
             # f2 = [f[o] * dataobs.loc[filobs]['snro{:d}'.format(o)]**2 / np.median(f[o]) for o in ords]
 

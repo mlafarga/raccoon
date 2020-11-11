@@ -34,7 +34,7 @@ setup(
     packages=setuptools.find_packages(),  # better for scripts
     # python_requires='>=3.6',
     setup_requires=['numpy', 'scipy'],  # need for fortran
-    install_requires=['numpy', 'scipy', 'astropy', 'pandas', 'lmfit', 'progress', 'matplotlib'],
+    install_requires=['numpy', 'scipy', 'astropy', 'pandas', 'lmfit', 'progress', 'matplotlib', 'ipdb'],
 
     # package_data={
     #     # 'raccoon': ["data/*.dat", "data/*.mas", "data/*.fits", ],

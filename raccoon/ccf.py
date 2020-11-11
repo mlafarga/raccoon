@@ -656,7 +656,10 @@ def listmask_default():
             'J20260+585default': {'sptmask': 'M5.0V', 'vsinimask': '2.0', 'objmask': 'J20260+585', 'filmask': os.path.join(dirhere, 'data/mask/CARM_NIR/', 'J20260+585serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
             'J10564+070default': {'sptmask': 'M6.0V', 'vsinimask': '2.9', 'objmask': 'J10564+070', 'filmask': os.path.join(dirhere, 'data/mask/CARM_NIR/', 'J10564+070serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
             'J02530+168default': {'sptmask': 'M7.0V', 'vsinimask': '2.0', 'objmask': 'J02530+168', 'filmask': os.path.join(dirhere, 'data/mask/CARM_NIR/', 'J02530+168serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas')},
-        }
+        },
+        'HARPS': {},
+        'HARPN': {},
+        'EXPRES': {},
     }
     return dictmask
 

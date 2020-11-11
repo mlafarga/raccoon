@@ -11,6 +11,7 @@ import sys
 import textwrap
 # import time
 
+import ipdb
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
@@ -60,11 +61,11 @@ def parse_args():
 
     # Template
     parser.add_argument('filtpl', help='File containing the spectrum template to be used to construct the mask', type=str, default=None)
-    parser.add_argument('tpltype', choices=['serval', 'phoenix', 'other'], help='', type=str)  # 'custommatrix', 'customstepctn'
+    parser.add_argument('tpltype', choices=['serval', 'phoenix', '1dtxt'], help='', type=str)  # 'custommatrix', 'customstepctn'
 
     parser.add_argument('obj', help='ID', type=str)
 
-    parser.add_argument('--inst', choices=['CARM_VIS', 'CARM_NIR', 'HARPS'])
+    parser.add_argument('--inst', choices=['CARM_VIS', 'CARM_NIR', 'HARPS', 'HARPN'])
 
     # Mask shift to RV 0
     # Shift mask by `--tplrv`.
@@ -72,7 +73,7 @@ def parse_args():
     parser.add_argument('--tplrv', help='Template RV. Options: a) float [km/s], b) carmencita. If None (default), the mask will be shifted 0 km/s. If carmencita data in NaN, the shift will be 0.', default=None, type=str)
 
     # CARMENES data
-    parser.add_argument('--dircarmencita', help='Absolute path.', default='PhDnew/Data/CARMENES_GTO/carmencita/')
+    parser.add_argument('--dircarmencita', help='Absolute path.', default=None)
     parser.add_argument('--carmencitaversion', help='', default=None)
 
     # PHOENIX
@@ -157,7 +158,7 @@ def parse_args():
     parser.add_argument('--joinord', choices=['keepred', 'merge'], help='How to join the orders. If `keepred`, keep the redder order lines in the overlap region (bluer part of the orders more noisy), if `merge`, merge blue and red extremes of consecutive orders', default='merge')
 
     # Outputs
-    parser.add_argument('--dirout', help='General output directory. Absolute path.', type=str, default='./')
+    parser.add_argument('--dirout', help='General output directory. Absolute path.', type=str, default='./mask_output/')
     parser.add_argument('--dirout_minfit', help='Output directory of the minima fit results, inside DIROUT (DIROUT/DIROUT_MINFIT/) ', type=str, default='minfit/')
     parser.add_argument('--dirout_tpl', help='Output directory of the processed template, inside DIROUT (DIROUT/DIROUT_TPL/) ', type=str, default='./')
     parser.add_argument('--dirout_mask', help='Output directory of the mask, inside DIROUT (DIROUT/DIROUT_MASK/) ', type=str, default='./')
@@ -268,15 +269,20 @@ def main():
     elif args.tpltype == 'phoenix':
         sys.exit('Template type is phoenix. Not implemented yet!')
         # TO DO: in parser, specify option for phoenix files
-        w, f = phoenixutils.read_phoenixfits(filw, filf)
+        # w, f = phoenixutils.read_phoenixfits(filw, filf)
         nord = 1
-        ords = np.array([1])
+        ords = np.array([0])
 
-    elif args.tpltype == 'other':
-        sys.exit('Template type is other. Not implemented yet!')
-        pass
+    elif args.tpltype == '1dtxt':
+        w, f = np.loadtxt(args.filtpl, unpack=True)
+        # sys.exit('Template type is other. Not implemented yet!')
+        # pass
+        w, f = [w], [f]
         nord = 1
-        ords = np.array([1])
+        ords = np.array([0])
+
+        # ###### TEST
+        # w, f = [w[0][760000:810000]], [f[0][760000:810000]]
 
     if args.ords_use is None: args.ords_use = ords
     else: args.ords_use = np.asarray(args.ords_use, dtype=int)
@@ -1097,133 +1103,139 @@ def main():
     # Join orders
     verboseprint('\nJoin orders')
 
-    if args.joinord == 'merge':
+    # only data with more than 1 order
+    if len(datafit_final) > 1:
+        if args.joinord == 'merge':
 
-        # Join merging blue and red extremes of consecutive orders
-        wm_join, fm_join = [], []
-        lineseparationlimit = args.dwmin
+            # Join merging blue and red extremes of consecutive orders
+            wm_join, fm_join = [], []
+            lineseparationlimit = args.dwmin
 
-        for i in range(len(args.ords_use)):
+            for i in range(len(args.ords_use)):
 
-            # Current order
-            o = args.ords_use[i]
-            # Previous order
-            if o == args.ords_use[0]: oprev = np.nan
-            else: oprev = args.ords_use[i-1]
-            # Next order
-            if o == args.ords_use[-1]: onext = np.nan
-            else: onext = onext = args.ords_use[i+1]
+                # Current order
+                o = args.ords_use[i]
+                # Previous order
+                if o == args.ords_use[0]: oprev = np.nan
+                else: oprev = args.ords_use[i-1]
+                # Next order
+                if o == args.ords_use[-1]: onext = np.nan
+                else: onext = onext = args.ords_use[i+1]
 
-            # print('-- o', o)
-            # First order
-            if o == args.ords_use[0]:
+                # print('-- o', o)
+                # First order
+                if o == args.ords_use[0]:
 
-                # No blue lines in overlap with previous order, because this is the first one
-                # Red lines in overlap with next order (include now!)
-                overlapred = datafit_final[o]['cen'] >= datafit_final[onext]['cen'].min()
-                # No overlap lines
-                datafito_nooverlap = datafit_final[o][~overlapred]
+                    # No blue lines in overlap with previous order, because this is the first one
+                    # Red lines in overlap with next order (include now!)
+                    overlapred = datafit_final[o]['cen'] >= datafit_final[onext]['cen'].min()
+                    # No overlap lines
+                    datafito_nooverlap = datafit_final[o][~overlapred]
 
-                # print('-- -- total:', len(datafit_final[o]))
-                # print('-- -- in overlap:', len(datafit_final[o][overlapred]))
-                # print('-- -- no overlap:', len(datafit_final[o][~overlapred]))
+                    # print('-- -- total:', len(datafit_final[o]))
+                    # print('-- -- in overlap:', len(datafit_final[o][overlapred]))
+                    # print('-- -- no overlap:', len(datafit_final[o][~overlapred]))
 
-                # Add lines not in overlap region
-                wm_join.extend(datafito_nooverlap[args.maskwave])
-                fm_join.extend(datafito_nooverlap[args.maskweight])
-                # print('-- -- add no overlap lines:', len(datafito_nooverlap[args.maskwave]))
+                    # Add lines not in overlap region
+                    wm_join.extend(datafito_nooverlap[args.maskwave])
+                    fm_join.extend(datafito_nooverlap[args.maskweight])
+                    # print('-- -- add no overlap lines:', len(datafito_nooverlap[args.maskwave]))
 
-                # Check if there is overlap with next order
-                # - If no overlap, continue
-                # - If there is overlap, go line by line, see if line exists in next order, and merge them
-                if True in overlapred.values:
-                    # Next order minima wavelength in the overlap region
-                    nextord_overlap = datafit_final[onext]['cen'][datafit_final[onext]['cen'] <= datafit_final[o]['cen'].max()]
-                    # print('-- -- -- overlap, possible common line in next order:', len(nextord_overlap))
-                    s = 0
-                    for l in datafit_final[o][overlapred].index:
-                        # Find closest line
-                        idxmindist = (np.abs(datafit_final[o].at[l, 'cen'] - nextord_overlap)).idxmin()  # idx closest line
-                        mindist = np.min(np.abs(datafit_final[o].at[l, 'cen'] - nextord_overlap))  # distance
-                        if mindist <= lineseparationlimit:  # If lines 2 orders close enough, slelect line and merge values
-                            wm_join.append(np.nanmean([datafit_final[o].at[l, args.maskwave], datafit_final[onext].at[idxmindist, args.maskwave]]))
-                            fm_join.append(np.nanmean([datafit_final[o].at[l, args.maskweight], datafit_final[onext].at[idxmindist, args.maskweight]]))
-                            s += 1
-                    # print('-- -- -- lines in overlap added:', s)
+                    # Check if there is overlap with next order
+                    # - If no overlap, continue
+                    # - If there is overlap, go line by line, see if line exists in next order, and merge them
+                    if True in overlapred.values:
+                        # Next order minima wavelength in the overlap region
+                        nextord_overlap = datafit_final[onext]['cen'][datafit_final[onext]['cen'] <= datafit_final[o]['cen'].max()]
+                        # print('-- -- -- overlap, possible common line in next order:', len(nextord_overlap))
+                        s = 0
+                        for l in datafit_final[o][overlapred].index:
+                            # Find closest line
+                            idxmindist = (np.abs(datafit_final[o].at[l, 'cen'] - nextord_overlap)).idxmin()  # idx closest line
+                            mindist = np.min(np.abs(datafit_final[o].at[l, 'cen'] - nextord_overlap))  # distance
+                            if mindist <= lineseparationlimit:  # If lines 2 orders close enough, slelect line and merge values
+                                wm_join.append(np.nanmean([datafit_final[o].at[l, args.maskwave], datafit_final[onext].at[idxmindist, args.maskwave]]))
+                                fm_join.append(np.nanmean([datafit_final[o].at[l, args.maskweight], datafit_final[onext].at[idxmindist, args.maskweight]]))
+                                s += 1
+                        # print('-- -- -- lines in overlap added:', s)
 
-            # Central orders
-            elif o != args.ords_use[0] and o != args.ords_use[-1]:
-                # Blue lines in overlap with previous order, already dealt with (not include now!)
-                overlapblue = datafit_final[o]['cen'] <= datafit_final[oprev]['cen'].max()
-                # Red lines in overlap with next order (include now!)
-                overlapred = datafit_final[o]['cen'] >= datafit_final[onext]['cen'].min()
-                # No overlap lines
-                datafito_nooverlap = datafit_final[o][(~overlapblue) & (~overlapred)]
+                # Central orders
+                elif o != args.ords_use[0] and o != args.ords_use[-1]:
+                    # Blue lines in overlap with previous order, already dealt with (not include now!)
+                    overlapblue = datafit_final[o]['cen'] <= datafit_final[oprev]['cen'].max()
+                    # Red lines in overlap with next order (include now!)
+                    overlapred = datafit_final[o]['cen'] >= datafit_final[onext]['cen'].min()
+                    # No overlap lines
+                    datafito_nooverlap = datafit_final[o][(~overlapblue) & (~overlapred)]
 
-                # print('-- -- total:', len(datafit_final[o]))
-                # print('-- -- in overlap:', len(datafit_final[o][overlapblue]), len(datafit_final[o][overlapred]))
-                # print('-- -- no overlap:', len(datafit_final[o][(~overlapblue) & (~overlapred)]))
+                    # print('-- -- total:', len(datafit_final[o]))
+                    # print('-- -- in overlap:', len(datafit_final[o][overlapblue]), len(datafit_final[o][overlapred]))
+                    # print('-- -- no overlap:', len(datafit_final[o][(~overlapblue) & (~overlapred)]))
 
-                # Add lines not in overlap region
-                wm_join.extend(datafito_nooverlap[args.maskwave])
-                fm_join.extend(datafito_nooverlap[args.maskweight])
-                # print('-- -- add no overlap lines:', len(datafito_nooverlap[args.maskwave]))
+                    # Add lines not in overlap region
+                    wm_join.extend(datafito_nooverlap[args.maskwave])
+                    fm_join.extend(datafito_nooverlap[args.maskweight])
+                    # print('-- -- add no overlap lines:', len(datafito_nooverlap[args.maskwave]))
 
-                # Check if there is overlap with next order
-                # - If no overlap, add all order (except the bluest lines which could have overlap with the previous order)
-                # - If there is overlap, go line by line, see if line exists in next order, and merge them
-                if True in overlapred.values:
-                    # overlap = datafit[o][cond[o]]['cen'] >= datafit[onext][cond[onext]]['cen'].min()
-                    # Next order minima wavelength in the overlap region
-                    nextord_overlap = datafit_final[onext]['cen'][datafit_final[onext]['cen'] <= datafit_final[o]['cen'].max()]
-                    # print('-- -- -- overlap, possible common line in next order:', len(nextord_overlap))
-                    # if len(nextord_overlap) == 0:  # If no minima in overlap region, skip to next order. Should not happen here, checked before
-                    #     continue
-                    # for l in datafit[o][cond[o]][overlap].index:
-                    s = 0
-                    for l in datafit_final[o][overlapred].index:
-                        # Find closest line
-                        # idxmindist = np.argmin(np.abs(datafit[o].at[l, 'cen'] - nextord_overlap))  # idx closest line
-                        idxmindist = (np.abs(datafit_final[o].at[l, 'cen'] - nextord_overlap)).idxmin()  # idx closest line
-                        mindist = np.min(np.abs(datafit_final[o].at[l, 'cen'] - nextord_overlap))  # distance
-                        if mindist <= lineseparationlimit:  # If lines 2 orders close enough, slelect line and merge values
-                            wm_join.append(np.nanmean([datafit_final[o].at[l, args.maskwave], datafit_final[onext].at[idxmindist, args.maskwave]]))
-                            fm_join.append(np.nanmean([datafit_final[o].at[l, args.maskweight], datafit_final[onext].at[idxmindist, args.maskweight]]))
-                            s += 1
-                    # print('-- -- -- lines in overlap added:', s)
+                    # Check if there is overlap with next order
+                    # - If no overlap, add all order (except the bluest lines which could have overlap with the previous order)
+                    # - If there is overlap, go line by line, see if line exists in next order, and merge them
+                    if True in overlapred.values:
+                        # overlap = datafit[o][cond[o]]['cen'] >= datafit[onext][cond[onext]]['cen'].min()
+                        # Next order minima wavelength in the overlap region
+                        nextord_overlap = datafit_final[onext]['cen'][datafit_final[onext]['cen'] <= datafit_final[o]['cen'].max()]
+                        # print('-- -- -- overlap, possible common line in next order:', len(nextord_overlap))
+                        # if len(nextord_overlap) == 0:  # If no minima in overlap region, skip to next order. Should not happen here, checked before
+                        #     continue
+                        # for l in datafit[o][cond[o]][overlap].index:
+                        s = 0
+                        for l in datafit_final[o][overlapred].index:
+                            # Find closest line
+                            # idxmindist = np.argmin(np.abs(datafit[o].at[l, 'cen'] - nextord_overlap))  # idx closest line
+                            idxmindist = (np.abs(datafit_final[o].at[l, 'cen'] - nextord_overlap)).idxmin()  # idx closest line
+                            mindist = np.min(np.abs(datafit_final[o].at[l, 'cen'] - nextord_overlap))  # distance
+                            if mindist <= lineseparationlimit:  # If lines 2 orders close enough, slelect line and merge values
+                                wm_join.append(np.nanmean([datafit_final[o].at[l, args.maskwave], datafit_final[onext].at[idxmindist, args.maskwave]]))
+                                fm_join.append(np.nanmean([datafit_final[o].at[l, args.maskweight], datafit_final[onext].at[idxmindist, args.maskweight]]))
+                                s += 1
+                        # print('-- -- -- lines in overlap added:', s)
 
-            # Last order: No overlap with any other order (overlap blue part already dealt with)
-            elif o == args.ords_use[-1]:
+                # Last order: No overlap with any other order (overlap blue part already dealt with)
+                elif o == args.ords_use[-1]:
 
-                # Blue lines in overlap with previous order, already dealt with (not include now!)
-                overlapblue = datafit_final[o]['cen'] <= datafit_final[oprev]['cen'].max()
+                    # Blue lines in overlap with previous order, already dealt with (not include now!)
+                    overlapblue = datafit_final[o]['cen'] <= datafit_final[oprev]['cen'].max()
 
-                # print('-- -- total:', len(datafit_final[o]))
-                # print('-- -- in overlap:', len(datafit_final[o][overlapblue]))
-                # print('-- -- no overlap:', len(datafit_final[o][~overlapblue]))
+                    # print('-- -- total:', len(datafit_final[o]))
+                    # print('-- -- in overlap:', len(datafit_final[o][overlapblue]))
+                    # print('-- -- no overlap:', len(datafit_final[o][~overlapblue]))
 
-                # No red lines in overlap with next order, because this is the last one
-                # No overlap lines
-                datafito_nooverlap = datafit_final[o][~overlapblue]
-                wm_join.extend(datafito_nooverlap[args.maskwave])
-                fm_join.extend(datafito_nooverlap[args.maskweight])
-                # print('-- -- add no overlap lines:', len(datafito_nooverlap[args.maskwave]))
+                    # No red lines in overlap with next order, because this is the last one
+                    # No overlap lines
+                    datafito_nooverlap = datafit_final[o][~overlapblue]
+                    wm_join.extend(datafito_nooverlap[args.maskwave])
+                    fm_join.extend(datafito_nooverlap[args.maskweight])
+                    # print('-- -- add no overlap lines:', len(datafito_nooverlap[args.maskwave]))
 
-    elif args.joinord == 'keepred':
-        sys.exit('Not implemented yet!')
-        # TODO REVISE
-        # # Join keeping the redder order lines in the overlap region (bc bluer part of the orders more noisy)
-        # wm_join, fm_join = [], []
-        # for o in args.ords_use:
-        #     if o==args.ords_use[0]:  #1st ord keep all range
-        #         for i in datafit[o].index[cond[o]]:
-        #             wm_join.append(datafit[o].at[i, args.maskwave])
-        #             fm_join.append(datafit[o].at[i, args.maskweight])
-        #     if o!=args.ords_use[0]:  #rest of the ords keep red region overlap, discard blue
-        #         for i in datafit[o].index[cond[o]]:
-        #             if datafit[o].at[i, 'cen'] > max(datafit[o-1]['cen']):
-        #                 wm_join.append(datafit[o].at[i, args.maskwave])
-        #                 fm_join.append(datafit[o].at[i, args.maskweight])
+        elif args.joinord == 'keepred':
+            sys.exit('Not implemented yet!')
+            # TODO REVISE
+            # # Join keeping the redder order lines in the overlap region (bc bluer part of the orders more noisy)
+            # wm_join, fm_join = [], []
+            # for o in args.ords_use:
+            #     if o==args.ords_use[0]:  #1st ord keep all range
+            #         for i in datafit[o].index[cond[o]]:
+            #             wm_join.append(datafit[o].at[i, args.maskwave])
+            #             fm_join.append(datafit[o].at[i, args.maskweight])
+            #     if o!=args.ords_use[0]:  #rest of the ords keep red region overlap, discard blue
+            #         for i in datafit[o].index[cond[o]]:
+            #             if datafit[o].at[i, 'cen'] > max(datafit[o-1]['cen']):
+            #                 wm_join.append(datafit[o].at[i, args.maskwave])
+            #                 fm_join.append(datafit[o].at[i, args.maskweight])
+
+    else:
+        wm_join = datafit_final[0][args.maskwave]
+        fm_join = datafit_final[0][args.maskweight]
 
     wm_join = np.array(wm_join)
     fm_join = np.array(fm_join)
@@ -1421,30 +1433,34 @@ def main():
     # Save processed template shifted to RV=0
     # ---------------------------------------
 
-    w_shift = [i * (1 - (tplrv + fitpar['fitcen']) / C_KMS) for i in w]
-    filout = os.path.join(args.dirout_tpl, os.path.splitext(os.path.basename(args.filtpl))[0] + 'matrix_rv0.pkl')
-    spectrumutils.spec_save_pkl_matrix(w_shift, f, filout, verb=args.verbose)
+    if (args.filphoenixw is not None) or (args.filphoenixf is not None):
+        w_shift = [i * (1 - (tplrv + fitpar['fitcen']) / C_KMS) for i in w]
+        filout = os.path.join(args.dirout_tpl, os.path.splitext(os.path.basename(args.filtpl))[0] + 'matrix_rv0.pkl')
+        spectrumutils.spec_save_pkl_matrix(w_shift, f, filout, verb=args.verbose)
 
     # Save clean minima wavelengths shifted fit data
     # ----------------------------------------------
 
-    for o in ords:
-        if o in args.ords_use and len(imin[o] > 0):
+    if (args.filphoenixw is not None) or (args.filphoenixf is not None):
 
-            # Shift
-            lisp = ['cen', 'wmin', 'wmax1', 'wmax2']
-            for p in lisp:
-                datafit[o][p] = datafit[o][p] * (1 - (tplrv + fitpar['fitcen']) / C_KMS)
+        for o in ords:
+            if o in args.ords_use and len(imin[o] > 0):
 
-            # Save
-            colp = ['cen', 'wmin', 'wmax1', 'wmax2', 'depth']
-            fil = os.path.join(args.dirout_minfit, 'minfito{:02d}_w_clean_rv0.dat'.format(o))
-            datafit[o].to_csv(fil, sep=' ', na_rep=np.nan, float_format=None, columns=colp, header=True)
+                # Shift
+                lisp = ['cen', 'wmin', 'wmax1', 'wmax2']
+                for p in lisp:
+                    datafit[o][p] = datafit[o][p] * (1 - (tplrv + fitpar['fitcen']) / C_KMS)
 
-        else:
-            # Save empty file
-            fil = os.path.join(args.dirout_minfit, 'minfito{:02d}_w_clean_rv0.dat'.format(o))
-            os.system('touch {}'.format(fil))
+                # Save
+                colp = ['cen', 'wmin', 'wmax1', 'wmax2', 'depth']
+                fil = os.path.join(args.dirout_minfit, 'minfito{:02d}_w_clean_rv0.dat'.format(o))
+                datafit[o].to_csv(fil, sep=' ', na_rep=np.nan, float_format=None, columns=colp, header=True)
+
+            else:
+                # Save empty file
+                fil = os.path.join(args.dirout_minfit, 'minfito{:02d}_w_clean_rv0.dat'.format(o))
+                os.system('touch {}'.format(fil))
+
 
     return
 

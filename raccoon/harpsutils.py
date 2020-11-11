@@ -219,9 +219,9 @@ def drs_e2dsred_read(filin, readblaze=True, dirblaze=None, filblaze=None, inst=N
     f, header = drs_fitsred_read(filin, ext=exte2ds)
 
     # Get wavelength from header
-    nord = len(f)
+    # nord = len(f)
     npix = len(f[0])
-    w = drs_e2dsred_readw(filin, inst=inst, nord=nord, npix=npix, ext=exte2ds)
+    w = drs_e2dsred_readw(filin, inst=inst, npix=npix, ext=exte2ds)
 
     # Read blaze
     if readblaze:
