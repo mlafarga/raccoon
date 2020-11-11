@@ -72,7 +72,7 @@ def parse_args():
     parser.add_argument('--tplrv', help='Template RV. Options: a) float [km/s], b) carmencita. If None (default), the mask will be shifted 0 km/s. If carmencita data in NaN, the shift will be 0.', default=None, type=str)
 
     # CARMENES data
-    parser.add_argument('--dircarmencita', help='Absolute path.', default='PhDnew/Data/CARMENES_GTO/carmencita/')
+    parser.add_argument('--dircarmencita', help='Absolute path.', default=None)
     parser.add_argument('--carmencitaversion', help='', default=None)
 
     # PHOENIX
