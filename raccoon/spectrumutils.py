@@ -246,7 +246,9 @@ def fitcontinuum(w, f, medfiltsize=9, maxfiltsize=10, fitfunc='poly', polyord=3,
         fitpar = np.polyfit(w[idxmax], f[idxmax], polyord)
         Cont = np.poly1d(fitpar) # Function
     elif fitfunc == 'spl':
-        n = np.max(f) # `UnivariateSpline` has problems with large values
+        n = np.nanmax(f) # `UnivariateSpline` has problems with large values
+        # print(w[idxmax])
+        # print(f[idxmax]/n)
         Cont_n = UnivariateSpline(w[idxmax], f[idxmax]/n, k=spldegree, s=splsmooth) #Function
         #--Cont = UnivariateSpline(w[idxmax], f[idxmax], k=spldegree, s=splsmooth) #Function
         def Cont(x, Cont_n=Cont_n, n=n):

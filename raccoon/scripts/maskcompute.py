@@ -427,7 +427,7 @@ def main():
     fmaskbad = ft_broaden_join
 
     # Extend mask (with flux 0) to all the spectrum range, so there are no interpolation problems
-    wspecmin, wspecmax = min(np.concatenate(w)), max(np.concatenate(w))
+    wspecmin, wspecmax = np.nanmin(np.concatenate(w)), np.nanmax(np.concatenate(w))
     wmaskbad = np.concatenate(([wspecmin], wmaskbad, [wspecmax]))
     fmaskbad = np.concatenate(([0], fmaskbad, [0]))
 
