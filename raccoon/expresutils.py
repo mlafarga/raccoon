@@ -113,8 +113,8 @@ def drs_bjd_lisobs(lisobs, notfound=np.nan, ext=2, name='bjd'):
     if name is not None: names = {kw: name}
     else: names = None
     data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext, names=names)
-    if name is not None: data[name] = data[name] + 2400000.
-    else: data[kw] = data[kw] + 2400000.
+    if name is not None: data[name] = data[name] # + 2400000.
+    else: data[kw] = data[kw] # + 2400000.
     return data
 
 

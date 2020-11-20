@@ -69,7 +69,7 @@ dicoref = {
    'CARM_NIR': 11,  # This is the double already
    'HARPS': 55,
    'HARPN': 55,
-   'EXPRES': 65,  # ?
+   'EXPRES': 60,  # ?
 }
 
 
