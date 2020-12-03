@@ -64,7 +64,7 @@ def parse_args():
     # Mask
     parser.add_argument('filmask', help='Path to custom mask file (file with extension `.mas`), or mask ID to use one of the default masks, or (CARM GTO) path to "mask selection file" (file with any other extension that specifies the masks available to choose from). Mask file format: Columns: 0) w (wavelengths), 1) f (weights), separated by whitespaces. Mask-selection file format: Columns: 0) object used to make the mask `objmask`, 1) spectral type of `objmask`, 2) `vsini` of `objmask`, 3) path to mask file (`.mas` extension). There can only be one mask file for each combination of spt-vsini. TODO: Only spt is used to select the mask (not the vsini).', type=str)
     parser.add_argument('--maskformatharp', help='If mask format is w1, w2, f and wavelengths are in air -> it is transformed into w, f and vacuum.', action='store_true')
-    # parser.add_argument('--maskair', help='If mask wavelengths in air, not vacuum. TO DO', action='store_true')
+    parser.add_argument('--maskair', help='If mask wavelengths in air, tranform to vacuum. Not needed if `maskformatharp` is True.', action='store_true')
     parser.add_argument('--objmask', help='Overwrites values from `filmask`.', type=str, default=None)
     parser.add_argument('--sptmask', help='Overwrites values from `filmask`.', type=str, default=None)
     parser.add_argument('--vsinimask', help='Overwrites values from `filmask`.', type=float, default=None)
@@ -483,6 +483,11 @@ def main():
         wm1, wm2, fm = np.loadtxt(filmask, usecols=[0, 1, 2], unpack=True)
         wm = (wm1 + wm2) / 2.
         wm = spectrumutils.wair2vac(wm)
+        args.maskair = False
+    # Transform to vacuum
+    if args.maskair:
+        wm = spectrumutils.wair2vac(wm)
+        args.maskair = False
 
     wm_original, fm_original = wm.copy(), fm.copy()
     nlinoriginal = len(wm)
