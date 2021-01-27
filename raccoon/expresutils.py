@@ -9,6 +9,7 @@ import sys
 from astropy.io import fits
 import numpy as np
 import pandas as pd
+from scipy.interpolate import BSpline
 
 from . import fitsutils
 
@@ -61,6 +62,77 @@ def drs_fitsred_read(filin):
     #     return we, f, sf, c, b, header0, header1, header2
     # elif out == 'excaliburbary':
     #     return wecb, f, sf, c, b, mwecb, header0, header1, header2
+
+
+# Merged spectra
+
+def drs_fitsredmerged_read(filin):
+    """
+    Read telluric model from merged reduced spectrum FITS.
+    """
+    # Read FITS
+    with fits.open(filin) as hdulist:
+
+        # Headers (0 main, 1 activity ind, 2 low-res chromatic exposure meter spectrograph and barycentric correction)
+        header0 = hdulist[0].header
+        header1 = hdulist[1].header
+        header2 = hdulist[2].header
+
+        # Telluric model
+        w = hdulist[1].data['bary_wavelength']  # uniform in log space
+        f = hdulist[1].data['spectrum']
+        fe = hdulist[1].data['spectrum_excalibur']
+
+        # B-spline information
+        knots = hdulist[2].data['spectrum_knots']
+        coeffs = hdulist[2].data['spectrum_coeffs']
+        knotse = hdulist[2].data['spectrum_excalibur_knots']
+        coeffse = hdulist[2].data['spectrum_excalibur_coeffs']
+        degree = hdulist[0].header['BDEGREE']  # Kind of a curve ball
+
+        # Generate B-spline Function
+        #   Mask zeros at the end of the arrays. If not, get "ValueError: Knots must be in a non-decreasing order."
+        maskzero = knots != 0
+        maskzeroe = knotse != 0
+        Tmerged = BSpline(knots[maskzero], coeffs[maskzero], degree, extrapolate=False)
+        Tmergede = BSpline(knotse[maskzeroe], coeffse[maskzeroe], degree, extrapolate=False)
+
+    return w, f, fe, knots, coeffs, knotse, coeffse, degree, Tmerged, Tmergede, header0, header1, header2
+
+
+def drs_fitsredmerged_tell_read(filin):
+    """
+    Read telluric model from merged reduced spectrum FITS.
+    """
+    # Read FITS
+    with fits.open(filin) as hdulist:
+
+        # Headers (0 main, 1 activity ind, 2 low-res chromatic exposure meter spectrograph and barycentric correction)
+        header0 = hdulist[0].header
+        header1 = hdulist[1].header
+        header2 = hdulist[2].header
+
+        # Telluric model
+        w = hdulist[1].data['bary_wavelength']  # uniform in log space
+        t = hdulist[1].data['tellurics']
+        te = hdulist[1].data['tellurics_excalibur']
+
+        # B-spline information
+        knots = hdulist[2].data['tellurics_knots']
+        coeffs = hdulist[2].data['tellurics_coeffs']
+        knotse = hdulist[2].data['tellurics_excalibur_knots']
+        coeffse = hdulist[2].data['tellurics_excalibur_coeffs']
+        degree = hdulist[0].header['BDEGREE']  # Kind of a curve ball
+
+        # Generate B-spline Function
+        #   Mask zeros at the end of the arrays. If not, get "ValueError: Knots must be in a non-decreasing order."
+        maskzero = knots != 0
+        maskzeroe = knotse != 0
+        Tmerged = BSpline(knots[maskzero], coeffs[maskzero], degree, extrapolate=False)
+        Tmergede = BSpline(knotse[maskzeroe], coeffse[maskzeroe], degree, extrapolate=False)
+
+    return w, t, te, knots, coeffs, knotse, coeffse, degree, Tmerged, Tmergede, header0, header1, header2
+
 
 
 # SNR

@@ -105,6 +105,7 @@ def mpl_custom_basic():
         'axes.prop_cycle': mpl.cycler(color=colorcycles['vega_category10_custom']),
         # Axes offset disable
         'axes.formatter.useoffset': True,
+        # 'figure.dpi': 200,
         })
     # mpl.rcParams.update({'histtype': 'step'})
     # mpl.rcdefaults()

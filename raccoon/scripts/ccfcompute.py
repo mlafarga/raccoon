@@ -81,7 +81,7 @@ def parse_args():
 
     # CCF computation
     parser.add_argument('--ords_use', nargs='+', help='Sectral orders to consider for the CCF (the orders not listed here will not be used). The orders are counted from 0 (bluest order) to N-1 (reddest order), where N is the number of orders in the template file - so these are not the real orders. Orders in instruments: CARM_VIS: 0-61, CARM_NIR:0-27 (use half order), HARPS: 0-71, HARPN: 0-71. If None (default), all orders are used.', default=None)
-    parser.add_argument('--pmin', help='Minimum pixel of each order to use. If None (default) all the pixels are used. Pixels: CARMENES 0-4095, HARP 0-4095.', type=int, default=None)
+    parser.add_argument('--pmin', help='Minimum pixel of each order to use. If None (default) all the pixels are used. Pixels: CARMENES 0-4095, HARP 0-4095, EXPRES 0-7919.', type=int, default=None)
     parser.add_argument('--pmax', help='Maximum pixel of each order to use. If None (default) all the pixels are used.', type=int, default=None)
     parser.add_argument('--wrange', nargs='+', help='Wavelength range to use (2 values), e.g. `--wrange 6000 6500`, [A]. Overwrites ORDS_USE. If None (default), use range defined by orders in ORDS_USE.', type=float, default=None)
     parser.add_argument('--nlinmin', help="Minimum number of usable mask lines per order. Orders with less lines won't be used to compute the CCF.", type=int, default=0)
@@ -188,6 +188,7 @@ def main():
         if not isinstance(args.ords_use[0], int): args.ords_use = [int(o) for o in args.ords_use]
     else:
         args.ords_use = ords
+    args.ords_use = np.sort(args.ords_use)
 
     # Pixels per order
     if 'CARM' in args.inst or 'HARP' in args.inst:
@@ -777,7 +778,10 @@ def main():
             if args.inst == 'HARPS' or args.inst == 'HARPN':
                 w = spectrumutils.wair2vac(w)
             wspecmin, wspecmax = min(np.concatenate(w)), max(np.concatenate(w))
-        wt_broaden_join = np.concatenate(([wspecmin], wt_broaden_join, [wspecmax]))
+        # wt_broaden_join = np.concatenate(([wspecmin], wt_broaden_join, [wspecmax]))
+        wmin = np.nanmin([wspecmin, wm[0], wt_broaden_join[0]]) - 500.
+        wmax = np.nanmax([wspecmax, wm[-1], wt_broaden_join[-1]]) + 500.
+        wt_broaden_join = np.concatenate(([wmin], wt_broaden_join, [wmax]))
         ft_broaden_join = np.concatenate(([0], ft_broaden_join, [0]))
 
         # Original masks: 0 good regions, 1 regions to be masked
@@ -911,7 +915,8 @@ def main():
     # Number of lines per order
     nlinords = [len(o) for o in wmords]
     ords_keep = np.argwhere(np.array(nlinords) >= args.nlinmin).flatten()
-    args.ords_use = np.array(list(set(args.ords_use).intersection(ords_keep)))
+    # args.ords_use = np.array(list(set(args.ords_use).intersection(ords_keep)))
+    args.ords_use = np.sort(list(set(args.ords_use).intersection(ords_keep)))
 
     # ----
 
@@ -983,10 +988,10 @@ def main():
         if args.plot_spec:
             fig, ax = plt.subplots(2, 1)
             # for o in args.ords_use:
-            for o in ords:
-                if o % 2 == 0: c = 'k'
+            for oo in ords:
+                if oo % 2 == 0: c = 'k'
                 else: c = '.5'
-                ax[0].plot(w[o], f[o], linewidth=0.5, marker='.', color=c)
+                ax[0].plot(w[oo], f[oo], linewidth=0.5, marker='.', color=c)
                 # ax[1].plot(w[o], f[o]/c[o], linewidth=0.5, marker='.', color=c)
             plt.tight_layout()
             plt.show()
@@ -1000,7 +1005,7 @@ def main():
 
         # EXPRES use own mask to remove bad pixels
         if args.inst == 'EXPRES':
-            w, f, sf, c = expresutils.apply_expres_masks_spec(w, f, sf, c, dataextra['pixel_mask'], excalibur_mask=dataextra['excalibur_mask'] if args.expresw == 'bary_excalibur' or args.expresw == 'excalibur' else None)
+            w, f, sf, c = expresutils.apply_expres_masks_spec(w, f, sf, c, dataextra['pixel_mask'][:, args.pmin:pmaxp], excalibur_mask=dataextra['excalibur_mask'][:, args.pmin:pmaxp] if args.expresw == 'bary_excalibur' or args.expresw == 'excalibur' else None)
 
         # Remove pixels with nan or negative wavelengths
         spec_removenan, masknan = spectrumutils.remove_nan_echelle(w, f, sf, c, ords_use=args.ords_use, returntype='original')
@@ -1009,6 +1014,19 @@ def main():
         # More cleaning...
         # - Pixels with nan or negative wavelengths
         # - Zeros at order edges
+
+        # if i == 19:
+        # # if i == 0 or i == 19:
+        #     fig, ax = plt.subplots(2, 1)
+        #     # for o in args.ords_use:
+        #     for oo in ords:
+        #         if oo % 2 == 0: c = 'k'
+        #         else: c = '.5'
+        #         ax[0].plot(w[oo], f[oo], linewidth=0.5, marker='.', color=c)
+        #         # ax[1].plot(w[o], f[o]/c[o], linewidth=0.5, marker='.', color=c)
+        #     plt.tight_layout()
+        #     plt.show()
+        #     plt.close()
 
         # Correct flux
         f = [f[o]/c[o] for o in ords]

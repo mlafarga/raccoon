@@ -68,7 +68,7 @@ def interp_mask_inverse(w, f, kind='linear'):
     >>> # wt, ft : Telluric mask
     >>> # ws, fs : Spectrum
     >>> # Make the inverted mask function
-    >>> MaskInv = interp_mask_inverse(wt, ft) # function
+    >>> MaskInv, _ = interp_mask_inverse(wt, ft) # function
     >>> # Make the spectrum flux 0 where there are tellurics
     >>> fs_clean = MaskInv(ws)
     >>> # Plot
