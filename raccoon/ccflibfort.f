@@ -115,8 +115,8 @@ Cf2py integer,intent(in,hide) :: nrv
         pixmsh2=pixmsh+0.5d0
 
         ! Check that mask line is inside spectrum limits
-        if((pixmsh2).lt.(pix(0)-0.5d0)) goto 4
-        if((pixmsh1).gt.(pix(ns-1)+0.5d0)) goto 4
+        if((pixmsh2).lt.(pix(1)-0.5d0)) goto 4
+        if((pixmsh1).gt.(pix(ns)+0.5d0)) goto 4
 
         ! Accelerator
         !Skip pixels with w(j)<wmsh
@@ -127,7 +127,7 @@ Cf2py integer,intent(in,hide) :: nrv
         !Pixel space (spectrum and mask in pixels)
         !Interpolate flux at the middle of the overlap region between
         !the spectrum pixel and the mask line
-        do j=jin1,ns-1 !for each spectrum point
+        do j=jin1,ns !for each spectrum point
          !Spectrum pixel edges
          pix1=pix(j)-0.5d0
          pix2=pix(j)+0.5d0
@@ -292,9 +292,10 @@ Cf2py integer,intent(in,hide) :: nrv
         pixmsh2=pixmsh+0.5d0
 
         ! Check that mask line is inside spectrum limits
-        if((pixmsh2).lt.(pix(0)-0.5d0)) goto 4
-        if((pixmsh1).gt.(pix(ns-1)+0.5d0)) goto 4
-
+C         if((pixmsh2).lt.(pix(0)-0.5d0)) goto 4
+        if((pixmsh2).lt.(pix(1)-0.5d0)) goto 4
+C         if((pixmsh1).gt.(pix(ns-1)+0.5d0)) goto 4
+        if((pixmsh1).gt.(pix(ns)+0.5d0)) goto 4
 
         ! Accelerator
         !Skip pixels with w(j)<wmsh
@@ -305,7 +306,9 @@ Cf2py integer,intent(in,hide) :: nrv
         !Pixel space (spectrum and mask in pixels)
         !Interpolate flux at the middle of the overlap region between
         !the spectrum pixel and the mask line
-        do j=jin1,ns-1 !for each spectrum point
+C         do j=jin1,ns-1 !for each spectrum point
+        do j=jin1,ns !for each spectrum point
+
          !Spectrum pixel edges
          pix1=pix(j)-0.5d0
          pix2=pix(j)+0.5d0
@@ -478,8 +481,8 @@ Cf2py integer,intent(in,hide) :: nrv
         pixmsh2=pixmsh+0.5d0
 
         ! Check that mask line is inside spectrum limits
-        if((pixmsh2).lt.(pix(0)-0.5d0)) goto 4
-        if((pixmsh1).gt.(pix(ns-1)+0.5d0)) goto 4
+        if((pixmsh2).lt.(pix(1)-0.5d0)) goto 4
+        if((pixmsh1).gt.(pix(ns)+0.5d0)) goto 4
 
 
         ! Accelerator
@@ -491,7 +494,7 @@ Cf2py integer,intent(in,hide) :: nrv
         !Pixel space (spectrum and mask in pixels)
         !Interpolate flux at the middle of the overlap region between
         !the spectrum pixel and the mask line
-        do j=jin1,ns-1 !for each spectrum point
+        do j=jin1,ns !for each spectrum point
          !Spectrum pixel edges
          pix1=pix(j)-0.5d0
          pix2=pix(j)+0.5d0
