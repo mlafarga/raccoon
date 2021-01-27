@@ -597,3 +597,14 @@ def drs_rvcorrection_lisobs(lisobs, inst, name='shift', notfound=np.nan, ext=0):
     data.rename(columns={kwinst + 'DRS BERV': 'berv', kwinst + 'DRS DRIFT CCF RV': 'drift'}, inplace=True)
 
     return shift, shifterr, data
+
+
+
+# CCF
+
+
+def drs_ccf_read(filin):
+    with fits.open(filin) as hdulist:
+        header = hdulist[0].header
+        lisccf = hdulist[0].data
+    return header, lisccf
