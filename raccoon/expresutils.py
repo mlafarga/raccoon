@@ -100,6 +100,32 @@ def drs_fitsredmerged_read(filin):
     return w, f, fe, knots, coeffs, knotse, coeffse, degree, Tmerged, Tmergede, header0, header1, header2
 
 
+def drs_fitsred_tell_read(filin):
+    """
+    Read telluric model from merged reduced spectrum FITS.
+    """
+    # Read FITS
+    with fits.open(filin) as hdulist:
+
+        # Headers (0 main, 1 activity ind, 2 low-res chromatic exposure meter spectrograph and barycentric correction)
+        header0 = hdulist[0].header
+        header1 = hdulist[1].header
+        header2 = hdulist[2].header
+
+        # # Optimally extracted data: extension 1
+        # w = hdulist[1].data['wavelength']
+        # wcb = hdulist[1].data['bary_wavelength']  # chromatic-barycentric corrected w
+        # we = hdulist[1].data['excalibur']  # excalibur w
+        # wecb = hdulist[1].data['bary_excalibur']  # chromatic-barycentric corrected, excalibur w
+        # mwecb = hdulist[1].data['excalibur_mask']  # mask pix w/o excalibur w (are NaN in array `we` or `wecb`)
+        w = hdulist[1].data['bary_wavelength']  # chromatic-barycentric corrected w,   # uniform in log space
+        # SELENITE-constructed telluric model
+        t = hdulist[1].data['tellurics']
+
+    # return w, wcb, we, wecb, mwecb, t, header0, header1, header2
+    return w, t, header0, header1, header2
+
+
 def drs_fitsredmerged_tell_read(filin):
     """
     Read telluric model from merged reduced spectrum FITS.
@@ -218,7 +244,20 @@ def drs_airmass_lisobs(lisobs, notfound=np.nan, ext=0, name='airmass'):
     return data
 
 
+def drs_moondist_lisobs(lisobs, notfound=np.nan, ext=0, name='moondist'):
+    """Get the airmass from FITS header ('AIRMASS') [s] for the observations in `lisobs`.
 
+    Returns
+    -------
+    data : pandas dataframe
+    """
+    kw = 'MOONDIST'
+    if name is not None: names = {kw: name}
+    else: names = None
+    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext, names=names)
+    # Transform to float
+    data = data.astype(float)
+    return data
 
 
 def apply_expres_masks_array(x, pixel_mask, excalibur_mask=None):

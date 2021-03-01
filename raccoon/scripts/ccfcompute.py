@@ -569,12 +569,18 @@ def main():
             fig, ax = plt.subplots(2, 1, figsize=(16, 10))
             # fig, ax = plt.subplots(1,2, figsize=(16, 5), gridspec_kw={'width_ratios': [2,1]})
             # Spec
+            args.ccftesto = 45
+            # ipdb.set_trace()
             fmax = np.nanmax(f[args.ccftesto])
             fn = (f[args.ccftesto]) / fmax
             fmaxn = np.nanmax(fn)  # 1.
             fminn = np.nanmin(fn)
             ax[0].plot(wcorr[args.ccftesto], fn, 'k', label='Spec norm shift')
+            # Mask
             ax[0].vlines(wm, fminn, fminn + fm / np.nanmax(fm) * fmaxn, colors='C1', label='Mask norm')
+            # Tellurics
+            wt, ft = telluricutils.read_mask(args.filtell)
+            telluricutils.plot_mask(wt, ft*fmaxn, ax=ax[0], leglab='Telluric mask', alpha=.3, color='k')
             ax[0].set_xlim(np.nanmin(wcorr[args.ccftesto]), np.nanmax(wcorr[args.ccftesto]))
             ax[0].set_ylim(fminn, fmaxn)
             ax[0].set_ylabel('Flux')
@@ -588,6 +594,8 @@ def main():
             for a in ax:
                 a.legend(loc='upper right')
             plotutils.figout(fig, filout=os.path.join(args.dirout, 'ccftest_{}_{}'.format(os.path.basename(os.path.splitext(filobsref)[0]), args.ccftesto)), sv=args.plottest_sv, svext=args.plot_ext, sh=args.plottest_sh)
+
+        # ipdb.set_trace()
 
         # ---------------------------------
 
@@ -1274,6 +1282,7 @@ def main():
         # Organize orders data
         ccfpar = pd.DataFrame.from_dict(ccfpar, orient='index')
         ccfpar.index.set_names('orders', inplace=True)
+        ccfpar.sort_index(inplace=True)
 
         # Sum CCF
         ccfsum = ccflib.sumccf(rv, ccf, ords_use_lines)
@@ -1505,6 +1514,7 @@ def main():
         filout = os.path.join(args.dirout, '{}.{}o.dat'.format(args.obj, p))
         dataorder[p].to_csv(filout, sep=' ', na_rep=np.nan, header=False)
 
+    # ipdb.set_trace()
     ###########################################################################
 
     # Plots
