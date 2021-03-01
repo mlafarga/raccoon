@@ -139,7 +139,10 @@ def idxminends_custom(f, imin):
                 r = r + 1
             imax2.append(r)
         else:
-            b = imax2[-1]
+            # b = imax2[-1]
+            b = i
+            while f[b] < f[b-1] and b != 0:
+                b = b - 1
             imax1.append(b)
             r = i
             while f[r] < f[r+1] and r != len(f)-2:
