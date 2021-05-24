@@ -1192,8 +1192,8 @@ def plot_ccf_fit_diff(rv, ccf, ccfpar, title='', fitpar='', diffzoom=True, parve
         ax[1].plot(rv, diff, 'ko')
 
     ax[-1].set_xlabel('RV [km/s]')
-    plotutils.Labeloffset(ax[0], label="CCF", axis="y")
-    #ax.set_ylabel('CCF')
+    # plotutils.Labeloffset(ax[0], label="CCF", axis="y")
+    ax[0].set_ylabel('CCF')
     # Add fit params text
     # ...
     ax[0].set_title(title)

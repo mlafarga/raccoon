@@ -138,3 +138,13 @@ def figout(fig, tl=True, sv=True, filout='', svext=['png', 'pdf'], sh=False, cl=
     if sh: plt.show()
     if cl: plt.close(fig)
     return
+
+
+def figout_simple(fig, sv=True, filout='', svext=['png', 'pdf'], sh=False, cl=True):
+    """
+    """
+    if sv:
+        for ext in svext: fig.savefig(filout+'.'+ext)
+    if sh: plt.show()
+    if cl: plt.close(fig)
+    return
