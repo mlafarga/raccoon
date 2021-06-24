@@ -717,6 +717,22 @@ def serval_read_rvc(fil, SI=True, ifnofilout='empty', nrow=1):
     """
     SI : bool, default True
         Return data in the international system of units (m/s instead of km/s, etc)
+
+    obj.rvc.dat    Radial velocity (drift and secular acceleration corrected, nan-drifts treated as zero)
+    Description of file: obj.rvc.dat
+    --------------------------------------------------------------------------------
+    Column Format Units     Label     Explanations
+    --------------------------------------------------------------------------------
+         1 D      ---       BJD       Barycentric Julian date [1]
+         2 D      m/s       RVC       Radial velocity (drift and sa corrected)
+         3 D      m/s     E_RVC       Radial velocity error
+         4 D      m/s       DRIFT     CARACAL drift measure
+         5 D      m/s     E_DRIFT     CARACAL drift measure error
+         6 D      m/s       RV        Radial velocity
+         7 D      m/s     E_RV        Radial velocity error
+         8 D      km/s      BERV      Barycentric earth radial velocity [1]
+         9 D      m/s       SADRIFT   Drift due to secular acceleration
+    --------------------------------------------------------------------------------
     """
     column_names = ['bjd', 'servalrvc', 'servalrvcerr', 'servaldrift', 'servaldrifterr', 'servalrv', 'servalrverr', 'servalberv', 'servalsa']
     data = read_file2dataframe(fil, column_names, ifnofilout=ifnofilout, nrow=nrow)
@@ -726,6 +742,24 @@ def serval_read_rvc(fil, SI=True, ifnofilout='empty', nrow=1):
 
 
 def serval_read_info(fil, index='timeid', SI=True, ifnofilout='empty', nrow=1):
+    """
+    obj.info.cvs   Infomation from fits file
+    Description of file: obj.info.cvs
+    --------------------------------------------------------------------------------
+    Column Format Units     Label     Explanations
+    --------------------------------------------------------------------------------
+         1 A      ---       TIMEID    Identifier for file (time stamp)
+         2 D      ---       BJD       Barycentric Julian date [1]
+         3 D      ---       SNREF     Signal-to-ratio in reference order (CARM_VIS: 36, CARM_NIR: 16, HARPS: 55)
+         4 A      ---       OBJ       Fits keyword OBJECT
+         5 D      s         EXPTIME   Exposure time
+         6 A      ---       SPT       Spectral type SpT ccf.mask
+         7 I256   ---       FLAG      Flag bad spectra/instrument mode (0: ok)
+         8 D      ---       AIRMASS   Air mass from fits header
+         9 D      deg       RA        Telescope Ascension (degrees)
+        10 D      deg       DE        Telescope declination (degrees)
+    --------------------------------------------------------------------------------
+    """
     column_names = ['timeid', 'bjd', 'bervunknown', 'snref', 'fitsobj', 'exptime', 'spt', 'flag', 'airmass', 'ratel', 'dectel']
     index_col = 0
     if index == 'timeid': index_col = 0
@@ -736,13 +770,71 @@ def serval_read_info(fil, index='timeid', SI=True, ifnofilout='empty', nrow=1):
     return data
 
 
+def serval_read_brv(fil, ifnofilout='empty', nrow=1):
+    """
+    obj.brv.dat    Barycentric earth radial velocity
+    Description of file: obj.brv.dat
+    --------------------------------------------------------------------------------
+    Column Format Units     Label     Explanations
+    --------------------------------------------------------------------------------
+         1 D      ---       BJD       Barycentric Julian date [1]
+         2 D      km/s      BERV      Barycentric earth radial velocity [1]
+         3 D      ---       DRSBJD    Barycentric Julian date (CARACAL)
+         4 D      km/s      DRSBERV   Barycentric earth radial velocity (CARACAL)
+         5 D      m/s       DRSDRIFT  CARACAL drift measure in fib B
+         6 A      ---       TIMEID    Identifier for file (time stamp)
+         7 D      ---       TMMEAN    Flux weighted mean point
+         8 D      s         EXPTIME   Exposure time
+         9 D      km/s      BERVSTART BERV at start of exposure
+        10 D      km/s      BERVEND   BERV at end of exposure
+    --------------------------------------------------------------------------------
+    """
+    column_names = ['bjd', 'berv', 'drsbjd', 'drsberv', 'drsdrift', 'timeid', 'tmmean', 'exptime', 'bervstart', 'bervend']
+    data = read_file2dataframe(fil, column_names, ifnofilout=ifnofilout, nrow=nrow)
+    return data
+
+
 def serval_read_srv(fil, ifnofilout='empty', nrow=1):
+    """
+    obj.srv.dat    Serval products time series compilation
+    Description of file: obj.srv.dat
+    --------------------------------------------------------------------------------
+    Column Format Units     Label     Explanations
+    --------------------------------------------------------------------------------
+         1 D      ---       BJD       Barycentric Julian date [1]
+         2 D      m/s       RVC       Radial velocity (drift and sa corrected)
+         3 D      m/s     E_RVC       Radial velocity error
+         4 D      m/s       CRX       Chromatic index (Slope over logarithmic wavelength)
+         5 D      m/s     E_CRX       error for CRX (slope error)
+         6 D      m^2/s^2   DLW       Differential Line Width
+         7 D      m^2/s^2 E_DLW       Error in DLW
+    --------------------------------------------------------------------------------
+    """
     column_names = ['bjd', 'servalrvc', 'servalrvcerr', 'servalcrx', 'servalcrxerr', 'servaldlw', 'servaldlwerr']
     data = read_file2dataframe(fil, column_names, ifnofilout=ifnofilout, nrow=nrow)
     return data
 
 
 def serval_read_halpha(fil, ifnofilout='empty', nrow=1):
+    """
+    obj.halpha.dat Halpha line index (requires absolute RVs)
+    Description of file: obj.halpha.dat
+    --------------------------------------------------------------------------------
+    Column Format Units     Label     Explanations
+    --------------------------------------------------------------------------------
+         1 D      ---       BJD       Barycentric Julian date [1]
+         2 D      ---       HALPHA    Halpha index (6562.808) (-40,40) km/s
+         3 D      ---     E_HALPHA    HALPHA error
+         4 D      ---       HACEN     Halpha mean flux
+         5 D      ---     E_HACEN     HACEN error
+         6 D      ---       HALEFT    Halpha reference region (-300,-100) km/s
+         7 D      ---     E_HALEFT    HALEFT error
+         8 D      ---       HARIGH    Halpha reference region (100,300) km/s
+         9 D      ---     E_HARIGH    HARIGH error
+        10 D      ---       CAI       Calcium I index
+        11 D      ---     E_CAI       CAI error
+    --------------------------------------------------------------------------------
+    """
     column_names = ['bjd', 'servalhalpha', 'servalhalphaerr', 'servalhacen', 'servalhacenerr', 'servalhaleft', 'servalhalefterr', 'servalharight', 'servalharighterr', 'servalcai', 'servalcaierr']
     data = read_file2dataframe(fil, column_names, ifnofilout=ifnofilout, nrow=nrow)
     return data
@@ -750,6 +842,7 @@ def serval_read_halpha(fil, ifnofilout='empty', nrow=1):
 
 def serval_read_cairt(fil, ifnofilout='empty', nrow=1):
     """
+    obj.cairt.dat  CAII IRT line index (requires absolute RVs)
     Description of file: obj.cairt.dat
     --------------------------------------------------------------------------------
     Column Format Units     Label     Explanations
@@ -764,6 +857,25 @@ def serval_read_cairt(fil, ifnofilout='empty', nrow=1):
     --------------------------------------------------------------------------------
     """
     column_names = ['bjd', 'servalcairt1', 'servalcairt1err', 'servalcairt2', 'servalcairt2err', 'servalcairt3', 'servalcairt3err']
+    data = read_file2dataframe(fil, column_names, ifnofilout=ifnofilout, nrow=nrow)
+    return data
+
+
+def serval_read_nad(fil, ifnofilout='empty', nrow=1):
+    """
+    obj.nad.dat    NaD line index (requires absolute RVs)
+    Description of file: obj.nad.dat
+    --------------------------------------------------------------------------------
+    Column Format Units     Label     Explanations
+    --------------------------------------------------------------------------------
+         1 D      ---       BJD       Barycentric Julian date [1]
+         2 D      ---       NAD1      NaD1 index (5889.950943) (-15,15) km/s [5]
+         3 D      ---     E_NAD1      NAD1 error
+         4 D      ---       NAD2      NaD2 index (5895.924237) (-15,15) km/s [6]
+         5 D      ---     E_NAD2      NAD2 error
+    --------------------------------------------------------------------------------
+    """
+    column_names = ['bjd', 'servalnad1', 'servalnad1err', 'servalnad2', 'servalnad2err']
     data = read_file2dataframe(fil, column_names, ifnofilout=ifnofilout, nrow=nrow)
     return data
 
@@ -786,6 +898,22 @@ def serval_read_rvo(fil, inst='CARM_VIS', ifnofilout='empty', nrow=1):
     -------
     data : pandas dataframe or np.nan
         See the documentation of the function `read_file2dataframe` for more details.
+
+    obj.rvo.dat    Radial velocity (orderwise, not drift corrected)
+    Description of file: obj.rvo.dat
+    --------------------------------------------------------------------------------
+    Column Format Units     Label     Explanations
+    --------------------------------------------------------------------------------
+         1 D      ---       BJD       Barycentric Julian date [1]
+         2 D      m/s       RV        Radial velocity (mean, not drift and not sa corrected)
+         3 D      m/s     E_RV        Radial velocity error
+         4 D      m/s       RVMED     Radial velocity (median)
+         5 D      m/s     E_RVMED    Radial velocity (median) error
+         6 D      m/s       RVO_00    Radial velocity in order 0
+         7 D      m/s       RVO_01    Radial velocity in order 1
+         8 D      m/s       RVO_02    Radial velocity in order 2
+    etc...
+    --------------------------------------------------------------------------------
     """
 
     # If instrument known, get the number of orders
@@ -841,7 +969,7 @@ def serval_read_rvo(fil, inst='CARM_VIS', ifnofilout='empty', nrow=1):
 
 
 def serval_read_rvoerr(fil, inst='CARM_VIS', ifnofilout='empty', nrow=1):
-    """Get data from SERVAL `obj.rvo.daterr`.
+    """Get data from SERVAL `obj.e_rvo.dat`.
 
     Number of columns in file depends on the number of orders of the instrument.
 
@@ -858,6 +986,21 @@ def serval_read_rvoerr(fil, inst='CARM_VIS', ifnofilout='empty', nrow=1):
     -------
     data : pandas dataframe or np.nan
         See the documentation of the function `read_file2dataframe` for more details.
+
+    Description of file: obj.rvo.daterr
+    --------------------------------------------------------------------------------
+    Column Format Units     Label     Explanations
+    --------------------------------------------------------------------------------
+         1 D      ---       BJD       Barycentric Julian date [1]
+         2 D      m/s       RV        Radial velocity (mean, not drift and not sa corrected)
+         3 D      m/s     E_RV        Radial velocity error
+         4 D      m/s       RVMED     Radial velocity (median)
+         5 D      m/s     E_RVMED     Radial velocity (median) error
+         6 D      m/s     E_RVO_00    Radial velocity error in order 0
+         7 D      m/s     E_RVO_01    Radial velocity error in order 1
+         8 D      m/s     E_RVO_02    Radial velocity error in order 2
+    etc...
+    --------------------------------------------------------------------------------
     """
 
     # If instrument known, get the number of orders
@@ -912,15 +1055,189 @@ def serval_read_rvoerr(fil, inst='CARM_VIS', ifnofilout='empty', nrow=1):
     return data
 
 
-def serval_read_snr(fil, inst='CARM_VIS', ifnofilout='empty', nrow=1):
-    """Get data from SERVAL `obj.snr.dat`.
+def serval_read_crx(fil, inst='CARM_VIS', ifnofilout='empty', nrow=1):
+    """Get data from SERVAL `obj.crx.dat`.
 
     Number of columns in file depends on the number of orders of the instrument.
 
     Parameters
     ----------
     fil : str
-        Path to input file `obj.rvo.daterr`.
+        Path to input file `obj.crx.dat`.
+    inst : {'CARM_VIS', 'CARM_NIR', 'HARPS', 'HARPN'}
+        Specifiy indtrument to get the number of orders (necessary to know the number of columns). If none of the options above, try to get the number of orders from the file name or directly from the number of columns of the file `fil`.
+    ifnofilout, nrow :
+        Output options of function `read_file2dataframe`. See its documentation for more details.
+
+    Returns
+    -------
+    data : pandas dataframe or np.nan
+        See the documentation of the function `read_file2dataframe` for more details.
+
+    obj.crx.dat    Chromatic RV index (wavelength depedence of the RV)
+    Description of file: obj.crx.dat
+    --------------------------------------------------------------------------------
+    Column Format Units     Label     Explanations
+    --------------------------------------------------------------------------------
+         1 D      ---       BJD       Barycentric Julian date [1]
+         2 D      m/s       CRX       Chromatic index (Slope over logarithmic wavelength)
+         3 D      m/s     E_CRX       Slope error
+         4 D      m/s       CRX_OFF   Offset parameter alpha
+         5 D      m/s     E_CRX_OFF   Error for offset parameter alpha
+         6 D      A         L_V       Wavelength at which the slope intersects RV
+         7 D                LNL_00    Central logarithmic wavelength of aperture 1
+         8 D                LNL_01    Central logarithmic wavelength of aperture 2
+    etc...
+    --------------------------------------------------------------------------------
+    """
+
+    # If instrument known, get the number of orders
+    ords_known = False
+    if inst == 'CARM_VIS':
+        nord = 61
+        ords_known = True
+    elif inst == 'CARM_NIR':
+        nord = 28
+        ords_known = True
+    elif inst == 'HARPS' or inst == 'HARPN':
+        nord = 72
+        ords_known = True
+
+    # If no instrument specified, try to get the number of orders from the filename
+    else:
+        if 'vis' in fil or 'VIS' in fil:
+            nord = 61
+            ords_known = True
+        elif 'nir' in fil or 'NIR' in fil:
+            nord = 28  # don't know actually
+            ords_known = True
+
+    # -----------------------------------------------------
+
+    # If number of orders known, read into pandas dataframe directly
+    if ords_known:
+        ords = np.arange(0, nord, 1)
+        column_names = ['bjd', 'servalcrx', 'servalcrxerr', 'servalcrxoff', 'servalcrxofferr', 'lv'] + ['servallnlo{:02d}'.format(o) for o in ords]
+        data = read_file2dataframe(fil, column_names, ifnofilout=ifnofilout, nrow=nrow)
+
+    # If number of orders not known, read the file and get it from there
+    else:
+        try:
+            # Read data 1st to get number of orders
+            data_raw = np.loadtxt(fil, unpack=True)
+            nord = len(data_raw[6:])
+            ords = np.arange(0, nord, 1)
+
+            # Put data in pandas dataframe
+            data_dic = {'bjd': data_raw[0], 'servalcrx': data_raw[1], 'servalcrxerr': data_raw[2], 'servalcrxoff': data_raw[3], 'servalcrxofferr': data_raw[4], 'lv': data_raw[5]}
+            dic_ords = {'servallnlo{:02d}'.format(i): data_raw[i+6] for i in ords}
+            data_dic.update(dic_ords)  # Merge dictionaries
+            data = pd.DataFrame(data_dic)
+            data.set_index('bjd', inplace=True)
+        # If cannot read the file, return the output of the function `read_file2dataframe` specified by `ifnofilout`
+        except:
+            ords = np.arange(0, 1, 1)
+            column_names = ['bjd', 'servalcrx', 'servalcrxerr', 'servalcrxoff', 'servalcrxofferr', 'lv'] + ['servallnlo{:02d}'.format(o) for o in ords]
+            data = read_file2dataframe(fil, column_names, ifnofilout=ifnofilout, nrow=nrow)
+
+    return data
+
+
+def serval_read_dlw(fil, inst='CARM_VIS', ifnofilout='empty', nrow=1):
+    """Get data from SERVAL `obj.dlw.dat`.
+
+    Number of columns in file depends on the number of orders of the instrument.
+
+    Parameters
+    ----------
+    fil : str
+        Path to input file `obj.dlw.dat`.
+    inst : {'CARM_VIS', 'CARM_NIR', 'HARPS', 'HARPN'}
+        Specifiy indtrument to get the number of orders (necessary to know the number of columns). If none of the options above, try to get the number of orders from the file name or directly from the number of columns of the file `fil`.
+    ifnofilout, nrow :
+        Output options of function `read_file2dataframe`. See its documentation for more details.
+
+    Returns
+    -------
+    data : pandas dataframe or np.nan
+        See the documentation of the function `read_file2dataframe` for more details.
+
+    obj.dlw.dat    Differential FWHM
+    Description of file: obj.dlw.dat
+    --------------------------------------------------------------------------------
+    Column Format Units     Label     Explanations
+    --------------------------------------------------------------------------------
+         1 D      ---       BJD       Barycentric Julian date [1]
+         2 D      ---       dLW       differential line width
+         3 D      ---     E_dLW       error for dLW
+         4 D      ---       dLWO_00   differential line width in order 0
+         5 D      ---       dLWO_01   differential line width in order 1
+         6 D      ---       dLWO_02   differential line width in order 2
+    etc...
+    --------------------------------------------------------------------------------
+    """
+
+    # If instrument known, get the number of orders
+    ords_known = False
+    if inst == 'CARM_VIS':
+        nord = 61
+        ords_known = True
+    elif inst == 'CARM_NIR':
+        nord = 28
+        ords_known = True
+    elif inst == 'HARPS' or inst == 'HARPN':
+        nord = 72
+        ords_known = True
+
+    # If no instrument specified, try to get the number of orders from the filename
+    else:
+        if 'vis' in fil or 'VIS' in fil:
+            nord = 61
+            ords_known = True
+        elif 'nir' in fil or 'NIR' in fil:
+            nord = 28  # don't know actually
+            ords_known = True
+
+    # -----------------------------------------------------
+
+    # If number of orders known, read into pandas dataframe directly
+    if ords_known:
+        ords = np.arange(0, nord, 1)
+        column_names = ['bjd', 'servaldlw', 'servaldlwerr'] + ['servaldlwo{:02d}'.format(o) for o in ords]
+        data = read_file2dataframe(fil, column_names, ifnofilout=ifnofilout, nrow=nrow)
+
+    # If number of orders not known, read the file and get it from there
+    else:
+        try:
+            # Read data 1st to get number of orders
+            data_raw = np.loadtxt(fil, unpack=True)
+            nord = len(data_raw[3:])
+            ords = np.arange(0, nord, 1)
+
+            # Put data in pandas dataframe
+            data_dic = {'bjd': data_raw[0], 'servaldlw': data_raw[1], 'servaldlwerr': data_raw[2]}
+            dic_ords = {'servaldlwo{:02d}'.format(i): data_raw[i+3] for i in ords}
+            data_dic.update(dic_ords)  # Merge dictionaries
+            data = pd.DataFrame(data_dic)
+            data.set_index('bjd', inplace=True)
+        # If cannot read the file, return the output of the function `read_file2dataframe` specified by `ifnofilout`
+        except:
+            ords = np.arange(0, 1, 1)
+            column_names = ['bjd', 'servaldlw', 'servaldlwerr'] + ['servaldlwo{:02d}'.format(o) for o in ords]
+            data = read_file2dataframe(fil, column_names, ifnofilout=ifnofilout, nrow=nrow)
+
+    return data
+
+
+def serval_read_dlwerr(fil, inst='CARM_VIS', ifnofilout='empty', nrow=1):
+    """Get data from SERVAL `obj.e_dlw.dat`.
+
+    Number of columns in file depends on the number of orders of the instrument.
+
+    Parameters
+    ----------
+    fil : str
+        Path to input file `obj.e_dlw.daterr`.
     inst : {'CARM_VIS', 'CARM_NIR', 'HARPS', 'HARPN'}
         Specifiy indtrument to get the number of orders (necessary to know the number of columns). If none of the options above, try to get the number of orders from the file name or directly from the number of columns of the file `fil`.
     ifnofilout, nrow :
@@ -958,6 +1275,91 @@ def serval_read_snr(fil, inst='CARM_VIS', ifnofilout='empty', nrow=1):
     # If number of orders known, read into pandas dataframe directly
     if ords_known:
         ords = np.arange(0, nord, 1)
+        column_names = ['bjd', 'servaldlw', 'servaldlwerr'] + ['servaldlwo{:02d}err'.format(o) for o in ords]
+        data = read_file2dataframe(fil, column_names, ifnofilout=ifnofilout, nrow=nrow)
+
+    # If number of orders not known, read the file and get it from there
+    else:
+        try:
+            # Read data 1st to get number of orders
+            data_raw = np.loadtxt(fil, unpack=True)
+            nord = len(data_raw[3:])
+            ords = np.arange(0, nord, 1)
+
+            # Put data in pandas dataframe
+            data_dic = {'bjd': data_raw[0], 'servaldlw': data_raw[1], 'servaldlwerr': data_raw[2]}
+            dic_ords = {'servaldlwo{:02d}err'.format(i): data_raw[i+3] for i in ords}
+            data_dic.update(dic_ords)  # Merge dictionaries
+            data = pd.DataFrame(data_dic)
+            data.set_index('bjd', inplace=True)
+        # If cannot read the file, return the output of the function `read_file2dataframe` specified by `ifnofilout`
+        except:
+            ords = np.arange(0, 1, 1)
+            column_names = ['bjd', 'servaldlw', 'servaldlwerr'] + ['servaldlwo{:02d}err'.format(o) for o in ords]
+            data = read_file2dataframe(fil, column_names, ifnofilout=ifnofilout, nrow=nrow)
+
+    return data
+
+
+def serval_read_snr(fil, inst='CARM_VIS', ifnofilout='empty', nrow=1):
+    """Get data from SERVAL `obj.snr.dat`.
+
+    Number of columns in file depends on the number of orders of the instrument.
+
+    Parameters
+    ----------
+    fil : str
+        Path to input file `obj.rvo.daterr`.
+    inst : {'CARM_VIS', 'CARM_NIR', 'HARPS', 'HARPN'}
+        Specifiy indtrument to get the number of orders (necessary to know the number of columns). If none of the options above, try to get the number of orders from the file name or directly from the number of columns of the file `fil`.
+    ifnofilout, nrow :
+        Output options of function `read_file2dataframe`. See its documentation for more details.
+
+    Returns
+    -------
+    data : pandas dataframe or np.nan
+        See the documentation of the function `read_file2dataframe` for more details.
+
+    obj.snr.dat    Signal-to-noise (orderwise)
+    Description of file: obj.snr.dat
+    --------------------------------------------------------------------------------
+    Column Format Units     Label     Explanations
+    --------------------------------------------------------------------------------
+         1 D      ---       BJD       Barycentric Julian date [1]
+         2 D      ---       SNR       Overall signal to noise
+         3 D      ---       SNRO_00   Signal to noise in order 0
+         4 D      ---       SNRO_01   Signal to noise in order 1
+         5 D      ---       SNRO_02   Signal to noise in order 2
+    etc...
+    --------------------------------------------------------------------------------
+    """
+
+    # If instrument known, get the number of orders
+    ords_known = False
+    if inst == 'CARM_VIS':
+        nord = 61
+        ords_known = True
+    elif inst == 'CARM_NIR':
+        nord = 28
+        ords_known = True
+    elif inst == 'HARPS' or inst == 'HARPN':
+        nord = 72
+        ords_known = True
+
+    # If no instrument specified, try to get the number of orders from the filename
+    else:
+        if 'vis' in fil or 'VIS' in fil:
+            nord = 61
+            ords_known = True
+        elif 'nir' in fil or 'NIR' in fil:
+            nord = 28  # don't know actually
+            ords_known = True
+
+    # -----------------------------------------------------
+
+    # If number of orders known, read into pandas dataframe directly
+    if ords_known:
+        ords = np.arange(0, nord, 1)
         column_names = ['bjd', 'servalsnr'] + ['servalsnro{:02d}'.format(o) for o in ords]
         data = read_file2dataframe(fil, column_names, ifnofilout=ifnofilout, nrow=nrow)
 
@@ -966,12 +1368,12 @@ def serval_read_snr(fil, inst='CARM_VIS', ifnofilout='empty', nrow=1):
         try:
             # Read data 1st to get number of orders
             data_raw = np.loadtxt(fil, unpack=True)
-            nord = len(data_raw[5:])
+            nord = len(data_raw[2:])
             ords = np.arange(0, nord, 1)
 
             # Put data in pandas dataframe
             data_dic = {'bjd': data_raw[0], 'servalsnr': data_raw[1]}
-            dic_ords = {'servalsnro{:02d}'.format(i): data_raw[i+5] for i in ords}
+            dic_ords = {'servalsnro{:02d}'.format(i): data_raw[i+2] for i in ords}
             data_dic.update(dic_ords)  # Merge dictionaries
             data = pd.DataFrame(data_dic)
             data.set_index('bjd', inplace=True)
@@ -984,6 +1386,112 @@ def serval_read_snr(fil, inst='CARM_VIS', ifnofilout='empty', nrow=1):
     return data
 
 
+def serval_read_chi(fil, inst='CARM_VIS', ifnofilout='empty', nrow=1):
+    """Get data from SERVAL `obj.chi.dat`.
+
+    Number of columns in file depends on the number of orders of the instrument.
+
+    Parameters
+    ----------
+    fil : str
+        Path to input file `obj.rvo.daterr`.
+    inst : {'CARM_VIS', 'CARM_NIR', 'HARPS', 'HARPN'}
+        Specifiy indtrument to get the number of orders (necessary to know the number of columns). If none of the options above, try to get the number of orders from the file name or directly from the number of columns of the file `fil`.
+    ifnofilout, nrow :
+        Output options of function `read_file2dataframe`. See its documentation for more details.
+
+    Returns
+    -------
+    data : pandas dataframe or np.nan
+        See the documentation of the function `read_file2dataframe` for more details.
+
+    obj.chi.dat    sqrt(reduced chi^2) (orderwise)
+    Description of file: obj.chi.dat
+    --------------------------------------------------------------------------------
+    Column Format Units     Label     Explanations
+    --------------------------------------------------------------------------------
+         1 D      ---       BJD       Barycentric Julian date [1]
+         2 D      ---       RCHI      Overall reduced chi^2
+         3 D      ---       RCHIO_00  Sqrt(reduced chi^2) in order 0
+         4 D      ---       RCHIO_01  Sqrt(reduced chi^2) in order 1
+         5 D      ---       RCHIO_02  Sqrt(reduced chi^2) in order 2
+    etc...
+    --------------------------------------------------------------------------------
+    """
+
+    # If instrument known, get the number of orders
+    ords_known = False
+    if inst == 'CARM_VIS':
+        nord = 61
+        ords_known = True
+    elif inst == 'CARM_NIR':
+        nord = 28
+        ords_known = True
+    elif inst == 'HARPS' or inst == 'HARPN':
+        nord = 72
+        ords_known = True
+
+    # If no instrument specified, try to get the number of orders from the filename
+    else:
+        if 'vis' in fil or 'VIS' in fil:
+            nord = 61
+            ords_known = True
+        elif 'nir' in fil or 'NIR' in fil:
+            nord = 28  # don't know actually
+            ords_known = True
+
+    # -----------------------------------------------------
+
+    # If number of orders known, read into pandas dataframe directly
+    if ords_known:
+        ords = np.arange(0, nord, 1)
+        column_names = ['bjd', 'servalchi'] + ['servalchio{:02d}'.format(o) for o in ords]
+        data = read_file2dataframe(fil, column_names, ifnofilout=ifnofilout, nrow=nrow)
+
+    # If number of orders not known, read the file and get it from there
+    else:
+        try:
+            # Read data 1st to get number of orders
+            data_raw = np.loadtxt(fil, unpack=True)
+            nord = len(data_raw[2:])
+            ords = np.arange(0, nord, 1)
+
+            # Put data in pandas dataframe
+            data_dic = {'bjd': data_raw[0], 'servalchi': data_raw[1]}
+            dic_ords = {'servalchio{:02d}'.format(i): data_raw[i+2] for i in ords}
+            data_dic.update(dic_ords)  # Merge dictionaries
+            data = pd.DataFrame(data_dic)
+            data.set_index('bjd', inplace=True)
+        # If cannot read the file, return the output of the function `read_file2dataframe` specified by `ifnofilout`
+        except:
+            ords = np.arange(0, 1, 1)
+            column_names = ['bjd', 'servalchi'] + ['servalchio{:02d}'.format(o) for o in ords]
+            data = read_file2dataframe(fil, column_names, ifnofilout=ifnofilout, nrow=nrow)
+
+    return data
+
+
+def serval_read_mlc(fil, ifnofilout='empty', nrow=1):
+    """
+    obj.mlc.dat    RV and CRX averages via maximum likelihood maps (experimental)
+    Description of file: obj.mlc.dat
+    --------------------------------------------------------------------------------
+    Column Format Units     Label     Explanations
+    --------------------------------------------------------------------------------
+         1 D      ---       BJD       Barycentric Julian date [1]
+         2 D      m/s       MLRVC     ML Radial velocity (drift and sa corrected)
+         3 D      m/s     E_MLRVC     ML Radial velocity error
+         4 D      m/s       MLCRX     ML Chromatic index (Slope over logarithmic wavelength)
+         5 D      m/s     E_MLCRX     error for MLCRX (slope error)
+         6 D      m^2/s^2   DLW       Differential Line Width
+         7 D      m^2/s^2 E_DLW       Error in DLW
+    --------------------------------------------------------------------------------
+    """
+    column_names = ['bjd', 'servalmlrvc', 'servalmlrvcerr', 'servalmlcrx', 'servalmlcrxerr', 'servalmldlw', 'servalmldlwerr']
+    data = read_file2dataframe(fil, column_names, ifnofilout=ifnofilout, nrow=nrow)
+    return data
+
+
 def serval_lisobs(listimeid):
     """Get observation filename, i.e. add change ".fits" to "_A.fits" in `timeid` column.
     """
@@ -992,7 +1500,7 @@ def serval_lisobs(listimeid):
     return data
 
 
-def serval_get(dirin, obj=None, lisdataid=['rvc', 'info'], obs=True, inst=None, join='outer', ifnofilout='empty', nrow=1):
+def serval_get(dirin, obj=None, lisdataid=['rvc', 'info', 'brv', 'srv', 'halpha', 'cairt', 'nad', 'rvo', 'rvoerr', 'crx', 'dlw', 'dlwerr', 'snr', 'chi', 'mlc'], obs=True, inst=None, join='outer', ifnofilout='empty', nrow=1):
     """Read data from SERVAL outputs specified in the list `lisdataid` and return a pandas dataframe with all the data marged.
 
     Output data in SI (e.g. m/s instead of km/s).
@@ -1027,7 +1535,8 @@ def serval_get(dirin, obj=None, lisdataid=['rvc', 'info'], obs=True, inst=None, 
 
         # File to be read
         if 'info' in dataid: filin = os.path.join(dirin, '{}.info.cvs'.format(obj))
-        elif 'err' in dataid: filin = os.path.join(dirin, '{}.{}.daterr'.format(obj, dataid.replace('err', '')))
+        # elif 'err' in dataid: filin = os.path.join(dirin, '{}.{}.daterr'.format(obj, dataid.replace('err', '')))
+        elif 'err' in dataid: filin = os.path.join(dirin, '{}.e_{}.dat'.format(obj, dataid.replace('err', '')))
         else: filin = os.path.join(dirin, '{}.{}.dat'.format(obj, dataid))
 
         # Function to be used to read the file
@@ -1040,7 +1549,7 @@ def serval_get(dirin, obj=None, lisdataid=['rvc', 'info'], obs=True, inst=None, 
             if dataid == 'info':
                 info_index = 'bjd'
                 data_lis.append(method(filin, index=info_index, ifnofilout=ifnofilout, nrow=nrow))
-            elif dataid in ['serval_read_rvo', 'serval_read_rvoerr', 'serval_read_snr']:
+            elif dataid in ['serval_read_rvo', 'serval_read_rvoerr', 'serval_read_crx', 'serval_read_dlw', 'serval_read_dlwerr', 'serval_read_snr', 'serval_read_chi']:
                 data_lis.append(method(filin, inst=inst, ifnofilout=ifnofilout, nrow=nrow))
             else:
                 data_lis.append(method(filin, ifnofilout=ifnofilout, nrow=nrow))
@@ -1555,6 +2064,148 @@ def ccf_read_ccfpar(fil, SI=True, ifnofilout='empty', nrow=1):
         data['ccfrverr'] = data['ccfrverr'] * 1.e3  # [m/s]
         data['ccfbis'] = data['ccfbis'] * 1.e3  # [m/s]
         data['ccfbiserr'] = data['ccfbiserr'] * 1.e3  # [m/s]
+    return data
+
+
+###############################################################################
+
+# -----------------------------------------------------------------------------
+#
+# pEW utils
+#
+# -----------------------------------------------------------------------------
+
+def pew_read_pewvis(fil, ifnofilout='empty', nrow=1):
+    """
+    obj.pEW.dat: time series of pEW' values
+    Description of file: obj.pEW.dat
+    -----------------------------------------------------------------------------
+    Col Format Units  Label             Explanations
+    -----------------------------------------------------------------------------
+      1 D      d      BJD               Barycentric Julian date (from SERVAL)
+      2 D      Å      Halpha            H alpha pEW'
+      3 D      Å      Halpha_err        H alpha pEW' error
+      4 D      ---    log_L_Halpha      normalized luminosity log(L_Halpha/L_bol)
+      5 D      ---    log_L_Halpha_err  normalized luminosity error
+      6 D      Å      HeD3              He D3 pEW'
+      7 D      Å      HeD3_err          He D3 pEW' error
+      8 D      Å      NaD2              Na D2 pEW'
+      9 D      Å      NaD2_err          Na D2 pEW' error
+     10 D      Å      NaD1              Na D1 pEW'
+     11 D      Å      NaD1_err          Na D1 pEW' error
+     12 D      Å      NaD               Na D pEW' (Na D1 + Na D2)
+     13 D      Å      NaD_err           Na D pEW' error
+     14 D      Å      CaIRTa            CaII-IRT-a pEW'
+     15 D      Å      CaIRTa_err        CaII-IRT-a pEW' error
+     16 D      Å      CaIRTb            CaII-IRT-b pEW'
+     17 D      Å      CaIRTb_err        CaII-IRT-b pEW' error
+     18 D      Å      CaIRTc            CaII-IRT-c pEW'
+     19 D      Å      CaIRTc_err        CaII-IRT-c pEW' error
+     20 D      Å      Fe8691            Fe 8691Å pEW'
+     21 D      Å      Fe8691_err        Fe 8691Å pEW' error
+    -----------------------------------------------------------------------------
+    """
+    column_names = ['bjd', 'halpha', 'halphaerr', 'loglhalpha', 'loglhalphaerr', 'hed3', 'hed3err', 'nad2', 'nad2err', 'nad1', 'nad1err', 'nad', 'naderr', 'cairta', 'cairtaerr', 'cairtb', 'cairtberr', 'cairtc', 'cairtcerr', 'fe8691', 'fe8691err']
+    data = read_file2dataframe(fil, column_names, ifnofilout=ifnofilout, nrow=nrow)
+    return data
+
+
+def pew_read_cahband(fil, ifnofilout='empty', nrow=1):
+    """
+    obj.CaH.band.dat: time series of CaH indices
+    Description of file: obj.CaH.band.dat
+    -------------------------------------------------------------------------
+    Col Format Units  Label             Explanations
+    -------------------------------------------------------------------------
+      1 D      d      BJD               Barycentric Julian date (from SERVAL)
+      2 D      ---    CaH2              CaH2 index
+      3 D      ---    CaH2_err          CaH2 index error
+      4 D      ---    CaH3              CaH3 index
+      5 D      ---    CaH3_err          CaH3 index error
+    -------------------------------------------------------------------------
+    """
+    column_names = ['bjd', 'cah2', 'cah2err', 'cah3' 'cah3err']
+    data = read_file2dataframe(fil, column_names, ifnofilout=ifnofilout, nrow=nrow)
+    return data
+
+
+def pew_read_tioband(fil, ifnofilout='empty', nrow=1):
+    """
+    obj.TiO.band.dat: time series of TiO indices
+    Description of file: obj.TiO.band.dat
+    -------------------------------------------------------------------------
+    Col Format Units  Label             Explanations
+    -------------------------------------------------------------------------
+      1 D      d      BJD               Barycentric Julian date (from SERVAL)
+      2 D      ---    TiO7050           TiO 7050 index
+      3 D      ---    TiO7050_err       TiO 7050 index error
+      4 D      ---    TiO8430           TiO 8430 index
+      5 D      ---    TiO8430_err       TiO 8430 index error
+      6 D      ---    TiO8860           TiO 8860 index
+      7 D      ---    TiO8860_err       TiO 8860 index error
+    -------------------------------------------------------------------------
+    """
+    column_names = ['bjd', 'tio7050', 'tio7050err', 'tio8430' 'tio8430err', 'tio8860', 'tio8860err']
+    data = read_file2dataframe(fil, column_names, ifnofilout=ifnofilout, nrow=nrow)
+    return data
+
+
+def pew_read_voband(fil, ifnofilout='empty', nrow=1):
+    """
+    obj.VO.band.dat: time series of VO indices
+    Description of file: obj.VO.band.dat
+    -------------------------------------------------------------------------
+    Col Format Units  Label             Explanations
+    -------------------------------------------------------------------------
+      1 D      d      BJD               Barycentric Julian date (from SERVAL)
+      2 D      ---    VO7436            VO 7436 index
+      3 D      ---    VO7436_err        VO 7436 index error
+      4 D      ---    VO7942            VO 7942 index
+      5 D      ---    VO7942_err        VO 7942 index error
+    -------------------------------------------------------------------------
+    """
+    column_names = ['bjd', 'vo7436', 'vo7436err', 'vo7942' 'vo7942err']
+    data = read_file2dataframe(fil, column_names, ifnofilout=ifnofilout, nrow=nrow)
+    return data
+
+
+def pew_read_pewnir(fil, ifnofilout='empty', nrow=1):
+    """
+    obj.pEW.dat: time series of pEW' values
+    Description of file: obj.pEW.dat
+    --------------------------------------------------------------------------------
+    Col Format Units  Label             Explanations
+    --------------------------------------------------------------------------------
+      1 D      d      BJD               Barycentric Julian date (from SERVAL)
+      2 D      Å      He10833           He 10833 pEW'
+      3 D      Å      He10833_err       He 10833 pEW' error
+      4 I      ---    He10833_telluric  1 if He 10833 window contains telluric lines
+      5 D      Å      Pabeta            Paschen beta pEW'
+      6 D      Å      Pabeta_err        Paschen beta pEW' error
+      7 I      ---    Pabeta_telluric   1 if Pa beta window contains telluric lines
+    --------------------------------------------------------------------------------
+    He 10833 is marked as contaminated by tellurics if the absolute Doppler shift of the stellar spectrum is between 14 and 125 km/s.
+    Pa beta is marked as contaminated by tellurics if the absolute Doppler shift of the stellar spectrum is between 10 and 43 km/s.
+    """
+    column_names = ['bjd', 'he10833', 'he10833err', 'he10833telluric' 'pabeta', 'pabetaerr', 'pabetatelluric']
+    data = read_file2dataframe(fil, column_names, ifnofilout=ifnofilout, nrow=nrow)
+    return data
+
+
+def pew_read_wfb(fil, ifnofilout='empty', nrow=1):
+    """
+    obj.WFB.band.dat: time series of FeH Wing-Ford band (WFB) index
+    Description of file: obj.WFB.band.dat
+    -------------------------------------------------------------------------
+    Col Format Units  Label             Explanations
+    -------------------------------------------------------------------------
+      1 D      d      BJD               Barycentric Julian date (from SERVAL)
+      2 D      ---    WFB               FeH Wing-Ford band index
+      3 D      ---    WFB_err           FeH Wing-Ford band index error
+    -------------------------------------------------------------------------
+    """
+    column_names = ['bjd', 'wfb', 'wfberr']
+    data = read_file2dataframe(fil, column_names, ifnofilout=ifnofilout, nrow=nrow)
     return data
 
 
