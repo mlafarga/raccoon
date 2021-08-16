@@ -743,8 +743,8 @@ def serval_read_rvc(fil, SI=True, ifnofilout='empty', nrow=1):
 
 def serval_read_info(fil, index='timeid', SI=True, ifnofilout='empty', nrow=1, oldversion=False):
     """
-    obj.info.cvs   Infomation from fits file
-    Description of file: obj.info.cvs
+    obj.info.csv   Infomation from fits file
+    Description of file: obj.info.csv
     --------------------------------------------------------------------------------
     Column Format Units     Label     Explanations
     --------------------------------------------------------------------------------
@@ -1531,17 +1531,17 @@ def serval_get(dirin, obj=None, lisdataid=['rvc', 'info', 'brv', 'srv', 'halpha'
 
     # If obj not specified, get it from file names
     if obj is None:
-        if os.path.exists(glob.glob(os.path.join(dirin, '*.info.cvs'))[0]):
-            obj = glob.glob(os.path.join(dirin, '*.info.cvs'))[0].replace('.info.cvs', '')
+        if os.path.exists(glob.glob(os.path.join(dirin, '*.info.csv'))[0]):
+            obj = glob.glob(os.path.join(dirin, '*.info.csv'))[0].replace('.info.csv', '')
         else:
-            sys.exit('File {} does not exist'.format(os.path.join(dirin, '*.info.cvs')))
+            sys.exit('File {} does not exist'.format(os.path.join(dirin, '*.info.csv')))
 
     # Read files
     data_lis = []
     for dataid in lisdataid:
 
         # File to be read
-        if 'info' in dataid: filin = os.path.join(dirin, '{}.info.cvs'.format(obj))
+        if 'info' in dataid: filin = os.path.join(dirin, '{}.info.csv'.format(obj))
         # elif 'err' in dataid: filin = os.path.join(dirin, '{}.{}.daterr'.format(obj, dataid.replace('err', '')))
         elif 'err' in dataid: filin = os.path.join(dirin, '{}.e_{}.dat'.format(obj, dataid.replace('err', '')))
         else: filin = os.path.join(dirin, '{}.{}.dat'.format(obj, dataid))
