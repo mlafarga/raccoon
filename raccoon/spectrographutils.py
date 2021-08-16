@@ -124,6 +124,34 @@ def inst_rvpixmed(inst, notfound=None, verb=True):
     return rvpixmed
 
 
+# Spectral sampling s [pix/SE] (SE: spectral element, ~ FWHM)
+
+dictspix = {
+    'CARM_VIS': 2.5,
+    'CARM_NIR': 2.8,
+    'HARPS': 3.2,
+    'HARPN': 3.2,
+    'EXPRES': 3.6,  # 4.0
+}
+
+
+def inst_rvpixmed(inst, notfound=None, verb=True):
+    """Get sampling [pix/SE] for instrument `inst`.
+
+    Parameters
+    ----------
+
+    Returns
+    -------
+    rvpixmed : int
+    """
+    try:
+        rvpixmed = dictspix[inst]
+    except:
+        if verb: print('Instrument {} not available, return {}'.format(inst, notfound))
+        rvpixmed = notfound
+    return rvpixmed
+
 ###############################################################################
 
 
