@@ -741,7 +741,7 @@ def serval_read_rvc(fil, SI=True, ifnofilout='empty', nrow=1):
     return data
 
 
-def serval_read_info(fil, index='timeid', SI=True, ifnofilout='empty', nrow=1):
+def serval_read_info(fil, index='timeid', SI=True, ifnofilout='empty', nrow=1, oldversion=False):
     """
     obj.info.cvs   Infomation from fits file
     Description of file: obj.info.cvs
@@ -759,8 +759,15 @@ def serval_read_info(fil, index='timeid', SI=True, ifnofilout='empty', nrow=1):
          9 D      deg       RA        Telescope Ascension (degrees)
         10 D      deg       DE        Telescope declination (degrees)
     --------------------------------------------------------------------------------
+    
+    Notes
+    -----
+    Columns description above not updated
     """
-    column_names = ['timeid', 'bjd', 'bervunknown', 'snref', 'fitsobj', 'exptime', 'spt', 'flag', 'airmass', 'ratel', 'dectel']
+    if oldversion:
+        column_names = ['timeid', 'bjd', 'bervunknown', 'snref', 'fitsobj', 'exptime', 'spt', 'flag', 'airmass', 'ratel', 'dectel']
+    else:
+        column_names = ['timeid', 'bjd', 'bervunknown', 'snref', 'fitsobj', 'exptime', 'spt', 'flag', 'airmass', 'ratel', 'dectel', 'unknown1', 'unknown2', 'unknown3']
     index_col = 0
     if index == 'timeid': index_col = 0
     elif index == 'bjd': index_col = 1
