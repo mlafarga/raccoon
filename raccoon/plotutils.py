@@ -140,11 +140,11 @@ def figout(fig, tl=True, sv=True, filout='', svext=['png', 'pdf'], sh=False, cl=
     return
 
 
-def figout_simple(fig, sv=True, filout='', svext=['png', 'pdf'], sh=False, cl=True):
+def figout_simple(fig, sv=True, filout='', svext=['png', 'pdf'], sh=False, cl=True, rasterized=True):
     """
     """
     if sv:
-        for ext in svext: fig.savefig(filout+'.'+ext)
+        for ext in svext: fig.savefig(filout+'.'+ext, rasterized=True)
     if sh: plt.show()
     if cl: plt.close(fig)
     return
