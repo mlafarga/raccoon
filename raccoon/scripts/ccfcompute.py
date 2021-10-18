@@ -140,6 +140,7 @@ def parse_args():
     parser.add_argument('--plot_sv', help='Make and save plots.', action='store_true')
     parser.add_argument('--plot_sh', help='Show all plots.', action='store_true')
     parser.add_argument('--plot_spec', action='store_true')
+    # parser.add_argument('--plot_ccfproc', help='CCF process', action='store_true')
     parser.add_argument('--plottest_sh', help='Show test plots to check progress.', action='store_true')
     parser.add_argument('--plottest_sv', help='Save test plots to check progress.', action='store_true')
     parser.add_argument('--plot_ext', nargs='+', help='Extensions of the plots to be saved (e.g. `--plot_ext pdf png`)', default=['pdf'])
@@ -999,7 +1000,8 @@ def main():
             for oo in ords:
                 if oo % 2 == 0: c = 'k'
                 else: c = '.5'
-                ax[0].plot(w[oo], f[oo], linewidth=0.5, marker='.', color=c)
+                ax[0].plot(w[oo], f[oo], linewidth=0.5, marker='.', color=c, alpha=0.8)
+                ax[1].plot(w[oo], f[oo]/c[oo], linewidth=0.5, marker='.', color=c, alpha=0.8)
                 # ax[1].plot(w[o], f[o]/c[o], linewidth=0.5, marker='.', color=c)
             plt.tight_layout()
             plt.show()
@@ -1144,6 +1146,40 @@ def main():
             #     plt.tight_layout()
             #     plt.show()
             #     plt.close()
+
+            # Plot spectrum
+            """
+            if args.plot_ccfproc:
+                print('----------------plotting')
+                fig, ax = plt.subplots(2, 1, figsize=(10, 6))
+
+                fig = plt.figure(constrained_layout=True)
+                gs = fig.add_gridspec(ncols=2, nrows=2, width_ratios=[3, 1], height_ratios=[1, 1])
+                axspec = fig.add_subplot(gs[0, 0])  # [y, x]
+                axspecnorm = fig.add_subplot(gs[1, 0])
+                axccf = fig.add_subplot(gs[:, 1])
+
+                axspec.plot(w[o], f[o], linewidth=0.5, marker='.', color='k')
+
+                ylim = axspec.get_ylim()
+                axspec.vlines(wmords[o], ylim[0], fmords[o]*0.5*ylim[1], color='C1', alpha=0.8, zorder=10)
+                axspec.vlines(wmords[o]*()SHIFT!!!!!!!!!!, ylim[0], fmords[o]*0.5*ylim[1], color='C2', alpha=0.8, zorder=10, linestyle='dashed')
+                axspec.vlines(wmords[o]-SHIFT!!!!!!!!!!, ylim[0], fmords[o]*0.5*ylim[1], color='C3', alpha=0.8, zorder=10, linestyle='dashed')
+                axspec.set_ylim(ylim)
+
+                axspecnorm.plot(w[o], f[o]/c[o], linewidth=0.5, marker='.', color='k')
+
+                ylim = axspecnorm.get_ylim()
+                axspecnorm.vlines(wmords[o], ylim[0], fmords[o]*0.5*ylim[1], color='C1', alpha=0.8, zorder=10)
+                axspecnorm.set_ylim(ylim)
+
+                axccf.plot(rv, ccfo, linewidth=0.5, marker='.', color='k')
+                # ax[1].plot(w[o], f[o]/c[o], linewidth=0.5, marker='.', color=c)
+                plt.tight_layout()
+                plotutils.figout(fig, filout=os.path.join(args.dirout, '{}_spec_ccf_o{}'.format(os.path.basename(os.path.splitext(filobs)[0]), o)), sv=args.plot_sv, svext=args.plot_ext, sh=args.plot_sh)
+                # plt.show()
+                # plt.close()
+            """
 
             # -------------------
 
