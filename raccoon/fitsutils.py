@@ -69,7 +69,7 @@ def read_header_keywords(filin, kws, notfound=np.nan, ext=0, names=None):
     return data
 
 
-def read_header_keywords_lisobs(lisobs, kws, notfound=np.nan, ext=0, names=None):
+def read_header_keywords_lisobs(lisobs, kws, notfound=np.nan, ext=0, names=None, index=None):
     """Read keywords in `kws` from FITS header for the observations in `lisobs`.
 
     Parameters
@@ -85,6 +85,10 @@ def read_header_keywords_lisobs(lisobs, kws, notfound=np.nan, ext=0, names=None)
         Names for the output dictionary keys, to substitute the original header keywords. E.g. `names={'oldk: 'newk}`.
         Must contain all the keywords in `kws`.
         If not a dictionary or old keywords not correct, no change is made.
+    index : list-like
+        Used if want the returned dataframe to have a specific index.
+        If None and list of observations provided, index will be the observations names (path + file name).
+        If None and headers provided, index will be numeric.
 
     Returns
     -------
@@ -98,8 +102,11 @@ def read_header_keywords_lisobs(lisobs, kws, notfound=np.nan, ext=0, names=None)
     lisdata = []
     for obs in lisobs:
         # Read header
-        if isinstance(obs, str): header = read_header(obs, ext=ext)
-        elif isinstance(obs, fits.header.Header): header = obs
+        if isinstance(obs, str):
+            header = read_header(obs, ext=ext)
+        # If header already provided, no need to read it again
+        elif isinstance(obs, fits.header.Header):
+            header = obs
 
         # Get keywords values
         dataobs = {}
@@ -109,8 +116,12 @@ def read_header_keywords_lisobs(lisobs, kws, notfound=np.nan, ext=0, names=None)
 
         lisdata.append(dataobs)
 
+    # Dataframe index
+    if index is None:
+        if isinstance(lisobs[0], str): index = lisobs
+        else: index = np.arange(0, len(lisobs), 1)
     # Convert to dataframe
-    data = pd.DataFrame(lisdata, index=lisobs)
+    data = pd.DataFrame(lisdata, index=index)
 
     # Change dataframe columns
     if isinstance(names, dict):

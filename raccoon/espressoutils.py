@@ -154,7 +154,7 @@ def drs_bjd_lisobs(lisobs, notfound=np.nan, ext=0, name='bjd'):
 
 # SNR
 
-def drs_snr(filin, ords=None, notfound=np.nan, ext=0):
+def drs_snr(filin, ords=None, notfound=np.nan, ext=0, name='snro'):
     """Get the SNR of the orders in `ords` (e.g. from keyword 'HIERARCH ESO QC ORDER10 SNR').
 
     Uses:
@@ -170,6 +170,8 @@ def drs_snr(filin, ords=None, notfound=np.nan, ext=0):
         Value to return if keyword not found in FITS header.
     ext : int, default 0
         Extension of the FITS from which to get the header. Only used if `filin` is a FITS file.
+    name : str
+        Change keywords to `name` plus the corresponding order (from 0 to nord, so will subtract -1 to the orders listed in the header)
 
     Returns
     -------
@@ -177,7 +179,7 @@ def drs_snr(filin, ords=None, notfound=np.nan, ext=0):
         Dictionary with the header keywords and their values.
     """
 
-    pattern = 'HIERARCH ESO QC ORDER* SNR'
+    pattern = 'ESO QC ORDER* SNR'
     # Read header
     if isinstance(filin, str): header = fitsutils.read_header(filin, ext=ext)
     elif isinstance(filin, fits.header.Header): header = filin
@@ -198,10 +200,21 @@ def drs_snr(filin, ords=None, notfound=np.nan, ext=0):
         # `int(re.search(r'\d+$', k).group())` used to find integers at the end of the string `k`
         dic = {k: v for k, v in kws.items() if int(re.search(r'\d+$', k).group()) in ords}
 
+    # Change keywords names
+    if name is not None:
+        dicnew = {}
+        for kw, v in dic.items():
+            kwnew = kw.replace('ESO QC ORDER', '')
+            kwnew = kwnew.replace('SNR', '')
+            kwnew = kwnew.strip()
+            kwnew = str(int(kwnew) - 1)
+            dicnew[name + kwnew] = v
+        dic = dicnew
+
     return dic
 
 
-def drs_snr_lisobs(lisobs, ords=None, notfound=np.nan, ext=0):
+def drs_snr_lisobs(lisobs, ords=None, notfound=np.nan, ext=0, name='snro'):
     """Get the SNR of the orders in `ords` (e.g. from keyword 'HIERARCH ESO QC ORDER10 SNR') for the observations in `lisobs`.
 
     Uses:
@@ -212,7 +225,7 @@ def drs_snr_lisobs(lisobs, ords=None, notfound=np.nan, ext=0):
     -------
     data : pandas dataframe
     """
-    pattern = 'HIERARCH ESO QC ORDER* SNR'
+    pattern = 'ESO QC ORDER* SNR'
 
     # Get keywords: Read header of 1st observation
     filin = lisobs[0]
@@ -240,50 +253,59 @@ def drs_snr_lisobs(lisobs, ords=None, notfound=np.nan, ext=0):
 
     # Read headers
     data = fitsutils.read_header_keywords_lisobs(lisobs, kws, notfound=notfound, ext=ext)
+
+    if name is not None:
+        columns = {kw: name+str(o) for o, kw in enumerate(data.columns)}
+        data.rename(columns=columns, inplace=True)
     return data
 
 
 # Exposure time
 
-def drs_exptime(filin, notfound=np.nan, ext=0, outfmt='single'):
+def drs_exptime(filin, notfound=np.nan, ext=0, name='exptime', outfmt='single'):
     """
     """
     kw = 'EXPTIME'
-    dic = fitsutils.read_header_keywords(filin, kw, notfound=notfound, ext=ext)
+    if name is not None: name = {kw: name}
+    dic = fitsutils.read_header_keywords(filin, kw, notfound=notfound, ext=ext, names=name)
     if outfmt == 'single': return dic[kw]
     elif outfmt == 'dict': return dic
     else: sys.exit('`outfmt`={} not valid!'.format(outfmt))
 
 
-def drs_exptime_lisobs(lisobs, notfound=np.nan, ext=0):
+def drs_exptime_lisobs(lisobs, notfound=np.nan, ext=0, name='exptime'):
     kw = 'EXPTIME'
-    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext)
+    if name is not None: name = {kw: name}
+    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext, names=name)
     return data
 
 
-def drs_airmass_start_lisobs(lisobs, notfound=np.nan, ext=0):
+def drs_airmass_start_lisobs(lisobs, notfound=np.nan, ext=0, name='airmassstart'):
     """
     HIERARCH ESO TEL1 AIRM END = 2.551 / Airmass at end
     HIERARCH ESO TEL1 AIRM START = 2.612 / Airmass at start
+    `TEL` can change from 1 to 4! 
     """
     kw = 'HIERARCH ESO TEL1 AIRM START'
-    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext)
+    if name is not None: name = {kw: name}
+    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext, names=name)
     return data
 
 
-def drs_airmass_end_lisobs(lisobs, notfound=np.nan, ext=0):
+def drs_airmass_end_lisobs(lisobs, notfound=np.nan, ext=0, name='airmassend'):
     """
     HIERARCH ESO TEL1 AIRM END = 2.551 / Airmass at end
     HIERARCH ESO TEL1 AIRM START = 2.612 / Airmass at start
     """
     kw = 'HIERARCH ESO TEL1 AIRM END'
-    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext)
+    if name is not None: name = {kw: name}
+    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext, names=name)
     return data
 
 
 # RV corrections
 
-def drs_berv(filin, notfound=np.nan, ext=0, outfmt='single', units='is'):
+def drs_berv(filin, notfound=np.nan, ext=0, name='berv', outfmt='single', units='is'):
     """
     Parameters
     ----------
@@ -295,7 +317,8 @@ def drs_berv(filin, notfound=np.nan, ext=0, outfmt='single', units='is'):
     """
 
     kw = 'HIERARCH ESO QC BERV'
-    dic = fitsutils.read_header_keywords(filin, kw, notfound=notfound, ext=ext)
+    if name is not None: name = {kw: name}
+    dic = fitsutils.read_header_keywords(filin, kw, notfound=notfound, ext=ext, names=name)
     if units == 'is':
         dic[kw] = dic[kw] * 1.e3  # m/s
     if outfmt == 'single': return dic[kw]
@@ -303,7 +326,7 @@ def drs_berv(filin, notfound=np.nan, ext=0, outfmt='single', units='is'):
     else: sys.exit('`outfmt`={} not valid!'.format(outfmt))
 
 
-def drs_berv_lisobs(lisobs, notfound=np.nan, ext=0, units='is'):
+def drs_berv_lisobs(lisobs, notfound=np.nan, ext=0, name='berv', units='is'):
     """
     Parameters
     ----------
@@ -314,7 +337,10 @@ def drs_berv_lisobs(lisobs, notfound=np.nan, ext=0, units='is'):
     data : pandas dataframe
     """
     kw = 'HIERARCH ESO QC BERV'
-    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext, units=units)
+    if name is not None: name = {kw: name}
+    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext, names=name)
+    if units == 'is':
+        data = data * 1.e3  # m/s
     return data
 
 
@@ -337,7 +363,8 @@ def drs_ccfkw(filin, notfound=np.nan, ext=0):
     HIERARCH PIPELINE MASK TIMESTAMP = '2021-08-17T02:23:05' / Header Mask generatio
     """
     kws = ['HIERARCH ESO QC CCF RV', 'HIERARCH ESO QC CCF RV ERROR', 'HIERARCH ESO QC CCF FWHM', 'HIERARCH ESO QC CCF FWHM ERROR', 'HIERARCH ESO QC CCF CONTRAST', 'HIERARCH ESO QC CCF CONTRAST ERROR', 'HIERARCH ESO QC CCF CONTINUUM', 'HIERARCH ESO QC CCF MASK', 'HIERARCH ESO QC CCF FLUX ASYMMETRY', 'HIERARCH ESO QC CCF FLUX ASYMMETRY ERROR', 'HIERARCH ESO QC CCF BIS SPAN', 'HIERARCH ESO QC CCF BIS SPAN ERROR', 'HIERARCH PIPELINE MASK TIMESTAMP']
-    names = {'ccfrv': 'HIERARCH ESO QC CCF RV', 'ccfrverr': 'HIERARCH ESO QC CCF RV ERROR', 'ccffwhm': 'HIERARCH ESO QC CCF FWHM', 'ccffwhmerr': 'HIERARCH ESO QC CCF FWHM ERROR', 'ccfcontrast': 'HIERARCH ESO QC CCF CONTRAST', 'ccfconstrasterr': 'HIERARCH ESO QC CCF CONTRAST ERROR', 'ccfcont': 'HIERARCH ESO QC CCF CONTINUUM', 'ccfmask': 'HIERARCH ESO QC CCF MASK', 'ccffasy': 'HIERARCH ESO QC CCF FLUX ASYMMETRY', 'ccffasyerr': 'HIERARCH ESO QC CCF FLUX ASYMMETRY ERROR', 'ccfbis': 'HIERARCH ESO QC CCF BIS SPAN', 'ccfbiserr': 'HIERARCH ESO QC CCF BIS SPAN ERROR', 'ccfmasktimestamp': 'HIERARCH PIPELINE MASK TIMESTAMP'}
+    # names = {'HIERARCH ESO QC CCF RV': 'ccfrv', 'HIERARCH ESO QC CCF RV ERROR': 'ccfrverr', 'HIERARCH ESO QC CCF FWHM': 'ccffwhm', 'HIERARCH ESO QC CCF FWHM ERROR': 'ccffwhmerr', 'HIERARCH ESO QC CCF CONTRAST': 'ccfcontrast', 'HIERARCH ESO QC CCF CONTRAST ERROR': 'ccfconstrasterr', 'HIERARCH ESO QC CCF CONTINUUM': 'ccfcont', 'HIERARCH ESO QC CCF MASK': 'ccfmask', 'HIERARCH ESO QC CCF FLUX ASYMMETRY': 'ccffasy', 'HIERARCH ESO QC CCF FLUX ASYMMETRY ERROR': 'ccffasyerr', 'HIERARCH ESO QC CCF BIS SPAN': 'ccfbis', 'HIERARCH ESO QC CCF BIS SPAN ERROR': 'ccfbiserr', 'HIERARCH PIPELINE MASK TIMESTAMP': 'ccfmasktimestamp'}
+    names = {'HIERARCH ESO QC CCF RV': 'ccfrv', 'HIERARCH ESO QC CCF RV ERROR': 'ccfrverr', 'HIERARCH ESO QC CCF FWHM': 'ccffwhm', 'HIERARCH ESO QC CCF FWHM ERROR': 'ccffwhmerr', 'HIERARCH ESO QC CCF CONTRAST': 'ccfcontrast', 'HIERARCH ESO QC CCF CONTRAST ERROR': 'ccfconstrasterr', 'HIERARCH ESO QC CCF CONTINUUM': 'ccfcont', 'HIERARCH ESO QC CCF MASK': 'ccfmask', 'HIERARCH ESO QC CCF FLUX ASYMMETRY': 'ccffasy', 'HIERARCH ESO QC CCF FLUX ASYMMETRY ERROR': 'ccffasyerr', 'HIERARCH ESO QC CCF BIS SPAN': 'ccfbis', 'HIERARCH ESO QC CCF BIS SPAN ERROR': 'ccfbiserr', 'HIERARCH PIPELINE MASK TIMESTAMP': 'ccfmasktimestamp'}
 
     data = fitsutils.read_header_keywords(filin, kws, notfound=notfound, ext=ext, names=names)
     return data
@@ -362,7 +389,7 @@ def drs_ccfkw_lisobs(lisobs, notfound=np.nan, ext=0):
     HIERARCH PIPELINE MASK TIMESTAMP = '2021-08-17T02:23:05' / Header Mask generatio
     """
     kws = ['HIERARCH ESO QC CCF RV', 'HIERARCH ESO QC CCF RV ERROR', 'HIERARCH ESO QC CCF FWHM', 'HIERARCH ESO QC CCF FWHM ERROR', 'HIERARCH ESO QC CCF CONTRAST', 'HIERARCH ESO QC CCF CONTRAST ERROR', 'HIERARCH ESO QC CCF CONTINUUM', 'HIERARCH ESO QC CCF MASK', 'HIERARCH ESO QC CCF FLUX ASYMMETRY', 'HIERARCH ESO QC CCF FLUX ASYMMETRY ERROR', 'HIERARCH ESO QC CCF BIS SPAN', 'HIERARCH ESO QC CCF BIS SPAN ERROR', 'HIERARCH PIPELINE MASK TIMESTAMP']
-    names = {'ccfrv': 'HIERARCH ESO QC CCF RV', 'ccfrverr': 'HIERARCH ESO QC CCF RV ERROR', 'ccffwhm': 'HIERARCH ESO QC CCF FWHM', 'ccffwhmerr': 'HIERARCH ESO QC CCF FWHM ERROR', 'ccfcontrast': 'HIERARCH ESO QC CCF CONTRAST', 'ccfconstrasterr': 'HIERARCH ESO QC CCF CONTRAST ERROR', 'ccfcont': 'HIERARCH ESO QC CCF CONTINUUM', 'ccfmask': 'HIERARCH ESO QC CCF MASK', 'ccffasy': 'HIERARCH ESO QC CCF FLUX ASYMMETRY', 'ccffasyerr': 'HIERARCH ESO QC CCF FLUX ASYMMETRY ERROR', 'ccfbis': 'HIERARCH ESO QC CCF BIS SPAN', 'ccfbiserr': 'HIERARCH ESO QC CCF BIS SPAN ERROR', 'ccfmasktimestamp': 'HIERARCH PIPELINE MASK TIMESTAMP'}
+    names = {'HIERARCH ESO QC CCF RV': 'ccfrv', 'HIERARCH ESO QC CCF RV ERROR': 'ccfrverr', 'HIERARCH ESO QC CCF FWHM': 'ccffwhm', 'HIERARCH ESO QC CCF FWHM ERROR': 'ccffwhmerr', 'HIERARCH ESO QC CCF CONTRAST': 'ccfcontrast', 'HIERARCH ESO QC CCF CONTRAST ERROR': 'ccfconstrasterr', 'HIERARCH ESO QC CCF CONTINUUM': 'ccfcont', 'HIERARCH ESO QC CCF MASK': 'ccfmask', 'HIERARCH ESO QC CCF FLUX ASYMMETRY': 'ccffasy', 'HIERARCH ESO QC CCF FLUX ASYMMETRY ERROR': 'ccffasyerr', 'HIERARCH ESO QC CCF BIS SPAN': 'ccfbis', 'HIERARCH ESO QC CCF BIS SPAN ERROR': 'ccfbiserr', 'HIERARCH PIPELINE MASK TIMESTAMP': 'ccfmasktimestamp'}
 
     data = fitsutils.read_header_keywords_lisobs(lisobs, kws, notfound=notfound, ext=ext, names=names)
     return data

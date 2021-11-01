@@ -15,11 +15,18 @@ import pandas as pd
 from . import carmenesutils
 from . import harpsutils
 from . import expresutils
+from . import espressoutils
 
 ###############################################################################
 
 # Spectrograph data
 # -----------------
+
+# Pixels per order
+dicpix = {
+    'CARM_VIS': 4096,
+    'ESPRESSO': 9111,
+}
 
 # Resolution
 dicres = {
@@ -37,6 +44,7 @@ dicnord = {
     'HARPS': 72,
     'HARPN': 69,
     'EXPRES': 86,
+    'ESPRESSO': 170,
 }
 
 
