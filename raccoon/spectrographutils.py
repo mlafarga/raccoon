@@ -35,6 +35,7 @@ dicres = {
     'HARPS': 115000,
     'HARPN': 115000,
     'EXPRES': 150000,
+    'ESPRESSO': 140000, # If HR mode (1-UT). Can also be 190000 if UHR mode (1-UT) or 70000 if MR mode (4-UT)
 }
 
 # Number of orders

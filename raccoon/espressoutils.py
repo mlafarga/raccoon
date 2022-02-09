@@ -57,6 +57,54 @@ kwinst = 'HIERARCH ESO'
 # FITS data
 # ---------
 
+# Read header
+
+def drs_fitsred_header(filin, verbose=True):
+    """
+    Read an echelle reduced spectrum FITS header.
+    Should work for all `_S2D_A.fits`, `_S2D_SKYSUB_A.fits`, `_S2D_BLAZE_A.fits`, 
+
+    Parameters
+    ----------
+    filin : str
+        FITS file.
+
+    _S2D_A.fits structure
+    ---------------------
+
+    Filename: r.ESPRE.2021-01-01T02:41:31.734_S2D_A.fits
+    
+    No.    Name      Ver    Type      Cards   Dimensions   Format
+      0  PRIMARY       1 PrimaryHDU    1480   ()      
+      1  SCIDATA       1 ImageHDU        10   (9111, 170)   float32   
+      2  ERRDATA       1 ImageHDU        10   (9111, 170)   float32   
+      3  QUALDATA      1 ImageHDU        12   (9111, 170)   int16 (rescales to uint16)   
+      4  WAVEDATA_VAC_BARY    1 ImageHDU        10   (9111, 170)   float64   
+      5  WAVEDATA_AIR_BARY    1 ImageHDU        10   (9111, 170)   float64   
+      6  DLLDATA_VAC_BARY    1 ImageHDU        10   (9111, 170)   float64   
+      7  DLLDATA_AIR_BARY    1 ImageHDU        10   (9111, 170)   float64 
+    """
+    # Check if file exists
+    if not os.path.isfile(filin): sys.exit('File does not exist: {}'.format(filin))
+
+    # Read FITS
+    if verbose: print('Reading header from', filin)
+    with fits.open(filin) as hdulist:
+        # Header
+        header = hdulist[0].header
+
+    return header
+
+
+def drs_fitsred_header_lisobs(lisfilin, verbose=True):
+    lisheader = []
+    nobs = len(lisfilin)
+    for i, filin in enumerate(lisfilin):
+        if verbose: print('{}/{} Reading header from {}'.format(i+1, nobs, filin))
+        lisheader.append(drs_fitsred_header(filin, verbose=False))
+    return lisheader
+
+
 # Read all reduced data
 
 def drs_fitsred_read(filin, qualdata2mask=True, w='vac'):
@@ -68,7 +116,6 @@ def drs_fitsred_read(filin, qualdata2mask=True, w='vac'):
     ----------
     filin
     qualdata2mask : bool, default: True
-        return 
 
     Notes
     -----
@@ -280,13 +327,47 @@ def drs_exptime_lisobs(lisobs, notfound=np.nan, ext=0, name='exptime'):
     return data
 
 
+def headertelescopenumber(filin, outfail=np.nan, ext=0):
+    """Get the corresponding start of the header keywords depending on the unit telescope used: keywords can be 'HIERARCH ESO TEL1 something', 'HIERARCH ESO TEL2 something', 'HIERARCH ESO TEL3 something', or 'HIERARCH ESO TEL4 something' since there are 4 telescopes.
+    If fail, return `outfail`, which by default is NaN.
+
+    Returns
+    -------
+    kwinst : {'HIERARCH TNG ', 'HIERARCH ESO '}
+
+    Notes
+    -----
+    TELESCOP= 'ESO-VLT-U1'         / ESO <TEL>
+    HIERARCH ESO OCS TEL NO =    1 / Number of active telescopes (1 - 4).
+    HIERARCH ESO OCS TEL1 ST =   T / Availability of the telescope.
+    HIERARCH ESO OCS TEL2 ST =   F / Availability of the telescope.
+    HIERARCH ESO OCS TEL3 ST =   F / Availability of the telescope.
+    HIERARCH ESO OCS TEL4 ST =   F / Availability of the telescope.
+    """
+
+    # Read header
+    if isinstance(filin, str): header = fitsutils.read_header(filin, ext=ext)
+    elif isinstance(filin, fits.header.Header): header = filin
+
+    # Identify telescope number
+    try:
+        telnumber = header['TELESCOP'].replace('ESO-VLT-U', '')
+    except:
+        telnumber = outfail
+        print('Telescope number not found: {}'.format(telnumber))
+
+    return telnumber
+
+
 def drs_airmass_start_lisobs(lisobs, notfound=np.nan, ext=0, name='airmassstart'):
     """
     HIERARCH ESO TEL1 AIRM END = 2.551 / Airmass at end
     HIERARCH ESO TEL1 AIRM START = 2.612 / Airmass at start
-    `TEL` can change from 1 to 4! 
+    `TEL` can change from 1 to 4! Assume all observations taken with the same telescope
     """
-    kw = 'HIERARCH ESO TEL1 AIRM START'
+    telnumber = headertelescopenumber(lisobs[0])
+    kw = 'HIERARCH ESO TEL{} AIRM START'.format(telnumber)
+
     if name is not None: name = {kw: name}
     data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext, names=name)
     return data
@@ -297,7 +378,8 @@ def drs_airmass_end_lisobs(lisobs, notfound=np.nan, ext=0, name='airmassend'):
     HIERARCH ESO TEL1 AIRM END = 2.551 / Airmass at end
     HIERARCH ESO TEL1 AIRM START = 2.612 / Airmass at start
     """
-    kw = 'HIERARCH ESO TEL1 AIRM END'
+    telnumber = headertelescopenumber(lisobs[0])
+    kw = 'HIERARCH ESO TEL{} AIRM END'.format(telnumber)
     if name is not None: name = {kw: name}
     data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext, names=name)
     return data
