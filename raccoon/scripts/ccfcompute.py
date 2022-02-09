@@ -1530,23 +1530,32 @@ def main():
 
     # lisccforv, lisccfofwhm, lisccfocontrast, lisccfobis = {}, {}, {}, {}
     # lisccforverr, lisccfofwhmerr, lisccfocontrasterr, lisccfobiserr = {}, {}, {}, {}
+    # Main params
     lisparam = ['rv', 'fwhm', 'contrast', 'bis', 'rverr', 'fwhmerr', 'contrasterr', 'biserr']
     dataorder = {'rv': {}, 'fwhm': {}, 'contrast': {}, 'bis': {}, 'rverr': {}, 'fwhmerr': {}, 'contrasterr': {}, 'biserr': {}}
+    # All params
     lisparam_all = ['rv', 'rverr', 'fwhm', 'fwhmerr', 'contrast', 'contrasterr', 'bis', 'biserr', 'fitamp', 'fitamperr', 'fitcen', 'fitcenerr', 'fitwid', 'fitwiderr', 'fitshift', 'fitshifterr', 'fitredchi2']
     dataorder_all = {'rv': {}, 'rverr': {}, 'fwhm': {}, 'fwhmerr': {}, 'contrast': {}, 'contrasterr': {}, 'bis': {}, 'biserr': {}, 'fitamp': {}, 'fitamperr': {}, 'fitcen': {}, 'fitcenerr': {}, 'fitwid': {}, 'fitwiderr': {}, 'fitshift': {}, 'fitshifterr': {}, 'fitredchi2': {}}
+    # CCF
+    lisccfs = []
     for i, obs in enumerate(lisfilobs):
         # Read CCF order data
         filobs = lisfilobs[i]
         filccf = os.path.join(args.dirout, os.path.basename(os.path.splitext(filobs)[0]) + '_ccf.fits')
         if not os.path.exists(filccf): continue
         rv, ccfsum, ccfparsum, ccf, ccfpar, bxsum, bysum, bx, by, headerobs = ccflib.infits_ccfall(filccf)
+        
         # Organise data main CCF params
         for p in lisparam:
             dataorder[p][ccfparsum['bjd']] = ccfpar[p]
+        
         #  Organise data all CCF params
         for p in lisparam_all:
             # dataorder_all[p][ccfparsum['bjd']] = ccfpar[p]
             dataorder_all[p][os.path.basename(obs)] = ccfpar[p]
+        
+        # Organise CCFs
+        lisccfs.append(np.vstack([rv, ccfsum, ccf]))
 
     # Join and save data (main params)
     for p in lisparam:
@@ -1576,6 +1585,16 @@ def main():
     filout = os.path.join(args.dirout, '{}.par.dat'.format(args.obj))
     datafinal.to_csv(filout, sep=' ', na_rep=np.nan, columns=cols, header=True, index=True, float_format='%0.8f')
     # verboseprint('\nCCF TS data saved in {}'.format(filout))
+
+    ###########################################################################
+
+    # Save CCFs: RVgrid, TS CCF, and each order CCF, one file per observation
+    header = 'rv ccfsum '
+    headero = ['ccfo{}'.format(o) for o in ords]
+    header += ' '.join(headero)
+    for i, obs in enumerate(lisfilobs):
+        filout = os.path.join(args.dirout, os.path.basename(os.path.splitext(obs)[0]) + '_ccfall.dat')
+        np.savetxt(filout, lisccfs[i].T, fmt='%0.8f', delimiter=' ', newline='\n', header=header, comments='')
 
     ###########################################################################
 
