@@ -10,11 +10,12 @@ import os
 import sys
 import textwrap
 
+# import ipdb
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import tqdm
+from tqdm import tqdm
 
 from raccoon import ccf as ccflib
 from raccoon import carmenesutils
@@ -975,7 +976,7 @@ def main():
     first, firsto = True, True
     for i, obs in enumerate(tqdm(lisfilobs)):
         filobs = lisfilobs[i]
-        verboseprint('{}/{} {}'.format(i+1, nobs, filobs))
+        # verboseprint('{}/{} {}'.format(i+1, nobs, filobs))
 
         # Get blaze file (if indicated)
         if args.filobs2blaze is not None:
@@ -1505,23 +1506,23 @@ def main():
     dataall['obs'] = [os.path.basename(filobs) for filobs in dataall['filobs']]
     dataall.set_index('obs', inplace=True, drop=False)
 
-    # Save in file: CCF data, some input data
-    cols = dataall.columns
-    filout = os.path.join(args.dirout, '{}.par.dat'.format(args.obj))
-    dataall.to_csv(filout, sep=' ', na_rep=np.nan, columns=cols, header=True, index=True, float_format='%0.8f')
-    verboseprint('\nCCF TS data saved in {}'.format(filout))
+    # # Save in file: CCF data, some input data ---> NEW Moved below
+    # cols = dataall.columns
+    # filout = os.path.join(args.dirout, '{}.par.dat'.format(args.obj))
+    # dataall.to_csv(filout, sep=' ', na_rep=np.nan, columns=cols, header=True, index=True, float_format='%0.8f')
+    # verboseprint('\nCCF TS data saved in {}'.format(filout))
 
     # Save in file main output: BJD, RV, FWHM, Contrast, BIS and their errors
     cols = ['bjd', 'rv', 'fwhm', 'contrast', 'bis', 'rverrabs', 'fwhmerr', 'contrasterr', 'biserr']
     filout = os.path.join(args.dirout, '{}.ccfpar.dat'.format(args.obj))
     dataall.to_csv(filout, sep=' ', na_rep=np.nan, columns=cols, header=False, index=False, float_format='%0.8f')
-    verboseprint('\nCCF TS data saved in {}'.format(filout))
+    # verboseprint('CCF TS data saved in {}'.format(filout))
 
     # Save file info.csv
     cols = ['bjd', 'obs', 'berv', 'drift', 'sa', 'rverr', 'drifterr', 'exptime', 'airmass', 'snroref', 'objmask', 'sptmask', 'vsinimask', 'nlinoriginal', 'nlint']
     filout = os.path.join(args.dirout, '{}.info.csv'.format(args.obj))
     dataall.to_csv(filout, sep=';', na_rep=np.nan, columns=cols, header=False, index=False, float_format='%0.8f')
-    verboseprint('\nCCF extra data saved in {}'.format(filout))
+    # verboseprint('CCF extra data saved in {}'.format(filout))
 
     ###########################################################################
 
@@ -1531,21 +1532,50 @@ def main():
     # lisccforverr, lisccfofwhmerr, lisccfocontrasterr, lisccfobiserr = {}, {}, {}, {}
     lisparam = ['rv', 'fwhm', 'contrast', 'bis', 'rverr', 'fwhmerr', 'contrasterr', 'biserr']
     dataorder = {'rv': {}, 'fwhm': {}, 'contrast': {}, 'bis': {}, 'rverr': {}, 'fwhmerr': {}, 'contrasterr': {}, 'biserr': {}}
+    lisparam_all = ['rv', 'rverr', 'fwhm', 'fwhmerr', 'contrast', 'contrasterr', 'bis', 'biserr', 'fitamp', 'fitamperr', 'fitcen', 'fitcenerr', 'fitwid', 'fitwiderr', 'fitshift', 'fitshifterr', 'fitredchi2']
+    dataorder_all = {'rv': {}, 'rverr': {}, 'fwhm': {}, 'fwhmerr': {}, 'contrast': {}, 'contrasterr': {}, 'bis': {}, 'biserr': {}, 'fitamp': {}, 'fitamperr': {}, 'fitcen': {}, 'fitcenerr': {}, 'fitwid': {}, 'fitwiderr': {}, 'fitshift': {}, 'fitshifterr': {}, 'fitredchi2': {}}
     for i, obs in enumerate(lisfilobs):
+        # Read CCF order data
         filobs = lisfilobs[i]
         filccf = os.path.join(args.dirout, os.path.basename(os.path.splitext(filobs)[0]) + '_ccf.fits')
         if not os.path.exists(filccf): continue
-        # verboseprint('{}/{} {}'.format(i+1, nobs, filccf))
-
         rv, ccfsum, ccfparsum, ccf, ccfpar, bxsum, bysum, bx, by, headerobs = ccflib.infits_ccfall(filccf)
+        # Organise data main CCF params
         for p in lisparam:
             dataorder[p][ccfparsum['bjd']] = ccfpar[p]
+        #  Organise data all CCF params
+        for p in lisparam_all:
+            # dataorder_all[p][ccfparsum['bjd']] = ccfpar[p]
+            dataorder_all[p][os.path.basename(obs)] = ccfpar[p]
 
-    # Join data
+    # Join and save data (main params)
     for p in lisparam:
+        # Main params
         dataorder[p] = pd.DataFrame.from_dict(dataorder[p], orient='index')
         filout = os.path.join(args.dirout, '{}.{}o.dat'.format(args.obj, p))
         dataorder[p].to_csv(filout, sep=' ', na_rep=np.nan, header=False)
+
+    ###########################################################################
+
+    # Save all data (TS and order) in a single file
+
+    # Join data (all params), as above with main params
+    for p in lisparam_all:
+        dataorder_all[p] = pd.DataFrame.from_dict(dataorder_all[p], orient='index')
+        rename_cols = {o: '{}o{}'.format(p, o) for o in dataorder_all[p].columns}
+        dataorder_all[p].rename(rename_cols, axis=1, inplace=True)
+
+    # Merge order data from dict of dataframes into single dataframe
+    dataorder_all = pd.concat(dataorder_all.values(), axis=1)
+
+    # Merge order data `dataorder_all` and TS data `dataall`
+    datafinal = pd.concat([dataall, dataorder_all], axis=1)
+
+    # Save in file: CCF data (TS and order), and some input data
+    cols = datafinal.columns
+    filout = os.path.join(args.dirout, '{}.par.dat'.format(args.obj))
+    datafinal.to_csv(filout, sep=' ', na_rep=np.nan, columns=cols, header=True, index=True, float_format='%0.8f')
+    # verboseprint('\nCCF TS data saved in {}'.format(filout))
 
     ###########################################################################
 
