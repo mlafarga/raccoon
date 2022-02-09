@@ -19,7 +19,7 @@ Before installing it needs a python 3 distribution with `numpy`.
 If you use conda you can create and activate a conda environment with:
 
 ```bash
-conda create -n raccoon python=3.6 numpy
+conda create -n raccoon python=3.7 numpy scipy astropy pandas lmfit
 conda activate raccoon
 ```
 

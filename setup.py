@@ -24,7 +24,7 @@ setup(
     classifiers=[
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
         "Intended Audience :: Science/Research",
         "Topic :: Scientific/Engineering :: Astronomy",
     ],
@@ -34,7 +34,7 @@ setup(
     packages=setuptools.find_packages(),  # better for scripts
     # python_requires='>=3.6',
     setup_requires=['numpy', 'scipy'],  # need for fortran
-    install_requires=['numpy', 'scipy', 'astropy', 'pandas', 'lmfit', 'progress', 'matplotlib', 'ipdb'],
+    install_requires=['numpy', 'scipy', 'astropy', 'pandas', 'lmfit', 'progress', 'matplotlib'],
 
     # package_data={
     #     # 'raccoon': ["data/*.dat", "data/*.mas", "data/*.fits", ],

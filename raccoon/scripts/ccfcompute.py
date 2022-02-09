@@ -10,7 +10,6 @@ import os
 import sys
 import textwrap
 
-import ipdb
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
@@ -571,7 +570,6 @@ def main():
             # fig, ax = plt.subplots(1,2, figsize=(16, 5), gridspec_kw={'width_ratios': [2,1]})
             # Spec
             args.ccftesto = 45
-            # ipdb.set_trace()
             fmax = np.nanmax(f[args.ccftesto])
             fn = (f[args.ccftesto]) / fmax
             fmaxn = np.nanmax(fn)  # 1.
@@ -595,8 +593,6 @@ def main():
             for a in ax:
                 a.legend(loc='upper right')
             plotutils.figout(fig, filout=os.path.join(args.dirout, 'ccftest_{}_{}'.format(os.path.basename(os.path.splitext(filobsref)[0]), args.ccftesto)), sv=args.plottest_sv, svext=args.plot_ext, sh=args.plottest_sh)
-
-        # ipdb.set_trace()
 
         # ---------------------------------
 
@@ -1550,7 +1546,6 @@ def main():
         filout = os.path.join(args.dirout, '{}.{}o.dat'.format(args.obj, p))
         dataorder[p].to_csv(filout, sep=' ', na_rep=np.nan, header=False)
 
-    # ipdb.set_trace()
     ###########################################################################
 
     # Plots
