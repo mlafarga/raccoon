@@ -14,6 +14,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import tqdm
 
 from raccoon import ccf as ccflib
 from raccoon import carmenesutils
@@ -972,7 +973,7 @@ def main():
     # ccfpar = {}
     dataccfsumTS = {}
     first, firsto = True, True
-    for i, obs in enumerate(lisfilobs):
+    for i, obs in enumerate(tqdm(lisfilobs)):
         filobs = lisfilobs[i]
         verboseprint('{}/{} {}'.format(i+1, nobs, filobs))
 
@@ -1474,7 +1475,7 @@ def main():
         # Save CCF data in FITS (one per obs)
         filout = os.path.join(args.dirout, os.path.basename(os.path.splitext(filobs)[0]) + '_ccf.fits')
         ccflib.outfits_ccfall(rv, ccfsum, ccfparsum, ccf, ccfpar, bxsum, bysum, bx, by, header, filout)
-        verboseprint('  CCF data saved in {}'.format(filout))
+        # verboseprint('  CCF data saved in {}'.format(filout))
 
         # How to read these FITS files: `ccflib.infits_ccfall`
         # Example:
@@ -1483,7 +1484,7 @@ def main():
         # Save CCF data txt
         filout = os.path.join(args.dirout, os.path.basename(os.path.splitext(filobs)[0]) + '_ccf.dat')
         ccflib.outdat_ccf(filout, rv, ccfsum)
-        verboseprint('  CCF data saved in {}'.format(filout))
+        # verboseprint('  CCF data saved in {}'.format(filout))
 
     # --- End observations loop ---
 
@@ -1534,7 +1535,7 @@ def main():
         filobs = lisfilobs[i]
         filccf = os.path.join(args.dirout, os.path.basename(os.path.splitext(filobs)[0]) + '_ccf.fits')
         if not os.path.exists(filccf): continue
-        verboseprint('{}/{} {}'.format(i+1, nobs, filccf))
+        # verboseprint('{}/{} {}'.format(i+1, nobs, filccf))
 
         rv, ccfsum, ccfparsum, ccf, ccfpar, bxsum, bysum, bx, by, headerobs = ccflib.infits_ccfall(filccf)
         for p in lisparam:
