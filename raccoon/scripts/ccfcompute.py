@@ -138,6 +138,8 @@ def parse_args():
     # Output
     parser.add_argument('--dirout', help='Output directory.', default='./ccf_output/', type=str)
 
+    parser.add_argument('--output', help='', default=None, type=str, choices=['gto'])
+
     parser.add_argument('--plot_sv', help='Make and save plots.', action='store_true')
     parser.add_argument('--plot_sh', help='Show all plots.', action='store_true')
     parser.add_argument('--plot_spec', action='store_true')
@@ -1483,11 +1485,14 @@ def main():
         # rv2, ccfsum2, ccfparsum2, ccf2, ccfpar2, bxsum2, bysum2, bx2, by2, headerobs2 = ccflib.infits_ccfall(filout)
 
         # Save CCF data txt
-        filout = os.path.join(args.dirout, os.path.basename(os.path.splitext(filobs)[0]) + '_ccf.dat')
-        ccflib.outdat_ccf(filout, rv, ccfsum)
-        # verboseprint('  CCF data saved in {}'.format(filout))
+        if args.output is None:
+            filout = os.path.join(args.dirout, os.path.basename(os.path.splitext(filobs)[0]) + '_ccf.dat')
+            ccflib.outdat_ccf(filout, rv, ccfsum)
+            # verboseprint('  CCF data saved in {}'.format(filout))
+        elif args.output == 'gto':
+            pass
 
-    # --- End observations loop ---
+   # --- End observations loop ---
 
     ###########################################################################
 
@@ -1514,13 +1519,19 @@ def main():
 
     # Save in file main output: BJD, RV, FWHM, Contrast, BIS and their errors
     cols = ['bjd', 'rv', 'fwhm', 'contrast', 'bis', 'rverrabs', 'fwhmerr', 'contrasterr', 'biserr']
-    filout = os.path.join(args.dirout, '{}.ccfpar.dat'.format(args.obj))
+    if args.output is None:
+        filout = os.path.join(args.dirout, '{}.ccfpar.dat'.format(args.obj))
+    elif args.output == 'gto':
+        filout = os.path.join(args.dirout, '{}.ccf.ccfpar.dat'.format(args.obj))
     dataall.to_csv(filout, sep=' ', na_rep=np.nan, columns=cols, header=False, index=False, float_format='%0.8f')
     # verboseprint('CCF TS data saved in {}'.format(filout))
 
     # Save file info.csv
     cols = ['bjd', 'obs', 'berv', 'drift', 'sa', 'rverr', 'drifterr', 'exptime', 'airmass', 'snroref', 'objmask', 'sptmask', 'vsinimask', 'nlinoriginal', 'nlint']
-    filout = os.path.join(args.dirout, '{}.info.csv'.format(args.obj))
+    if args.output is None:
+        filout = os.path.join(args.dirout, '{}.info.csv'.format(args.obj))
+    elif args.output == 'gto':
+        filout = os.path.join(args.dirout, '{}.ccf.info.csv'.format(args.obj))
     dataall.to_csv(filout, sep=';', na_rep=np.nan, columns=cols, header=False, index=False, float_format='%0.8f')
     # verboseprint('CCF extra data saved in {}'.format(filout))
 
@@ -1542,7 +1553,9 @@ def main():
         # Read CCF order data
         filobs = lisfilobs[i]
         filccf = os.path.join(args.dirout, os.path.basename(os.path.splitext(filobs)[0]) + '_ccf.fits')
-        if not os.path.exists(filccf): continue
+        if not os.path.exists(filccf):
+            print('No FITS file', filobs)
+            continue
         rv, ccfsum, ccfparsum, ccf, ccfpar, bxsum, bysum, bx, by, headerobs = ccflib.infits_ccfall(filccf)
         
         # Organise data main CCF params
@@ -1561,7 +1574,11 @@ def main():
     for p in lisparam:
         # Main params
         dataorder[p] = pd.DataFrame.from_dict(dataorder[p], orient='index')
-        filout = os.path.join(args.dirout, '{}.{}o.dat'.format(args.obj, p))
+        if args.output is None:
+            filout = os.path.join(args.dirout, '{}.{}o.dat'.format(args.obj, p))
+        elif args.output == 'gto':
+            pname = 'e_{}'.format(p.replace('err', '')) if p.endswith('err') else p
+            filout = os.path.join(args.dirout, '{}.ccf.{}o.dat'.format(args.obj, pname))
         dataorder[p].to_csv(filout, sep=' ', na_rep=np.nan, header=False)
 
     ###########################################################################
@@ -1581,10 +1598,13 @@ def main():
     datafinal = pd.concat([dataall, dataorder_all], axis=1)
 
     # Save in file: CCF data (TS and order), and some input data
-    cols = datafinal.columns
-    filout = os.path.join(args.dirout, '{}.par.dat'.format(args.obj))
-    datafinal.to_csv(filout, sep=' ', na_rep=np.nan, columns=cols, header=True, index=True, float_format='%0.8f')
-    # verboseprint('\nCCF TS data saved in {}'.format(filout))
+    if args.output is None:
+        cols = datafinal.columns
+        filout = os.path.join(args.dirout, '{}.par.dat'.format(args.obj))
+        datafinal.to_csv(filout, sep=' ', na_rep=np.nan, columns=cols, header=True, index=True, float_format='%0.8f')
+        # verboseprint('\nCCF TS data saved in {}'.format(filout))
+    elif args.output == 'gto':
+        pass
 
     ###########################################################################
 
@@ -1593,7 +1613,10 @@ def main():
     headero = ['ccfo{}'.format(o) for o in ords]
     header += ' '.join(headero)
     for i, obs in enumerate(lisfilobs):
-        filout = os.path.join(args.dirout, os.path.basename(os.path.splitext(obs)[0]) + '_ccfall.dat')
+        if args.output is None:
+            filout = os.path.join(args.dirout, os.path.basename(os.path.splitext(obs)[0]) + '_ccfall.dat')
+        elif args.output == 'gto':
+            filout = os.path.join(args.dirout, os.path.basename(os.path.splitext(obs)[0]) + '_ccf.dat')
         np.savetxt(filout, lisccfs[i].T, fmt='%0.8f', delimiter=' ', newline='\n', header=header, comments='')
 
     ###########################################################################
