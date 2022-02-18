@@ -10,7 +10,7 @@ import os
 import sys
 import textwrap
 
-# import ipdb
+import ipdb
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
@@ -735,6 +735,15 @@ def main():
         # flux_ratios = [np.nanmedian(f[o]) / np.nanmedian(f[oref]) for o in ords]
         flux_ratios = [np.nanmedian(f[o]) / np.nanmedian(f[oref]) for o in ords]
         # plt.plot(ords, flux_ratios, 'o', ords, flux_ratios2, 'x'), plt.show(), plt.close()
+
+        # Save flux ratios per order: Order, flux ratio (i.e. weight), lambda min order, lambda max order
+        if args.output is None:
+            arrwmin = [np.nanmin(w[o]) for o in ords]
+            arrwmax = [np.nanmax(w[o]) for o in ords]
+            filout = os.path.join(args.dirout, '{}.flux_ratios.dat'.format(args.obj))
+            np.savetxt(filout, np.vstack((ords, flux_ratios, arrwmin, arrwmax)).T, delimiter=' ', fmt=['%d', '%.8f', '%.8f', '%.8f'])
+        elif args.output == 'gto':
+            pass
 
     ###########################################################################
 
