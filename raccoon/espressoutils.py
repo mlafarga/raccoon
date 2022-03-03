@@ -161,6 +161,40 @@ def drs_fitsred_read(filin, qualdata2mask=True, w='vac'):
     return w, wair, f, sf, q, mq, dll, dllair, header
 
 
+# Telescope number, need for certain keywords
+
+def headertelescopenumber(filin, outfail=np.nan, ext=0):
+    """Get the corresponding start of the header keywords depending on the unit telescope used: keywords can be 'HIERARCH ESO TEL1 something', 'HIERARCH ESO TEL2 something', 'HIERARCH ESO TEL3 something', or 'HIERARCH ESO TEL4 something' since there are 4 telescopes.
+    If fail, return `outfail`, which by default is NaN.
+
+    Returns
+    -------
+    kwinst : {'HIERARCH TNG ', 'HIERARCH ESO '}
+
+    Notes
+    -----
+    TELESCOP= 'ESO-VLT-U1'         / ESO <TEL>
+    HIERARCH ESO OCS TEL NO =    1 / Number of active telescopes (1 - 4).
+    HIERARCH ESO OCS TEL1 ST =   T / Availability of the telescope.
+    HIERARCH ESO OCS TEL2 ST =   F / Availability of the telescope.
+    HIERARCH ESO OCS TEL3 ST =   F / Availability of the telescope.
+    HIERARCH ESO OCS TEL4 ST =   F / Availability of the telescope.
+    """
+
+    # Read header
+    if isinstance(filin, str): header = fitsutils.read_header(filin, ext=ext)
+    elif isinstance(filin, fits.header.Header): header = filin
+
+    # Identify telescope number
+    try:
+        telnumber = header['TELESCOP'].replace('ESO-VLT-U', '')
+    except:
+        telnumber = outfail
+        print('Telescope number not found: {}'.format(telnumber))
+
+    return telnumber
+
+
 # BJD
 
 def drs_bjd(filin, notfound=np.nan, ext=0, outfmt='single', name='bjd'):
@@ -327,37 +361,7 @@ def drs_exptime_lisobs(lisobs, notfound=np.nan, ext=0, name='exptime'):
     return data
 
 
-def headertelescopenumber(filin, outfail=np.nan, ext=0):
-    """Get the corresponding start of the header keywords depending on the unit telescope used: keywords can be 'HIERARCH ESO TEL1 something', 'HIERARCH ESO TEL2 something', 'HIERARCH ESO TEL3 something', or 'HIERARCH ESO TEL4 something' since there are 4 telescopes.
-    If fail, return `outfail`, which by default is NaN.
-
-    Returns
-    -------
-    kwinst : {'HIERARCH TNG ', 'HIERARCH ESO '}
-
-    Notes
-    -----
-    TELESCOP= 'ESO-VLT-U1'         / ESO <TEL>
-    HIERARCH ESO OCS TEL NO =    1 / Number of active telescopes (1 - 4).
-    HIERARCH ESO OCS TEL1 ST =   T / Availability of the telescope.
-    HIERARCH ESO OCS TEL2 ST =   F / Availability of the telescope.
-    HIERARCH ESO OCS TEL3 ST =   F / Availability of the telescope.
-    HIERARCH ESO OCS TEL4 ST =   F / Availability of the telescope.
-    """
-
-    # Read header
-    if isinstance(filin, str): header = fitsutils.read_header(filin, ext=ext)
-    elif isinstance(filin, fits.header.Header): header = filin
-
-    # Identify telescope number
-    try:
-        telnumber = header['TELESCOP'].replace('ESO-VLT-U', '')
-    except:
-        telnumber = outfail
-        print('Telescope number not found: {}'.format(telnumber))
-
-    return telnumber
-
+# Airmass
 
 def drs_airmass_start_lisobs(lisobs, notfound=np.nan, ext=0, name='airmassstart'):
     """
@@ -380,6 +384,50 @@ def drs_airmass_end_lisobs(lisobs, notfound=np.nan, ext=0, name='airmassend'):
     """
     telnumber = headertelescopenumber(lisobs[0])
     kw = 'HIERARCH ESO TEL{} AIRM END'.format(telnumber)
+    if name is not None: name = {kw: name}
+    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext, names=name)
+    return data
+
+
+# ADC stuff
+
+def drs_adc2ra_lisobs(lisobs, notfound=np.nan, ext=0, name='adc2ra'):
+    """
+    """
+    telnumber = headertelescopenumber(lisobs[0])
+    if telnumber == '1': telnumber = ''
+    kw = 'HIERARCH ESO INS{} ADC2 RA'.format(telnumber)
+    if name is not None: name = {kw: name}
+    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext, names=name)
+    return data
+
+
+def drs_adc2sens1_lisobs(lisobs, notfound=np.nan, ext=0, name='adc2sens1'):
+    """
+    """
+    telnumber = headertelescopenumber(lisobs[0])
+    if telnumber == '1': telnumber = ''
+    kw = 'HIERARCH ESO INS{} ADC2 SENS1'.format(telnumber)
+    if name is not None: name = {kw: name}
+    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext, names=name)
+    return data
+
+
+def drs_adc2temp_lisobs(lisobs, notfound=np.nan, ext=0, name='adc2temp'):
+    """
+    """
+    telnumber = headertelescopenumber(lisobs[0])
+    if telnumber == '1': telnumber = ''
+    kw = 'HIERARCH ESO INS{} ADC2 TEMP'.format(telnumber)
+    if name is not None: name = {kw: name}
+    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext, names=name)
+    return data
+
+
+def drs_fluxcorrcheck_lisobs(lisobs, notfound=np.nan, ext=0, name='fluxcorrcheck'):
+    """
+    """
+    kw = 'HIERARCH ESO QC SCIRED FLUX CORR CHECK'
     if name is not None: name = {kw: name}
     data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext, names=name)
     return data
