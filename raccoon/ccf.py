@@ -931,6 +931,11 @@ def infits_ccfall(filin):
         fin_val = ini_val + n * stp
         rv = np.arange(ini_val, fin_val, stp)
 
+        # Issue with decimals: rv array can end up having an extra point
+        # E.g. J09439+269: From FITS header, initial RV value is `ini_val = 19.1788947345789` but from the original RV array, initial RV value is `rv[0]=19.178894734578897`.
+        if len(rv) == n+1: rv = rv[:-1]
+        elif len(rv) != n: print('rv array length wrong')
+
         # CCF sum
         ccfsum = hdulist['ccfsum'].data
 
