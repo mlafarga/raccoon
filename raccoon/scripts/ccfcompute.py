@@ -1625,7 +1625,8 @@ def main():
         if args.output is None:
             filout = os.path.join(args.dirout, os.path.basename(os.path.splitext(obs)[0]) + '_ccfall.dat')
         elif args.output == 'gto':
-            filout = os.path.join(args.dirout, os.path.basename(os.path.splitext(obs)[0]) + '_ccf.dat')
+            # filout = os.path.join(args.dirout, os.path.basename(os.path.splitext(obs)[0]) + '_ccf.dat')
+            filout = os.path.join(args.dirout, args.obj + '.' + os.path.basename(os.path.splitext(obs)[0]) + '.ccf.dat')
         np.savetxt(filout, lisccfs[i].T, fmt='%0.8f', delimiter=' ', newline='\n', header=header, comments='')
 
     ###########################################################################
