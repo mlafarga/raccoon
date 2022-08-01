@@ -17,7 +17,6 @@ The methods implemented in this code are explained in this article: https://ui.a
 Before installing it needs a python 3 distribution with `numpy`.
 
 If you use conda you can create and activate a conda environment with:
-
 ```bash
 conda create -n raccoon python=3.7 numpy scipy astropy pandas lmfit
 conda activate raccoon
@@ -26,7 +25,6 @@ conda activate raccoon
 ### From source
 
 The source code for `raccoon` can be downloaded from GitHub and installed by running
-
 ```bash
 git clone https://github.com/mlafarga/raccoon.git
 cd raccoon
@@ -55,10 +53,10 @@ CCFs can be computed with the script `raccoonccf`.
 
 You need to specify the following 3 mandatory arguments
 - `fil_or_list_spec`: The input spectra. This can be a file with the names of the reduced FITS spectra or directly the file names (names must include the absolute path to the files).
-- `inst`: Instrument. `CARM_VIS`, `CARM_NIR`.
+- `inst`: Instrument. `CARM_VIS`, `CARM_NIR`, `HARPS`, `HARPN`, `EXPRES`.
 - `filmask`: Mask. You can choose your own mask file (include the absolute path) or use any of the available masks by specifing the mask id (see below).
 
-There are also avaliable several optional arguments. Here is a description of the most important ones
+There are also several optional arguments. Here is a description of the most important ones:
 - `--obj`: Name of the target. The oputput files use this name.
 - `--rvabs`: The absolute RV of the target (in km/s) can be specified to locate the minimum of the CCF faster.
 - `--ords_use`: List of the orders to consider. In general the following orders work well for these instruments:
@@ -66,40 +64,40 @@ There are also avaliable several optional arguments. Here is a description of th
     - `CARM_NIR`: `1 3 4 5 6 7 8 9 10 11 14 15 28 29 31 46 48 50 52`
 - `--filtell`: Telluric mask file. To use the default masks: `--filtell default`
 - `--rvshift`: Usually the spectra are not corrected for barycentric shifts or instrumental drifts. This argument specifies how to get these corrections.
-- `--fcorrorders`: Same SED for all observations.
+- `--fcorrorders obshighsnr`: Use the same SED for all observations. Avoids biases in the CCF profile due to e.g. different extinction values.
 
-For all the available options see
-
+For all the available options see:
 ```bash
 raccoonccf -h
 ```
 
-Here is a basic example of how to run the script with recommended options:
+Here is a basic example of how to run the script with recommended options for a set of CARMENES VIS spectra:
 ```bash
 raccoonccf PATH/TO/OBS/car*vis_A.fits CARM_VIS J07274+052default --obj OBJ --filtell default --rvshift header --fcorrorders obshighsnr --ords_use 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 --plot_sv --verbose
 ```
 
-Outputs:
+<!-- Outputs:
 - `spec_ccf.dat`: 
-- `OBJ.ccfpar.dat`: 
+- `OBJ.ccfpar.dat`:  -->
 
 
 ### Build masks
 
-Example for CARMENES VIS data:
+Weighted binary masks can be computed with the script `raccoonmask`.
 
+Here is a basic example for CARMENES VIS data:
 ```bash
 raccoonmask PATH/TO/TPL.fits TPL_TYPE OBJ --inst CARM_VIS --tplrv 10. --cont poly --contfiltmed 1 --contfiltmax 400 --contpolyord 2 -line_fwhmmin 2.00 --line_fwhmmax 30.00 --line_contrastminmin 0.06 --line_depthw_percentdeepest 0.10 --line_depthw_depthmaxquantile 0.6 --verbose
 ```
 
-For all the available options see
-
+For all the available options see:
 ```bash
 raccoonmask -h
 ```
 
-Output:
-- `TPL.mas`: 
+<!-- Output:
+- `TPL.mas`:  -->
+
 
 ## Available data
 
