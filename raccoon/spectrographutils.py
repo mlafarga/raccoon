@@ -79,7 +79,8 @@ dicoref = {
    'HARPS': 55,
    'HARPN': 55,
    'EXPRES': 60,  # ?
-   'ESPRESSO': 106,  # ? Orders 106 and 107 (starting from 0) cover the 550 nm (orders 104 and 105 too, but 550 nnm falls on the extreme)
+   # 'ESPRESSO': 106,  # ? Orders 106 and 107 (starting from 0) cover the 550 nm (orders 104 and 105 too, but 550 nnm falls on the extreme)
+   'ESPRESSO': 102,  # ? Orders 102 and 103 (starting from 0) cover the 550 nm (orders 100 and 101 too, but 550 nnm falls on the extreme)
 }
 
 

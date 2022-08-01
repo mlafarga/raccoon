@@ -433,6 +433,157 @@ def drs_fluxcorrcheck_lisobs(lisobs, notfound=np.nan, ext=0, name='fluxcorrcheck
     return data
 
 
+def drs_domestatus_lisobs(lisobs, notfound=np.nan, ext=0, name='domestatus'):
+    """
+    """
+    telnumber = headertelescopenumber(lisobs[0])
+    kw = 'HIERARCH ESO TEL{} DOME STATUS'.format(telnumber)
+    if name is not None: name = {kw: name}
+    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext, names=name)
+    return data
+
+
+# Seeing
+
+"""
+From https://www.eso.org/rm/api/v1/public/releaseDescriptions/176
+    The fourth flag is related to the seeing during the observation. The pipeline corrects the extracted
+flux for losses due to the fibre entrance (“slit loss”) which depends on the seeing. The seeing value
+is recorded in the “HIERARCH ESO TEL<N> IA FWHM” header keywords. In exceptional cases, the
+keyword contains an unrealistically low or high value which leads to an unreliable flux correction.
+Flag #4 is set in such a case.
+
+IA detector: Image Analyis detector
+
+AMBI FWHM: Astronomical Site Monitor seeing
+
+TEL.IA.FWHMLIN Delivered seeing on Image Analysis detector at ∼550-nm.
+TEL.IA.FWHMLINOBS Delivered seeing on Image Analysis detector at ∼550-nm.
+
+"""
+
+def drs_seeingambi_start_lisobs(lisobs, notfound=np.nan, ext=0, name='seeingambistart'):
+    """Observatory seeing
+    HIERARCH ESO TEL1 AMBI FWHM END = 0.51 / [arcsec] Observatory Seeing queried fro
+    HIERARCH ESO TEL1 AMBI FWHM START = 0.49 / [arcsec] Observatory Seeing queried f
+    `TEL` can change from 1 to 4! Assume all observations taken with the same telescope
+    """
+    telnumber = headertelescopenumber(lisobs[0])
+    kw = 'HIERARCH ESO TEL{} AMBI FWHM START'.format(telnumber)
+    if name is not None: name = {kw: name}
+    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext, names=name)
+    return data
+
+
+def drs_seeingambi_end_lisobs(lisobs, notfound=np.nan, ext=0, name='seeingambiend'):
+    """Observatory seeing
+    HIERARCH ESO TEL1 AMBI FWHM END = 0.51 / [arcsec] Observatory Seeing queried fro
+    HIERARCH ESO TEL1 AMBI FWHM START = 0.49 / [arcsec] Observatory Seeing queried f
+    `TEL` can change from 1 to 4! Assume all observations taken with the same telescope
+    """
+    telnumber = headertelescopenumber(lisobs[0])
+    kw = 'HIERARCH ESO TEL{} AMBI FWHM END'.format(telnumber)
+    if name is not None: name = {kw: name}
+    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext, names=name)
+    return data
+
+
+def drs_seeingia_airmasscorrected_lisobs(lisobs, notfound=np.nan, ext=0, name='seeingiaairmasscorrected'):
+    """
+    HIERARCH ESO TEL1 IA FWHM = 0.71 / [arcsec] Delivered seeing corrected by airmas
+    `TEL` can change from 1 to 4! Assume all observations taken with the same telescope
+    """
+    telnumber = headertelescopenumber(lisobs[0])
+    kw = 'HIERARCH ESO TEL{} IA FWHM'.format(telnumber)
+    if name is not None: name = {kw: name}
+    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext, names=name)
+    return data
+
+
+def drs_seeingia_linear_lisobs(lisobs, notfound=np.nan, ext=0, name='seeingialinear'):
+    """
+    HIERARCH ESO TEL1 IA FWHMLIN = 0.85 / Delivered seeing on IA detector (linear fi
+    `TEL` can change from 1 to 4! Assume all observations taken with the same telescope
+    """
+    telnumber = headertelescopenumber(lisobs[0])
+    kw = 'HIERARCH ESO TEL{} IA FWHMLIN'.format(telnumber)
+    if name is not None: name = {kw: name}
+    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext, names=name)
+    return data
+
+
+def drs_seeingia_linearobs_lisobs(lisobs, notfound=np.nan, ext=0, name='seeingialinearobs'):
+    """
+    HIERARCH ESO TEL1 IA FWHMLINOBS = 1.5 / Delivered seeing on IA detector (linear 
+    `TEL` can change from 1 to 4! Assume all observations taken with the same telescope
+    """
+    telnumber = headertelescopenumber(lisobs[0])
+    kw = 'HIERARCH ESO TEL{} IA FWHMLINOBS'.format(telnumber)
+    if name is not None: name = {kw: name}
+    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext, names=name)
+    return data
+
+
+# Integrated water vapor
+"""
+TEL AMBI.IWV.START Average of the Integrated Water Vapor measurements towards
+zenith over the previous 2min at start of exposure. Implemented soon.
+"""
+def drs_iwv_start_lisobs(lisobs, notfound=np.nan, ext=0, name='iwvstart'):
+    """
+    HIERARCH ESO TEL1 AMBI IWV END = 12.12 / Integrated Water Vapor                 
+    HIERARCH ESO TEL1 AMBI IWV START = 12.12 / Integrated Water Vapor               
+    HIERARCH ESO TEL1 AMBI IWV30D END = 12.12 / IWV at 30deg elev.                  
+    HIERARCH ESO TEL1 AMBI IWV30D START = 11.87 / IWV at 30deg elev.                
+    HIERARCH ESO TEL1 AMBI IWV30DSTD END = 0.08 / IWV at 30deg elev.                
+    HIERARCH ESO TEL1 AMBI IWV30DSTD START = 0.18 / IWV at 30deg elev.  
+    HIERARCH ESO TEL1 AMBI IWVSTD END = 0. / Standard Deviation of Integrated Wate  
+    `TEL` can change from 1 to 4! Assume all observations taken with the same telescope
+    """
+    telnumber = headertelescopenumber(lisobs[0])
+    kw = 'HIERARCH ESO TEL{} AMBI IWV START'.format(telnumber)
+    if name is not None: name = {kw: name}
+    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext, names=name)
+    return data
+
+
+def drs_iwv_end_lisobs(lisobs, notfound=np.nan, ext=0, name='iwvend'):
+    """ 
+    HIERARCH ESO TEL1 AMBI IWV END = 12.12 / Integrated Water Vapor                 
+    HIERARCH ESO TEL1 AMBI IWV START = 12.12 / Integrated Water Vapor               
+    HIERARCH ESO TEL1 AMBI IWV30D END = 12.12 / IWV at 30deg elev.                  
+    HIERARCH ESO TEL1 AMBI IWV30D START = 11.87 / IWV at 30deg elev.                
+    HIERARCH ESO TEL1 AMBI IWV30DSTD END = 0.08 / IWV at 30deg elev.                
+    HIERARCH ESO TEL1 AMBI IWV30DSTD START = 0.18 / IWV at 30deg elev.  
+    HIERARCH ESO TEL1 AMBI IWVSTD START = 0. / Standard Deviation of Integrated Wa 
+    `TEL` can change from 1 to 4! Assume all observations taken with the same telescope
+    """
+    telnumber = headertelescopenumber(lisobs[0])
+    kw = 'HIERARCH ESO TEL{} AMBI IWV END'.format(telnumber)
+    if name is not None: name = {kw: name}
+    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext, names=name)
+    return data
+
+
+def drs_ambirhum_lisobs(lisobs, notfound=np.nan, ext=0, name='ambirhum'):
+    """ 
+    HIERARCH ESO TEL1 AMBI RHUM = 38.5 / [%] Observatory ambient relative humidity q
+    `TEL` can change from 1 to 4! Assume all observations taken with the same telescope
+    """
+    telnumber = headertelescopenumber(lisobs[0])
+    kw = 'HIERARCH ESO TEL{} AMBI RHUM'.format(telnumber)
+    if name is not None: name = {kw: name}
+    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext, names=name)
+    return data
+    
+# Other keywords to consider
+# HIERARCH ESO TEL1 AMBI PRES END = 744.2 / [hPa] Observatory ambient air pressur 
+# HIERARCH ESO TEL1 AMBI PRES START = 744.2 / [hPa] Observatory ambient air press 
+# HIERARCH ESO TEL1 AMBI WINDDIR = 76.5 / [deg] Observatory ambient wind direction
+# HIERARCH ESO TEL1 AMBI WINDSP = 6.53 / [m/s] Observatory ambient wind speed quer
+
+
+
 # RV corrections
 
 def drs_berv(filin, notfound=np.nan, ext=0, name='berv', outfmt='single', units='is'):
@@ -493,8 +644,8 @@ def drs_ccfkw(filin, notfound=np.nan, ext=0):
     HIERARCH PIPELINE MASK TIMESTAMP = '2021-08-17T02:23:05' / Header Mask generatio
     """
     kws = ['HIERARCH ESO QC CCF RV', 'HIERARCH ESO QC CCF RV ERROR', 'HIERARCH ESO QC CCF FWHM', 'HIERARCH ESO QC CCF FWHM ERROR', 'HIERARCH ESO QC CCF CONTRAST', 'HIERARCH ESO QC CCF CONTRAST ERROR', 'HIERARCH ESO QC CCF CONTINUUM', 'HIERARCH ESO QC CCF MASK', 'HIERARCH ESO QC CCF FLUX ASYMMETRY', 'HIERARCH ESO QC CCF FLUX ASYMMETRY ERROR', 'HIERARCH ESO QC CCF BIS SPAN', 'HIERARCH ESO QC CCF BIS SPAN ERROR', 'HIERARCH PIPELINE MASK TIMESTAMP']
-    # names = {'HIERARCH ESO QC CCF RV': 'ccfrv', 'HIERARCH ESO QC CCF RV ERROR': 'ccfrverr', 'HIERARCH ESO QC CCF FWHM': 'ccffwhm', 'HIERARCH ESO QC CCF FWHM ERROR': 'ccffwhmerr', 'HIERARCH ESO QC CCF CONTRAST': 'ccfcontrast', 'HIERARCH ESO QC CCF CONTRAST ERROR': 'ccfconstrasterr', 'HIERARCH ESO QC CCF CONTINUUM': 'ccfcont', 'HIERARCH ESO QC CCF MASK': 'ccfmask', 'HIERARCH ESO QC CCF FLUX ASYMMETRY': 'ccffasy', 'HIERARCH ESO QC CCF FLUX ASYMMETRY ERROR': 'ccffasyerr', 'HIERARCH ESO QC CCF BIS SPAN': 'ccfbis', 'HIERARCH ESO QC CCF BIS SPAN ERROR': 'ccfbiserr', 'HIERARCH PIPELINE MASK TIMESTAMP': 'ccfmasktimestamp'}
-    names = {'HIERARCH ESO QC CCF RV': 'ccfrv', 'HIERARCH ESO QC CCF RV ERROR': 'ccfrverr', 'HIERARCH ESO QC CCF FWHM': 'ccffwhm', 'HIERARCH ESO QC CCF FWHM ERROR': 'ccffwhmerr', 'HIERARCH ESO QC CCF CONTRAST': 'ccfcontrast', 'HIERARCH ESO QC CCF CONTRAST ERROR': 'ccfconstrasterr', 'HIERARCH ESO QC CCF CONTINUUM': 'ccfcont', 'HIERARCH ESO QC CCF MASK': 'ccfmask', 'HIERARCH ESO QC CCF FLUX ASYMMETRY': 'ccffasy', 'HIERARCH ESO QC CCF FLUX ASYMMETRY ERROR': 'ccffasyerr', 'HIERARCH ESO QC CCF BIS SPAN': 'ccfbis', 'HIERARCH ESO QC CCF BIS SPAN ERROR': 'ccfbiserr', 'HIERARCH PIPELINE MASK TIMESTAMP': 'ccfmasktimestamp'}
+    # names = {'HIERARCH ESO QC CCF RV': 'ccfrv', 'HIERARCH ESO QC CCF RV ERROR': 'ccfrverr', 'HIERARCH ESO QC CCF FWHM': 'ccffwhm', 'HIERARCH ESO QC CCF FWHM ERROR': 'ccffwhmerr', 'HIERARCH ESO QC CCF CONTRAST': 'ccfcontrast', 'HIERARCH ESO QC CCF CONTRAST ERROR': 'ccfcontrasterr', 'HIERARCH ESO QC CCF CONTINUUM': 'ccfcont', 'HIERARCH ESO QC CCF MASK': 'ccfmask', 'HIERARCH ESO QC CCF FLUX ASYMMETRY': 'ccffasy', 'HIERARCH ESO QC CCF FLUX ASYMMETRY ERROR': 'ccffasyerr', 'HIERARCH ESO QC CCF BIS SPAN': 'ccfbis', 'HIERARCH ESO QC CCF BIS SPAN ERROR': 'ccfbiserr', 'HIERARCH PIPELINE MASK TIMESTAMP': 'ccfmasktimestamp'}
+    names = {'HIERARCH ESO QC CCF RV': 'ccfrv', 'HIERARCH ESO QC CCF RV ERROR': 'ccfrverr', 'HIERARCH ESO QC CCF FWHM': 'ccffwhm', 'HIERARCH ESO QC CCF FWHM ERROR': 'ccffwhmerr', 'HIERARCH ESO QC CCF CONTRAST': 'ccfcontrast', 'HIERARCH ESO QC CCF CONTRAST ERROR': 'ccfcontrasterr', 'HIERARCH ESO QC CCF CONTINUUM': 'ccfcont', 'HIERARCH ESO QC CCF MASK': 'ccfmask', 'HIERARCH ESO QC CCF FLUX ASYMMETRY': 'ccffasy', 'HIERARCH ESO QC CCF FLUX ASYMMETRY ERROR': 'ccffasyerr', 'HIERARCH ESO QC CCF BIS SPAN': 'ccfbis', 'HIERARCH ESO QC CCF BIS SPAN ERROR': 'ccfbiserr', 'HIERARCH PIPELINE MASK TIMESTAMP': 'ccfmasktimestamp'}
 
     data = fitsutils.read_header_keywords(filin, kws, notfound=notfound, ext=ext, names=names)
     return data
@@ -519,7 +670,7 @@ def drs_ccfkw_lisobs(lisobs, notfound=np.nan, ext=0):
     HIERARCH PIPELINE MASK TIMESTAMP = '2021-08-17T02:23:05' / Header Mask generatio
     """
     kws = ['HIERARCH ESO QC CCF RV', 'HIERARCH ESO QC CCF RV ERROR', 'HIERARCH ESO QC CCF FWHM', 'HIERARCH ESO QC CCF FWHM ERROR', 'HIERARCH ESO QC CCF CONTRAST', 'HIERARCH ESO QC CCF CONTRAST ERROR', 'HIERARCH ESO QC CCF CONTINUUM', 'HIERARCH ESO QC CCF MASK', 'HIERARCH ESO QC CCF FLUX ASYMMETRY', 'HIERARCH ESO QC CCF FLUX ASYMMETRY ERROR', 'HIERARCH ESO QC CCF BIS SPAN', 'HIERARCH ESO QC CCF BIS SPAN ERROR', 'HIERARCH PIPELINE MASK TIMESTAMP']
-    names = {'HIERARCH ESO QC CCF RV': 'ccfrv', 'HIERARCH ESO QC CCF RV ERROR': 'ccfrverr', 'HIERARCH ESO QC CCF FWHM': 'ccffwhm', 'HIERARCH ESO QC CCF FWHM ERROR': 'ccffwhmerr', 'HIERARCH ESO QC CCF CONTRAST': 'ccfcontrast', 'HIERARCH ESO QC CCF CONTRAST ERROR': 'ccfconstrasterr', 'HIERARCH ESO QC CCF CONTINUUM': 'ccfcont', 'HIERARCH ESO QC CCF MASK': 'ccfmask', 'HIERARCH ESO QC CCF FLUX ASYMMETRY': 'ccffasy', 'HIERARCH ESO QC CCF FLUX ASYMMETRY ERROR': 'ccffasyerr', 'HIERARCH ESO QC CCF BIS SPAN': 'ccfbis', 'HIERARCH ESO QC CCF BIS SPAN ERROR': 'ccfbiserr', 'HIERARCH PIPELINE MASK TIMESTAMP': 'ccfmasktimestamp'}
+    names = {'HIERARCH ESO QC CCF RV': 'ccfrv', 'HIERARCH ESO QC CCF RV ERROR': 'ccfrverr', 'HIERARCH ESO QC CCF FWHM': 'ccffwhm', 'HIERARCH ESO QC CCF FWHM ERROR': 'ccffwhmerr', 'HIERARCH ESO QC CCF CONTRAST': 'ccfcontrast', 'HIERARCH ESO QC CCF CONTRAST ERROR': 'ccfcontrasterr', 'HIERARCH ESO QC CCF CONTINUUM': 'ccfcont', 'HIERARCH ESO QC CCF MASK': 'ccfmask', 'HIERARCH ESO QC CCF FLUX ASYMMETRY': 'ccffasy', 'HIERARCH ESO QC CCF FLUX ASYMMETRY ERROR': 'ccffasyerr', 'HIERARCH ESO QC CCF BIS SPAN': 'ccfbis', 'HIERARCH ESO QC CCF BIS SPAN ERROR': 'ccfbiserr', 'HIERARCH PIPELINE MASK TIMESTAMP': 'ccfmasktimestamp'}
 
     data = fitsutils.read_header_keywords_lisobs(lisobs, kws, notfound=notfound, ext=ext, names=names)
     return data
