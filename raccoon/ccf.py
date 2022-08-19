@@ -6,10 +6,15 @@ import glob
 import os
 
 from astropy.io import fits
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
+
+import colorcet as cc
+import cmocean
+
 
 from . import peakutils
 from . import plotutils
@@ -1207,9 +1212,112 @@ def plot_ccf_fit_diff(rv, ccf, ccfpar, title='', fitpar='', diffzoom=True, parve
     return fig, ax[0], ax[1]
 
 
-def plot_ccfo():
-    pass
-    return
+def plot_ccfo_lines(rv, ccfo, lisord=None, printord=True, multiline=True, cb=True, cmap=cc.cm.rainbow4, lw=2, alpha=0.9, xlabel='RV [km/s]', ylabel='Order CCF', cblabel='Order', ax=None, **kwargs):
+    # cmap = cc.cm.CET_I1
+    # cmap = 'Spectral'
+    """Plot order CCFs as given, no normalisation or offset.
+    
+    Parameters
+    ----------
+    rv : 1D array-like
+        RV grid of the CCF
+    ccfo : 2D array-like
+        CCFs of each order
+    lisord : 1D array-like
+        Order number of each CCF in `ccfo`. If None, order numbers are 0 to `len(ccfo)`. Only shown if `printord` is `True` (default).
+    multiline : bool, default True
+        If True plot lines following a specific color map (default). If not, color-code following default color-cycle.
+    """
+    # Make sure we have an axis where to plot the fit
+    if not isinstance(ax, mpl.axes._subplots.Axes): ax = plt.gca()
+    # Order number
+    if lisord is None: lisord = np.arange(0, len(ccfo), 1)
+    # Plot
+    if multiline == False:
+        # Plot lines following default color cycle
+        for o, ccf in zip(lisord, ccfo):
+            # CCF
+            ax.plot(rv, ccf, cmap=cmap, lw=lw, alpha=alpha, **kwargs)
+            # Order number TODO
+            # ax.text()
+    else:
+        # Plot lines following a specific map
+        # CCF
+        xs = np.array([rv for i in ccfo])
+        ys = np.array(ccfo)
+        c = np.array(lisord)
+        lc = plotutils.multiline(xs, ys, c, cmap=cmap, lw=lw, alpha=alpha, ax=ax, **kwargs)
+        # Colorbar
+        if cb:
+            cbar = plt.colorbar(lc, ax=ax, aspect=15, pad=0.02, label=cblabel)
+            cbar.minorticks_on()
+    # Labels
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    return ax
+
+
+def plot_ccfo_map(rv, ccfo, lisord=None, cb=True, cmap=cmocean.cm.deep_r, extent='data', vmin=None, vmax=None, extend='neither', xlabel='RV [km/s]', ylabel='Order', cblabel='CCF', ax=None):
+    """Plot map of order CCFs as given, no normalisation or offset.
+    
+    Parameters
+    ----------
+    rv : 1D array-like
+        RV grid of the CCF
+    ccfo : 2D array-like
+        CCFs of each order
+    lisord : 1D array-like
+        Order number of each CCF in `ccfo`. If None, order numbers are 0 to `len(ccfo)`. Only shown if `printord` is `True` (default).
+    """
+    # Make sure we have an axis where to plot the fit
+    if not isinstance(ax, mpl.axes._subplots.Axes): ax = plt.gca()
+
+    # Orde rnumber
+    if lisord is None: lisord = np.arange(0, len(ccfo), 1)
+    # Plot
+    if extent == 'data': extent = [rv[0], rv[-1], lisord[0], lisord[-1]]
+    nocb = not cb
+    ax = plotutils.plot_map(ccfo, cblabel, interpolation='none', origin='lower', extent=extent, vmin=vmin, vmax=vmax, extend=extend, cmap=cmap, axcb=None, nocb=nocb, aspect=15, pad=0.02, fraction=0.15, ax=ax)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    return ax
+
+
+def plot_ccfo_lines_map(rv, ccfo, ccfsum, ccferrsum, lisord=None, 
+    ylabelsum = 'Coadd. CCF',
+    multiline=True, cbline=True, cmapline=cc.cm.rainbow4, lw=2, alpha=0.9, ylabelline='Order CCF', cblabelline='Order',
+    cbmap=True, cmapmap=cmocean.cm.deep_r, extent='data', vmin=None, vmax=None, extend='neither', ylabelmap='Order', cblabelmap='CCF',
+    xlabel='RV [km/s]', title=''
+    ):
+    """3-panel plot with CCFsum, CCFo lines, CCFo map, one below each other.
+    """
+    fig, ax = plt.subplots(3,1, figsize=(8,7), sharex=True, gridspec_kw={'height_ratios': [1,2.5,2.5]})
+    axsum = ax[0]
+    axo = ax[1]
+    axmap = ax[2]
+    # CCF sum
+    axsum.errorbar(rv, ccfsum, yerr=ccferrsum, fmt='k.')
+    axsum.set_ylabel(ylabelsum)
+    # CCFo
+    axo = plot_ccfo_lines(rv, ccfo, cmap=cmapline, lw=lw, alpha=alpha, xlabel=None, ylabel=ylabelline, ax=axo)
+    # CCFo map
+    axmap = plot_ccfo_map(rv, ccfo, cmap=cmapmap, extent=extent, vmin=vmin, vmax=vmax, extend=extend, xlabel=xlabel, ylabel=ylabelmap, ax=axmap)
+    # 
+    ax[0].set_title(title)
+    for a in ax.flatten():
+        a.minorticks_on()
+    plt.tight_layout()
+    fig.subplots_adjust(hspace=0.1)  # wspace=0.08, hspace=0.08
+    # Adjust ccfsum panel size
+    boxo = axo.get_position()
+    boxsum = axsum.get_position()
+    # Set based on width
+    axsum.set_position([boxsum.x0, boxsum.y0, boxo.width, boxsum.height])  # left, bottom, width, height
+    # # Or set with Bbox and coordinates
+    # boxsum_new = mpl.transforms.Bbox([[boxsum.x0, boxsum.y0], [boxo.x1, boxsum.y1]])
+    # axsum.set_position(boxsum_new)
+    # 
+    return fig, axsum, axo, axmap
 
 
 def plot_ccf_bisector():

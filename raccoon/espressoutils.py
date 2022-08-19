@@ -27,6 +27,8 @@ import os
 import re
 import sys
 
+import ipdb
+
 from astropy.io import fits
 import numpy as np
 
@@ -105,7 +107,7 @@ def drs_fitsred_header_lisobs(lisfilin, verbose=True):
     return lisheader
 
 
-# Read all reduced data
+# Read all reduced data (S2D)
 
 def drs_fitsred_read(filin, qualdata2mask=True, w='vac'):
     """
@@ -160,6 +162,7 @@ def drs_fitsred_read(filin, qualdata2mask=True, w='vac'):
 
     return w, wair, f, sf, q, mq, dll, dllair, header
 
+# -------------------------------------
 
 # Telescope number, need for certain keywords
 
@@ -194,6 +197,7 @@ def headertelescopenumber(filin, outfail=np.nan, ext=0):
 
     return telnumber
 
+# -------------------------------------
 
 # BJD
 
@@ -447,19 +451,11 @@ def drs_domestatus_lisobs(lisobs, notfound=np.nan, ext=0, name='domestatus'):
 
 """
 From https://www.eso.org/rm/api/v1/public/releaseDescriptions/176
-    The fourth flag is related to the seeing during the observation. The pipeline corrects the extracted
-flux for losses due to the fibre entrance (“slit loss”) which depends on the seeing. The seeing value
-is recorded in the “HIERARCH ESO TEL<N> IA FWHM” header keywords. In exceptional cases, the
-keyword contains an unrealistically low or high value which leads to an unreliable flux correction.
-Flag #4 is set in such a case.
-
-IA detector: Image Analyis detector
-
-AMBI FWHM: Astronomical Site Monitor seeing
-
-TEL.IA.FWHMLIN Delivered seeing on Image Analysis detector at ∼550-nm.
-TEL.IA.FWHMLINOBS Delivered seeing on Image Analysis detector at ∼550-nm.
-
+    The fourth flag is related to the seeing during the observation. The pipeline corrects the extracted flux for losses due to the fibre entrance (“slit loss”) which depends on the seeing. The seeing value is recorded in the “HIERARCH ESO TEL<N> IA FWHM” header keywords. In exceptional cases, the keyword contains an unrealistically low or high value which leads to an unreliable flux correction. Flag #4 is set in such a case.
+    IA detector: Image Analyis detector
+    AMBI FWHM: Astronomical Site Monitor seeing
+    TEL.IA.FWHMLIN Delivered seeing on Image Analysis detector at ∼550-nm.
+    TEL.IA.FWHMLINOBS Delivered seeing on Image Analysis detector at ∼550-nm.
 """
 
 def drs_seeingambi_start_lisobs(lisobs, notfound=np.nan, ext=0, name='seeingambistart'):
@@ -583,7 +579,6 @@ def drs_ambirhum_lisobs(lisobs, notfound=np.nan, ext=0, name='ambirhum'):
 # HIERARCH ESO TEL1 AMBI WINDSP = 6.53 / [m/s] Observatory ambient wind speed quer
 
 
-
 # RV corrections
 
 def drs_berv(filin, notfound=np.nan, ext=0, name='berv', outfmt='single', units='is'):
@@ -676,10 +671,92 @@ def drs_ccfkw_lisobs(lisobs, notfound=np.nan, ext=0):
     return data
 
 
-# # CCF
+# -----------------------------------------------------------------------------
 
-# def drs_ccf_read(filin):
-#     with fits.open(filin) as hdulist:
-#         header = hdulist[0].header
-#         lisccf = hdulist[0].data
-#     return header, lisccf
+
+# CCF
+
+def drs_ccfrvgrid_read(filin, ext=1, ext1=0):
+    """
+    Parameters
+    ----------
+    filin : str
+        CCF file. Cannot be header, because need to read extension 0, and not 1, where the data is.
+
+    Notes
+    -----
+    Extension 0:
+    HIERARCH ESO PRO REC1 PARAM9 NAME = 'rv_center' / Approximate RV. In case of def
+    HIERARCH ESO PRO REC1 PARAM9 VALUE = '14.58   ' / Default: -9999                
+    HIERARCH ESO PRO REC1 PARAM10 NAME = 'rv_range' / Range for the RV table.       
+    HIERARCH ESO PRO REC1 PARAM10 VALUE = '20      ' / Default: 20                  
+    HIERARCH ESO PRO REC1 PARAM11 NAME = 'rv_step ' / Range's step for the RV table.
+    HIERARCH ESO PRO REC1 PARAM11 VALUE = '0.5     ' / Default: 0.5   
+
+    HIERARCH ESO RV STEP =     0.5 / Coordinate increment per pixel                 
+    HIERARCH ESO RV START =  -5.42 / Coordinate at reference pixel  
+
+    Extension 1:
+    NAXIS1  =                   81 / length of data axis 1  -> rv grid length
+    NAXIS2  =                  171 / length of data axis 2  -> orders
+    """
+    # Read header
+    header1 = fitsutils.read_header(filin, ext=ext)
+    header0 = fitsutils.read_header(filin, ext=ext1)
+    rvstart = header0['HIERARCH ESO RV START']
+    rvstep = header0['HIERARCH ESO RV STEP']
+    rvlength = header1['NAXIS1']
+    return np.arange(rvstart, rvstart + rvlength * rvstep , rvstep)
+
+
+def drs_ccf_read(filin, ext=1):
+    with fits.open(filin) as hdulist:
+        header = hdulist[ext].header
+        lisccf = hdulist[ext].data
+    return header, lisccf
+
+
+def drs_ccferr_read(filin, ext=2):
+    with fits.open(filin) as hdulist:
+        header = hdulist[ext].header
+        lisccferr = hdulist[ext].data
+    return header, lisccferr
+
+
+def drs_ccfq_read(filin, ext=3):
+    with fits.open(filin) as hdulist:
+        header = hdulist[ext].header
+        lisccfq = hdulist[ext].data
+    return header, lisccfq
+
+
+def drs_ccffluxes_read(filin):
+    with fits.open(filin) as hdulist:
+        lisccf = hdulist[1].data
+        lisccferr = hdulist[2].data
+        lisccfq = hdulist[3].data
+    return lisccf, lisccferr, lisccfq
+
+
+def drs_ccfall_read(filin):
+    with fits.open(filin) as hdulist:
+        lisccf = hdulist[1].data
+        lisccferr = hdulist[2].data
+        lisccfq = hdulist[3].data
+        header0 = hdulist[0].header
+        header1 = hdulist[1].header
+        rvstart = header0['HIERARCH ESO RV START']
+        rvstep = header0['HIERARCH ESO RV STEP']
+        rvlength = header1['NAXIS1']
+        rvgrid = np.arange(rvstart, rvstart + rvlength * rvstep , rvstep)
+    return header0, lisccf, lisccferr, lisccfq, rvgrid
+
+
+
+
+
+
+
+
+
+

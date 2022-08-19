@@ -7,6 +7,8 @@ import matplotlib as mpl
 from matplotlib.collections import LineCollection
 import matplotlib.pyplot as plt
 
+import colorcet as cc
+
 ###############################################################################
 
 
@@ -220,4 +222,21 @@ def multiline(xs, ys, c, ax=None, **kwargs):
     ax.add_collection(lc)
     ax.autoscale()
     return lc
+
+
+# General map plot
+def plot_map(f, label, ax, interpolation='none', origin='lower', extent=None, vmin=None, vmax=None, extend='neither', cmap='viridis', axcb=None, nocb=False, aspect=15, pad=0.02, fraction=0.15):
+    """Plot flux map.
+    extent : floats (left, right, bottom, top)
+        Define the coordinates of the image area.
+    """
+    fmap = ax.imshow(f, origin=origin, extent=extent, interpolation=interpolation, aspect='auto', cmap=cmap, rasterized=True, vmin=vmin, vmax=vmax)
+    if nocb == False:
+        if axcb is None: axcb = ax
+        cbar = plt.colorbar(fmap, ax=axcb, aspect=aspect, fraction=fraction,  pad=pad, extend=extend, label=label)
+        cbar.minorticks_on()
+    return ax
+
+
+
 

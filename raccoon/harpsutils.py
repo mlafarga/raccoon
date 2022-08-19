@@ -602,6 +602,18 @@ def drs_rvcorrection_lisobs(lisobs, inst, name='shift', notfound=np.nan, ext=0):
 
 # CCF
 
+def drs_ccfrvgrid_read(filin, ext=0):
+    """
+    NAXIS1 length of data axis 1 [161 HARPS]
+    CRVAL1 value of ref pixel
+    CTYPE1 Pixel coordinate system [km/s]
+    CDELT1 CCF steps [km/s]
+    """
+    # Read header
+    if isinstance(filin, str): header = fitsutils.read_header(filin, ext=ext)
+    elif isinstance(filin, fits.header.Header): header = filin
+    return np.arange(header['CRVAL1'], header['CRVAL1'] + header['NAXIS1'] * header['CDELT1'] , header['CDELT1'])
+
 
 def drs_ccf_read(filin):
     with fits.open(filin) as hdulist:

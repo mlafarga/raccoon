@@ -14,8 +14,8 @@ import pandas as pd
 
 from . import carmenesutils
 from . import harpsutils
-from . import expresutils
 from . import espressoutils
+from . import expresutils
 
 ###############################################################################
 
@@ -450,3 +450,59 @@ def serval_header_rvcorrection_lisobs(lisobs, inst, source='header', servalin=No
             datashift[c] = np.ones_like(shift, dtype=float) * np.nan
 
     return shift, shifterr, datashift
+
+# -----------------------------------------------------------------------------
+
+
+# CCF
+# ------------------
+
+def fitsccf_rvgrid_read(filin, inst, ext=None, ext1=None):
+    if inst == 'CARM_VIS' or inst == 'CARM_NIR':
+        sys.exit()
+    elif inst == 'HARPS' or inst == 'HARPN':
+        if ext is None: ext = 0
+        rvgrid = harpsutils.drs_ccfrvgrid_read(filin, ext=ext)
+    elif inst == 'ESPRESSO':
+        if ext is None: ext = 1
+        if ext1 is None: ext1 = 0
+        rvgrid = espressoutils.drs_ccfrvgrid_read(filin, ext=ext, ext1=ext1)
+    elif inst == 'EXPRES':
+        sys.exit()
+    return rvgrid
+
+
+def fitsccf_read(filin, inst):
+    if inst == 'CARM_VIS' or inst == 'CARM_NIR':
+        sys.exit()
+    elif inst == 'HARPS' or inst == 'HARPN':
+        header, lisccf = harpsutils.drs_ccf_read(filin)
+    elif inst == 'ESPRESSO':
+        header, lisccf = espressoutils.drs_ccf_read(filin)
+    elif inst == 'EXPRES':
+        sys.exit()
+    return header, lisccf
+
+
+def fitsccf_fluxes_read(filin, inst):
+    if inst == 'CARM_VIS' or inst == 'CARM_NIR':
+        sys.exit()
+    elif inst == 'HARPS' or inst == 'HARPN':
+        _, lisccf = harpsutils.drs_ccf_read(filin)
+        lisccferr = np.zeros_like(lisccf) * np.nan
+        lisccfq = np.zeros_like(lisccf) * np.nan
+    elif inst == 'ESPRESSO':
+        lisccf, lisccferr, lisccfq = espressoutils.drs_ccffluxes_read(filin)
+    elif inst == 'EXPRES':
+        sys.exit()
+    return lisccf, lisccferr, lisccfq
+
+
+
+
+
+
+
+
+
+
