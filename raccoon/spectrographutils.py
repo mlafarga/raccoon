@@ -246,10 +246,8 @@ def header_bjd_lisobs(lisobs, inst, name='bjd', notfound=np.nan, ext=0):
         #     lisbjd.rename(columns={'HIERARCH CARACAL BJD': name}, inplace=True)
     elif inst == 'HARPS' or inst == 'HARPN':
         lisbjd = harpsutils.drs_bjd_lisobs(lisobs, inst, notfound=notfound, ext=ext, name=name)
-        # # Change column names
-        # if name is not None:
-        #     kwinst = harpsutils.headerkwinst(inst, outfail=np.nan)
-        #     lisbjd.rename(columns={kwinst + 'DRS BJD': name}, inplace=True)
+    elif inst == 'ESPRESSO':
+        lisbjd = espressoutils.drs_bjd_lisobs(lisobs, notfound=notfound, ext=ext, name=name)
     elif inst == 'EXPRES':
         lisbjd = expresutils.drs_bjd_lisobs(lisobs, notfound=notfound, ext=ext, name=name)
     return lisbjd
@@ -472,7 +470,7 @@ def fitsccf_rvgrid_read(filin, inst, ext=None, ext1=None):
     return rvgrid
 
 
-def fitsccf_read(filin, inst):
+def fitsccf_read_ccf(filin, inst):
     if inst == 'CARM_VIS' or inst == 'CARM_NIR':
         sys.exit()
     elif inst == 'HARPS' or inst == 'HARPN':
