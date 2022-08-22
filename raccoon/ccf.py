@@ -12,6 +12,8 @@ import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
 
+import ipdb
+
 import colorcet as cc
 import cmocean
 
@@ -1318,6 +1320,67 @@ def plot_ccfo_lines_map(rv, ccfo, ccfsum, ccferrsum, lisord=None,
     # axsum.set_position(boxsum_new)
     # 
     return fig, axsum, axo, axmap
+
+
+
+def plot_lisccf_lines_map(rv, lisccf, lisccferr, time, maskgray=None, labelrv='RV [km/s]', labelccf='CCF',
+    cmapline=cc.cm.rainbow4, lw=2, alpha=0.9, cbline=True, labeltime='Time',
+    interpolation='none', origin='lower', extent='data', vmin=None, vmax=None, extend='neither', cbmap=True, cmapmap=cmocean.cm.deep_r,
+    title='',):
+    """2-panel plot with list of CCF (coadded CCFs from different observations) lines color-coded as a function of time, and CCF map with time on y-axis and color-ocoded on CCF value, one below each other.
+
+    TODO: add errorbars `lisccferr`
+
+    maskgray : 1D array-like
+        Plot set of CCFs in gray (e.g. out-of-transit, or low S/N)
+    """
+    fig, ax = plt.subplots(2,1, figsize=(8,6), sharex=True, gridspec_kw={'height_ratios': [3,1.2]})
+    axline = ax[0]
+    axmap = ax[1]
+    # CCF lines
+    xs = np.array([rv for i in lisccf[~maskgray]])
+    ys = np.array(lisccf[~maskgray])
+    c = np.array(time[~maskgray])
+    lc = plotutils.multiline(xs, ys, c, cmap=cmapline, lw=lw, alpha=alpha, ax=axline)
+    # Colorbar
+    if cbline:
+        cbar = plt.colorbar(lc, ax=axline, aspect=15, pad=0.02, label=labeltime)
+        cbar.minorticks_on()
+    axline.set_ylabel(labelccf)
+
+    # CCF line gray
+    for ccf in lisccf[maskgray]:
+        axline.plot(rv, ccf, '0.5', lw=1, alpha=alpha, zorder=0)
+
+    # CCF map
+    if extent == 'data': extent = [rv[0], rv[-1], time[0], time[-1]]
+    nocb = not cbmap
+    # If set the aspect of the small panel to be the same of the big on, the cb width is narrower and it looks weird. Hence need to change it as follows:
+    #   Width of cb of small panel to be the same of bigger panel:
+    #       aspect_cb_bigpanel = 15
+    #       bigpanel_height = 3
+    #       smallpanel_height = 1.2
+    #       aspect_cb_smallpanel = aspect_cb_bigpanel * smallpanel_height / bigpanel_height = 6
+    axmap = plotutils.plot_map(lisccf, labelccf, interpolation=interpolation, origin=origin, extent=extent, vmin=vmin, vmax=vmax, extend=extend, cmap=cmapmap, axcb=None, nocb=nocb, aspect=6, pad=0.02, fraction=0.15, ax=axmap)
+    axmap.set_ylabel(labeltime)
+    ax[-1].set_xlabel(labelrv)
+
+    ax[0].set_title(title)
+    for a in ax.flatten():
+        a.minorticks_on()
+    plt.tight_layout()
+    fig.subplots_adjust(hspace=0.1)  # wspace=0.08, hspace=0.08
+
+    # Adjust ccfsum panel size (if 1st panel has no colorbar)
+    if cbline == False:
+        boxo = axo.get_position()
+        boxsum = axsum.get_position()
+        # Set based on width
+        axsum.set_position([boxsum.x0, boxsum.y0, boxo.width, boxsum.height])  # left, bottom, width, height
+        # # Or set with Bbox and coordinates
+        # boxsum_new = mpl.transforms.Bbox([[boxsum.x0, boxsum.y0], [boxo.x1, boxsum.y1]])
+        # axsum.set_position(boxsum_new)
+    return fig, axline, axmap
 
 
 def plot_ccf_bisector():
