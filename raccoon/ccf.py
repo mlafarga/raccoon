@@ -1334,6 +1334,7 @@ def plot_lisccf_lines_map(rv, lisccf, lisccferr, time, maskgray=None, labelrv='R
     maskgray : 1D array-like
         Plot set of CCFs in gray (e.g. out-of-transit, or low S/N)
     """
+    if maskgray is None: maskgray = np.zeros_like(time, dtype=bool)
     fig, ax = plt.subplots(2,1, figsize=(8,6), sharex=True, gridspec_kw={'height_ratios': [3,1.2]})
     axline = ax[0]
     axmap = ax[1]
