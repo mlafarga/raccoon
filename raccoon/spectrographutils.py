@@ -12,6 +12,7 @@ import sys
 import numpy as np
 import pandas as pd
 
+from . import ccf as ccflib
 from . import carmenesutils
 from . import harpsutils
 from . import espressoutils
@@ -457,7 +458,7 @@ def serval_header_rvcorrection_lisobs(lisobs, inst, source='header', servalin=No
 
 def fitsccf_rvgrid_read(filin, inst, ext=None, ext1=None):
     if inst == 'CARM_VIS' or inst == 'CARM_NIR':
-        sys.exit()
+        rvgrid, _, _, _, _, _, _, _, _, _ = ccflib.infits_ccfall(filin)
     elif inst == 'HARPS' or inst == 'HARPN':
         if ext is None: ext = 0
         rvgrid = harpsutils.drs_ccfrvgrid_read(filin, ext=ext)
@@ -484,7 +485,9 @@ def fitsccf_read_ccf(filin, inst):
 
 def fitsccf_fluxes_read(filin, inst):
     if inst == 'CARM_VIS' or inst == 'CARM_NIR':
-        sys.exit()
+        _, lisccf, _, _, _, _, _, _, _, _ = ccflib.infits_ccfall(filin)
+        lisccferr = np.zeros_like(lisccf) * np.nan
+        lisccfq = np.zeros_like(lisccf) * np.nan
     elif inst == 'HARPS' or inst == 'HARPN':
         _, lisccf = harpsutils.drs_ccf_read(filin)
         lisccferr = np.zeros_like(lisccf) * np.nan
@@ -494,8 +497,6 @@ def fitsccf_fluxes_read(filin, inst):
     elif inst == 'EXPRES':
         sys.exit()
     return lisccf, lisccferr, lisccfq
-
-
 
 
 
