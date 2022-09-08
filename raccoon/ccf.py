@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
+from scipy.interpolate import griddata
 
 import ipdb
 
@@ -1323,7 +1324,7 @@ def plot_ccfo_lines_map(rv, ccfo, ccfsum, ccferrsum, lisord=None,
 
 
 
-def plot_lisccf_lines_map(rv, lisccf, lisccferr, time, maskgray=None, labelrv='RV [km/s]', labelccf='CCF',
+def plot_lisccf_lines_map(rv, lisccf, lisccferr, time, maskgray=None, maskmap=None, labelrv='RV [km/s]', labelccf='CCF',
     cmapline=cc.cm.rainbow4, lw=2, alpha=0.9, cbline=True, labeltime='Time',
     interpolation='none', origin='lower', extent='data', vmin=None, vmax=None, extend='neither', cbmap=True, cmapmap=cmocean.cm.deep_r,
     title='',):
@@ -1354,15 +1355,68 @@ def plot_lisccf_lines_map(rv, lisccf, lisccferr, time, maskgray=None, labelrv='R
         axline.plot(rv, ccf, '0.5', lw=1, alpha=alpha, zorder=0)
 
     # CCF map
-    if extent == 'data': extent = [rv[0], rv[-1], time[0], time[-1]]
+    if maskmap is None: maskmap = np.ones_like(time, dtype=bool)
     nocb = not cbmap
+    # 
     # If set the aspect of the small panel to be the same of the big on, the cb width is narrower and it looks weird. Hence need to change it as follows:
     #   Width of cb of small panel to be the same of bigger panel:
     #       aspect_cb_bigpanel = 15
     #       bigpanel_height = 3
     #       smallpanel_height = 1.2
     #       aspect_cb_smallpanel = aspect_cb_bigpanel * smallpanel_height / bigpanel_height = 6
-    axmap = plotutils.plot_map(lisccf, labelccf, interpolation=interpolation, origin=origin, extent=extent, vmin=vmin, vmax=vmax, extend=extend, cmap=cmapmap, axcb=None, nocb=nocb, aspect=6, pad=0.02, fraction=0.15, ax=axmap)
+    # 
+    # Check if observations are non-consecutive
+    consecutiveobs = True
+    time_min = np.diff(time[maskmap]).min()
+    time_min_range = 2
+    for dt in np.diff(time[maskmap]):
+        if dt > time_min*time_min_range:
+            consecutiveobs = False
+            break
+    # If obs are non-consecutive, imshow will show the wrong "grid" because it assumes the values are equally spaced. Need to add "fake" nan-filled CCFs in between non-consecutive obs.
+    # Add a nan-filled CCF at the beginning and end because if not the actual ones might be hidden by the borders
+    # For non-uniform grid spacing, use plt.pcolor(rv, time, lisccf) or pcolormesh. But have everything coded with imshow, so it's easier to tweak the data.
+    if consecutiveobs is False:
+        # Add nan-filled CCF between non-consecutive observations
+        # Define consecutive by twice the minimum difference in time
+        time_min = np.diff(time[maskmap]).min() * 2
+        time_new = []
+        lisccf_new = []
+        maskmap_new = []
+        nanccf = np.ones_like(lisccf[0])*np.nan
+        # Fake obs beginning
+        time_new.append(time[maskmap][0]-time_min)
+        lisccf_new.append(nanccf)
+        maskmap_new.append(True)
+        for obs_i in range(len(time[maskmap])):
+            time_new.append(time[maskmap][obs_i])
+            lisccf_new.append(lisccf[obs_i])
+            maskmap_new.append(maskmap[obs_i])
+            # Last obs
+            if obs_i == len(time[maskmap])-1:
+                continue
+            # Time diff with following observation
+            dt = time[maskmap][obs_i+1] - time[maskmap][obs_i]
+            # If difference larger than minimum time, assume non-consecutive obs, and fill with nan
+            if dt > time_min:
+                # How many new nan-filled obs are needed
+                nobs_new = int(dt/time_min)
+                for newobs in range(nobs_new):
+                    time_new.append(time[maskmap][obs_i]*(newobs+2))
+                    lisccf_new.append(nanccf)
+                    maskmap_new.append(True)
+        # Fake obs end
+        time_new.append(time[maskmap][-1]+time_min)
+        lisccf_new.append(nanccf)
+        maskmap_new.append(True)
+        # Arrays
+        time = np.array(time_new)
+        lisccf = np.array(lisccf_new)
+        maskmap = np.array(maskmap_new)
+    # 
+    if extent == 'data': extent = [rv[0], rv[-1], time[maskmap][0], time[maskmap][-1]]
+    axmap = plotutils.plot_map(lisccf[maskmap], labelccf, interpolation=interpolation, origin=origin, extent=extent, vmin=vmin, vmax=vmax, extend=extend, cmap=cmapmap, axcb=None, nocb=nocb, aspect=6, pad=0.02, fraction=0.15, ax=axmap)
+
     axmap.set_ylabel(labeltime)
     ax[-1].set_xlabel(labelrv)
 

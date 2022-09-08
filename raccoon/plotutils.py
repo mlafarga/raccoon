@@ -226,7 +226,7 @@ def multiline(xs, ys, c, ax=None, **kwargs):
 
 # General map plot
 def plot_map(f, label, ax, interpolation='none', origin='lower', extent=None, vmin=None, vmax=None, extend='neither', cmap='viridis', axcb=None, nocb=False, aspect=15, pad=0.02, fraction=0.15):
-    """Plot flux map.
+    """Plot flux map. `imshow()` assumes data is regularly spaced!
     extent : floats (left, right, bottom, top)
         Define the coordinates of the image area.
     """
