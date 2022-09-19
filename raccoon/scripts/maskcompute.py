@@ -10,6 +10,7 @@ import os
 import sys
 import textwrap
 # import time
+import ipdb
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -19,6 +20,7 @@ import scipy.signal
 
 from raccoon import ccf as ccflib
 from raccoon import carmenesutils
+from raccoon import espressoutils
 from raccoon import peakutils
 from raccoon import phoenixutils
 from raccoon import plotutils
@@ -60,11 +62,11 @@ def parse_args():
 
     # Template
     parser.add_argument('filtpl', help='File containing the spectrum template to be used to construct the mask', type=str, default=None)
-    parser.add_argument('tpltype', choices=['serval', 'phoenix', '1dtxt'], help='', type=str)  # 'custommatrix', 'customstepctn'
+    parser.add_argument('tpltype', choices=['serval', 'phoenix', '1dtxt', 'espressos1dcoadd'], help='', type=str)  # 'custommatrix', 'customstepctn'
 
     parser.add_argument('obj', help='ID', type=str)
 
-    parser.add_argument('--inst', choices=['CARM_VIS', 'CARM_NIR', 'HARPS', 'HARPN'])
+    parser.add_argument('--inst', choices=['CARM_VIS', 'CARM_NIR', 'HARPS', 'HARPN', 'ESPRESSO'])
 
     # Mask shift to RV 0
     # Shift mask by `--tplrv`.
@@ -272,6 +274,28 @@ def main():
         nord = 1
         ords = np.array([0])
 
+    elif args.tpltype == 'espressos1dcoadd':
+        w, f, ferr, snr, q, contrib = espressoutils.drs_fitsred_s1dcoadd_read(args.filtpl)
+        w, f = [w], [f]
+        nord = 1
+        ords = np.array([0])
+        if False:
+            fig, ax = plt.subplots(4,1,figsize=(16,8), sharex=True)
+            # ax[0].errorbar(w, f, yerr=ferr, linestyle='None', marker='o', color='0.2')
+            ax[0].plot(w, f, color='0.2')
+            ax[0].set_ylabel('Flux')
+            ax[1].plot(w, ferr, color='0.2')
+            ax[1].set_ylabel('Flux error')
+            ax[2].plot(w, snr)
+            ax[2].set_ylabel('S/N')
+            ax[3].plot(w, contrib)
+            ax[3].set_ylabel('# input spec.')
+            ax[-1].set_xlabel('Wavelength $[\AA]$')
+            for a in ax:
+                a.minorticks_on()
+            plt.tight_layout()
+            plt.show(), plt.close()
+
     elif args.tpltype == '1dtxt':
         w, f = np.loadtxt(args.filtpl, unpack=True)
         # sys.exit('Template type is other. Not implemented yet!')
@@ -282,6 +306,7 @@ def main():
 
         # ###### TEST
         # w, f = [w[0][760000:810000]], [f[0][760000:810000]]
+
 
     if args.ords_use is None: args.ords_use = ords
     else: args.ords_use = np.asarray(args.ords_use, dtype=int)

@@ -40,6 +40,7 @@ nord = 170
 
 # Number of pixels
 npix = 9111
+# npix = 4545  # binning 4x2
 
 # Header keywords stars
 kwinst = 'HIERARCH ESO'
@@ -161,6 +162,49 @@ def drs_fitsred_read(filin, qualdata2mask=True, w='vac'):
         dllair = hdulist['DLLDATA_AIR_BARY'].data
 
     return w, wair, f, sf, q, mq, dll, dllair, header
+
+def drs_fitsred_s1dcoadd_read(filin):
+    """Filename: science/archive/ES_SOBF_3329677_2022-04-14T23:55:34.690_HR_4x2_U2.fits
+    From `espresso_release_description_v1_0_1.pdf`
+    Table columns of co-added spectra
+    - WAVE [A], in vacuum
+    - FLUX [erg/cm^2/s/A], co-added flux, sky-subtracted if fibre B is on sky, otherwise not sky-subtracted
+    - ERR [erg/cm^2/s/A], error of flux
+    - SNR
+    - QUAL, Quality. Values above 0 may indicate issues with data, e.g. saturation
+    - CONTRIB, number of contributing input spectra
+
+    More info
+    ---------
+
+    >>> hdulist.info()
+    No.    Name      Ver    Type      Cards   Dimensions   Format
+      0  PRIMARY       1 PrimaryHDU    1007   ()      
+      1  SPECTRUM      1 BinTableHDU     56   1R x 6C   [221570D, 221570D, 221570D, 221570D, 221570J, 221570J] 
+
+    >>> hdulist[1].data.columns
+    ColDefs(
+        name = 'WAVE'; format = '221570D'; unit = 'angstrom'
+        name = 'FLUX'; format = '221570D'; unit = 'erg.cm**(-2).s**(-1).angstrom**(-1)'
+        name = 'ERR'; format = '221570D'; unit = 'erg.cm**(-2).s**(-1).angstrom**(-1)'
+        name = 'SNR'; format = '221570D'
+        name = 'QUAL'; format = '221570J'
+        name = 'CONTRIB'; format = '221570J'
+    )
+    """
+    # Check if file exists
+    if not os.path.isfile(filin): sys.exit('File does not exist: {}'.format(filin))
+
+    # Read FITS
+    with fits.open(filin) as hdulist:
+        w = hdulist[1].data['WAVE'][0]
+        f = hdulist[1].data['FLUX'][0]
+        ferr = hdulist[1].data['ERR'][0]
+        snr = hdulist[1].data['SNR'][0]
+        q = hdulist[1].data['QUAL'][0]
+        contrib = hdulist[1].data['CONTRIB'][0]
+    
+    return w, f, ferr, snr, q, contrib
 
 # -------------------------------------
 
