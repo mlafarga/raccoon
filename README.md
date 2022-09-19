@@ -87,7 +87,7 @@ Weighted binary masks can be computed with the script `raccoonmask`.
 
 Here is a basic example for CARMENES VIS data:
 ```bash
-raccoonmask PATH/TO/TPL.fits TPL_TYPE OBJ --inst CARM_VIS --tplrv 10. --cont poly --contfiltmed 1 --contfiltmax 400 --contpolyord 2 -line_fwhmmin 2.00 --line_fwhmmax 30.00 --line_contrastminmin 0.06 --line_depthw_percentdeepest 0.10 --line_depthw_depthmaxquantile 0.6 --verbose
+raccoonmask PATH/TO/TPL.fits TPL_TYPE OBJ --inst CARM_VIS --tplrv 10. --cont poly --contfiltmed 1 --contfiltmax 400 --contpolyord 2 --line_fwhmmin 2.00 --line_fwhmmax 30.00 --line_contrastminmin 0.06 --line_depthw_percentdeepest 0.10 --line_depthw_depthmaxquantile 0.6 --verbose
 ```
 
 For all the available options see:
