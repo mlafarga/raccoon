@@ -668,6 +668,8 @@ def listmask_default():
         'HARPS': {},
         'HARPN': {},
         'EXPRES': {},
+        'ESPRESSO': {},
+        'ESPRESSO4x2': {},
     }
     return dictmask
 

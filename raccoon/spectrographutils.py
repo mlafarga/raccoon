@@ -8,6 +8,7 @@ from __future__ import print_function
 
 import os
 import sys
+import ipdb
 
 import numpy as np
 import pandas as pd
@@ -27,6 +28,7 @@ from . import expresutils
 dicpix = {
     'CARM_VIS': 4096,
     'ESPRESSO': 9111,
+    'ESPRESSO4x2': 4545,
 }
 
 # Resolution
@@ -37,6 +39,7 @@ dicres = {
     'HARPN': 115000,
     'EXPRES': 150000,
     'ESPRESSO': 140000, # If HR mode (1-UT). Can also be 190000 if UHR mode (1-UT) or 70000 if MR mode (4-UT)
+    'ESPRESSO4x2': 130000, # If HR mode (1-UT). Can also be 190000 if UHR mode (1-UT) or 70000 if MR mode (4-UT)
 }
 
 # Number of orders
@@ -47,6 +50,7 @@ dicnord = {
     'HARPN': 69,
     'EXPRES': 86,
     'ESPRESSO': 170,
+    'ESPRESSO4x2': 170,
 }
 
 
@@ -82,6 +86,7 @@ dicoref = {
    'EXPRES': 60,  # ?
    # 'ESPRESSO': 106,  # ? Orders 106 and 107 (starting from 0) cover the 550 nm (orders 104 and 105 too, but 550 nnm falls on the extreme)
    'ESPRESSO': 102,  # ? Orders 102 and 103 (starting from 0) cover the 550 nm (orders 100 and 101 too, but 550 nnm falls on the extreme)
+   'ESPRESSO4x2': 102,  # ? Orders 102 and 103 (starting from 0) cover the 550 nm (orders 100 and 101 too, but 550 nnm falls on the extreme)
 }
 
 
@@ -222,6 +227,12 @@ def fitsred_read(filin, inst,
             w = wcb
         dataextra = {'blaze': b, 'pixel_mask': mf, 'excalibur_mask': mwecb, 'header1': header1, 'header2': header2}
 
+    elif inst == 'ESPRESSO' or inst == 'ESPRESSO4x2':
+        w, wair, f, sf, q, mq, dll, dllair, header = espressoutils.drs_fitsred_read(filin, qualdata2mask=True, w='vac')
+        c = np.ones_like(w)
+        # TODO: add data extra
+        dataextra = {}
+
     return w, f, sf, c, header, dataextra
 
 # -----------------------------------------------------------------------------
@@ -247,7 +258,7 @@ def header_bjd_lisobs(lisobs, inst, name='bjd', notfound=np.nan, ext=0):
         #     lisbjd.rename(columns={'HIERARCH CARACAL BJD': name}, inplace=True)
     elif inst == 'HARPS' or inst == 'HARPN':
         lisbjd = harpsutils.drs_bjd_lisobs(lisobs, inst, notfound=notfound, ext=ext, name=name)
-    elif inst == 'ESPRESSO':
+    elif inst == 'ESPRESSO' or inst == 'ESPRESSO4x2':
         lisbjd = espressoutils.drs_bjd_lisobs(lisobs, notfound=notfound, ext=ext, name=name)
     elif inst == 'EXPRES':
         lisbjd = expresutils.drs_bjd_lisobs(lisobs, notfound=notfound, ext=ext, name=name)
@@ -287,6 +298,10 @@ def header_ron_lisobs(lisobs, inst, name='ron', notfound=np.nan, ext=0):
         # TODO: set to 0 for now
         lisron = pd.DataFrame(np.zeros_like(lisobs, dtype=float), columns=[name], index=lisobs)
 
+    elif inst == 'ESPRESSO' or inst == 'ESPRESSO4x2':
+        # TODO: set to 0 for now
+        lisron = pd.DataFrame(np.zeros_like(lisobs, dtype=float), columns=[name], index=lisobs)
+
     return lisron
 
 
@@ -304,8 +319,11 @@ def header_exptime_lisobs(lisobs, inst, name='exptime', notfound=np.nan, ext=0):
         if name is not None:
             lisexptime.rename(columns={'EXPTIME': name}, inplace=True)
 
-    if inst == 'EXPRES':
+    elif inst == 'EXPRES':
         lisexptime = expresutils.drs_exptime_lisobs(lisobs, notfound=notfound, ext=ext, name=name)
+
+    elif inst == 'ESPRESSO' or inst == 'ESPRESSO4x2':
+        lisexptime = espressoutils.drs_exptime_lisobs(lisobs, notfound=notfound, ext=ext, name=name)
 
     return lisexptime
 
@@ -326,6 +344,9 @@ def header_airmass_lisobs(lisobs, inst, name='airmass', notfound=np.nan, ext=0):
 
     elif inst == 'EXPRES':
         lisairmass = expresutils.drs_airmass_lisobs(lisobs, notfound=notfound, ext=ext, name=name)
+    
+    elif inst == 'ESPRESSO' or inst == 'ESPRESSO4x2':
+        lisairmass = espressoutils.drs_airmass_start_lisobs(lisobs, notfound=notfound, ext=ext, name=name)
 
     return lisairmass
 
@@ -364,6 +385,10 @@ def header_snr_lisobs(lisobs, inst, name='snro', ords=None, notfound=np.nan, ext
     elif inst == 'EXPRES':
         # EXPRES S/N not in FITS header, get from spectrum
         lissnr = expresutils.drs_snr_lisobs(lisobs, ords, name=name)
+
+    elif inst == 'ESPRESSO' or inst == 'ESPRESSO4x2':
+        # ords=None uses all orders by default
+        lissnr = espressoutils.drs_snr_lisobs(lisobs, ords=None, notfound=notfound, ext=ext, name=name)
 
     return lissnr
 
@@ -462,7 +487,7 @@ def fitsccf_rvgrid_read(filin, inst, ext=None, ext1=None):
     elif inst == 'HARPS' or inst == 'HARPN':
         if ext is None: ext = 0
         rvgrid = harpsutils.drs_ccfrvgrid_read(filin, ext=ext)
-    elif inst == 'ESPRESSO':
+    elif inst == 'ESPRESSO' or inst == 'ESPRESSO4x2':
         if ext is None: ext = 1
         if ext1 is None: ext1 = 0
         rvgrid = espressoutils.drs_ccfrvgrid_read(filin, ext=ext, ext1=ext1)
@@ -476,7 +501,7 @@ def fitsccf_read_ccf(filin, inst):
         sys.exit()
     elif inst == 'HARPS' or inst == 'HARPN':
         header, lisccf = harpsutils.drs_ccf_read(filin)
-    elif inst == 'ESPRESSO':
+    elif inst == 'ESPRESSO' or inst == 'ESPRESSO4x2':
         header, lisccf = espressoutils.drs_ccf_read(filin)
     elif inst == 'EXPRES':
         sys.exit()
@@ -485,14 +510,16 @@ def fitsccf_read_ccf(filin, inst):
 
 def fitsccf_fluxes_read(filin, inst):
     if inst == 'CARM_VIS' or inst == 'CARM_NIR':
-        _, lisccf, _, _, _, _, _, _, _, _ = ccflib.infits_ccfall(filin)
+        # _, lisccf, _, _, _, _, _, _, _, _ = ccflib.infits_ccfall(filin)
+        rv, ccfsum, ccfparsum, ccf, ccfpar, bxsum, bysum, bx, by, headerobs= ccflib.infits_ccfall(filin)
+        lisccf = np.vstack((ccf, ccfsum))
         lisccferr = np.zeros_like(lisccf) * np.nan
         lisccfq = np.zeros_like(lisccf) * np.nan
     elif inst == 'HARPS' or inst == 'HARPN':
         _, lisccf = harpsutils.drs_ccf_read(filin)
         lisccferr = np.zeros_like(lisccf) * np.nan
         lisccfq = np.zeros_like(lisccf) * np.nan
-    elif inst == 'ESPRESSO':
+    elif inst == 'ESPRESSO' or inst == 'ESPRESSO4x2':
         lisccf, lisccferr, lisccfq = espressoutils.drs_ccffluxes_read(filin)
     elif inst == 'EXPRES':
         sys.exit()

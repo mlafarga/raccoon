@@ -163,6 +163,7 @@ def drs_fitsred_read(filin, qualdata2mask=True, w='vac'):
 
     return w, wair, f, sf, q, mq, dll, dllair, header
 
+
 def drs_fitsred_s1dcoadd_read(filin):
     """Filename: science/archive/ES_SOBF_3329677_2022-04-14T23:55:34.690_HR_4x2_U2.fits
     From `espresso_release_description_v1_0_1.pdf`
