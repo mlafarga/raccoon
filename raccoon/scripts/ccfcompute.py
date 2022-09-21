@@ -821,6 +821,7 @@ def main():
         # Make sure rvstp is small enough
         # If not make it half of the BERV, to be sure that no overlaps are missed
         if rv[1] - rv[0] > 2 * args.bervmax / 1.e3:
+            # TODO: fails is args.bermax is 0!!!
             rvnew = np.arange(rv[0], rv[-1] + (rv[1] - rv[0]), args.bervmax / 2.e3)
         else:
             rvnew = rv

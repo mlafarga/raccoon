@@ -154,6 +154,8 @@ def parse_args():
     parser.add_argument('--maskwave', help='', type=str, default='cen')
     parser.add_argument('--maskweight', help='', type=str, default='contrastmeanfwhm-1')
 
+    parser.add_argument('--condnodepth', help='Do not take depth conditions into account when selection minima (for non-normalised templates', action='store_true')
+
     # Orders join
     parser.add_argument('--dwmin', help='Minimum separation between to lines to be considered different lines [A]', type=float, default=0.05)
     parser.add_argument('--joinord', choices=['keepred', 'merge'], help='How to join the orders. If `keepred`, keep the redder order lines in the overlap region (bluer part of the orders more noisy), if `merge`, merge blue and red extremes of consecutive orders', default='merge')
@@ -571,6 +573,7 @@ def main():
     # Plot norm spec
     # if True:
     if args.plot_test:
+        verboseprint('Normalised template')
         fig, ax = plt.subplots(2, 1, sharex=True)
         xmin, xmax = np.nanmin([np.nanmin(w[o]) for o in args.ords_use]), np.nanmax([np.nanmax(w[o]) for o in args.ords_use])
         ymin0, ymax0 = np.nanmin([np.nanmin(fraw[o]) for o in args.ords_use]), np.nanmax([np.nanmax(fraw[o]) for o in args.ords_use])
@@ -578,6 +581,7 @@ def main():
         for o in args.ords_use:
             # Spectrum raw
             ax[0].plot(wraw[o], fraw[o])
+            ax[0].plot(w[o], continuum[o])
             # Spectrum continuum norm
             ax[1].plot(w[o], f[o])
         # Telluric mask
@@ -911,7 +915,10 @@ def main():
         # -----------------------------------------------------
 
         # Final selection
-        cond[o] = condcontrast1 & condcontrast2 & condcontrastmin & condcontrastmax & condcontrastmean & condfwhm & conddepth & depthcondw
+        if args.condnodepth is False:  # Take all conditions into account
+            cond[o] = condcontrast1 & condcontrast2 & condcontrastmin & condcontrastmax & condcontrastmean & condfwhm & conddepth & depthcondw
+        else:  # Do not take depth conditions into account (in cases with non-normalised templates)
+            cond[o] = condcontrast1 & condcontrast2 & condcontrastmin & condcontrastmax & condcontrastmean & condfwhm
 
     # Final lines (cond = True)
     datafit_final = [[]]*nord
@@ -1115,6 +1122,8 @@ def main():
         #     ]
         region = [
             # [(x0, x1), (y0, y1)],
+            [(xmin, xmax), (0., 10.)],
+            [(7540, 7575), (0., 10.)],
             [(7720.92, 7731), (0.4, 1.08)],
             # [(7720.92, 7733.41), (0.4, 1.08)],
             ]
@@ -1442,7 +1451,7 @@ def main():
             if args.tellbroadendv == 'obsall':
                 tell = '_tellbervmax'
             else:
-                tell = '_tell{:5.0f}'.format(tellbroadendv)
+                tell = '_tell{:.0f}'.format(tellbroadendv)
         else:
             tell = ''
         cuts = '_fwhm{:2.2f}-{:2.2f}_contrminmin{:.2f}_depthwq{:.2f}'.format(args.line_fwhmmin, args.line_fwhmmax, args.line_contrastminmin, args.line_depthw_depthmaxquantile)
