@@ -2,11 +2,14 @@
 from __future__ import division
 from __future__ import print_function
 
+import ipdb
 import pickle
 import sys
 
 from astropy.convolution import convolve, Box1DKernel, Gaussian1DKernel
+from astropy.stats import sigma_clip
 import numpy as np
+from scipy.interpolate import interp1d
 from scipy.interpolate import UnivariateSpline
 from scipy.ndimage.filters import median_filter
 from scipy.ndimage.filters import maximum_filter1d
@@ -156,6 +159,115 @@ def remove_nan_echelle(*args, **kwargs):
                 else:
                     args_new[j][o] = a[o][mask[o]]
     return args_new, mask
+
+###############################################################################
+
+# Clip flux spikes
+
+def mask_spike(f, sigma_lower=10, sigma_upper=2, maxiters=2, axis=2):
+    fnew = f.copy()
+    # Mask spikes
+    mask = sigma_clip(fnew, sigma_upper=sigma_upper, sigma_lower=sigma_lower, maxiters=maxiters, cenfunc='median', stdfunc='std', axis=axis, copy=False).mask
+    return mask
+
+
+def extend_mask(mask, pointnear=1):
+    """If mask with True/False, extend the True values to the neighbouring points. For 3D arrays with nord, nobs, npix. Extend along npix (i.e. per ord, per obs).
+    Issue: Goes through all True values, but should only need to change those next to a False.
+    """
+    indices = np.where(mask == True)
+    indices = np.array(indices)
+    _, npoints = indices.shape
+    npixmin, npixmax = 0, mask.shape[2]-1
+    for ip in range(npoints):
+        a, b, c = indices[:,ip]
+        # Make sure indices donñt extend past array dimensions
+        if c == npixmin:
+            mask[a,b,c+pointnear] = True
+        elif c == npixmax:
+            mask[a,b,c-pointnear] = True
+        else:
+            mask[a,b,c-pointnear] = True
+            mask[a,b,c+pointnear] = True
+    return mask
+
+
+def extend_mask_1D(mask, pointnear=1):
+    """If mask with True/False, extend the True values to the neighbouring points. For 3D arrays with nord, nobs, npix. Extend along npix (i.e. per ord, per obs).
+    Issue: Goes through all True values, but should only need to change those next to a False.
+    """
+    indices = np.where(mask == True)
+    indices = np.array(indices)
+    _, npoints = indices.shape
+    npixmin, npixmax = 0, mask.shape[0]-1
+    for ip in range(npoints):
+        a = indices[:,ip]
+        # Make sure indices dont extend past array dimensions
+        if a == npixmin:
+            mask[a+pointnear] = True
+        elif a == npixmax:
+            mask[a-pointnear] = True
+        else:
+            mask[a-pointnear] = True
+            mask[a+pointnear] = True
+    return mask
+
+
+def clean_spike(w, f, mask, clean='nan', fill_value=np.nan):
+    wnew = w.copy()
+    fnew = f.copy()
+    masknew = mask.copy()
+
+    # Clean data
+    # Set pixel with a spike to nan
+    if clean == 'nan':
+        fnew[masknew] = np.nan
+    # Set pixel with a spike in any obs to nan for all obs
+    elif clean == 'nanall':
+        mask_red = np.sum(masknew, axis=0, dtype=bool)
+        fnew[:,mask_red] = np.nan
+    # Set pixel with a spike to the interpolation between neighbouring points. If spike at one of the spectrum ends, return `fill_value`` (defaults to nan)
+    elif clean == 'interpol':
+        # # https://stackoverflow.com/questions/6518811/interpolate-nan-values-in-a-numpy-array
+        # F = lambda z: z.nonzero()[0]
+        # f[masknew]= np.interp(F(masknew), F(~masknew), f[~masknew])
+
+        # F = interpolate.interp1d(wnew[~masknew], fnew[~masknew], axis=2)
+        # fnew = F(wnew)
+
+        fclip = np.empty(fnew.shape)
+        for io in range(f.shape[0]):
+            # print('ord', io)
+            for iobs in range(f.shape[1]):
+                # if io == 10:
+                #     print('   obs', iobs)
+                # Interpolation function
+                F = interp1d(wnew[io,iobs][~masknew[io,iobs]], fnew[io,iobs][~masknew[io,iobs]], bounds_error=False, fill_value=fill_value)
+                # print('   ', np.nanmin(wnew[io][masknew[io]]), np.nanmax(wnew[io][masknew[io]]), '   ', np.nanmin(wnew[io]), np.nanmax(wnew[io]))
+                # Interpolate flux for original wavelength
+                fclip[io,iobs] = F(wnew[io,iobs])
+        fnew = fclip
+    return fnew
+
+
+def clean_spike_1D(w, f, mask, clean='nan', fill_value=np.nan):
+    wnew = w.copy()
+    fnew = f.copy()
+    masknew = mask.copy()
+
+    # Clean data
+    # Set pixel with a spike to nan
+    if clean == 'nan':
+        fnew[masknew] = np.nan
+    # Set pixel with a spike to the interpolation between neighbouring points. If spike at one of the spectrum ends, return `fill_value`` (defaults to nan)
+    elif clean == 'interpol':
+        # # https://stackoverflow.com/questions/6518811/interpolate-nan-values-in-a-numpy-array
+        # F = lambda z: z.nonzero()[0]
+        # f[masknew]= np.interp(F(masknew), F(~masknew), f[~masknew])
+        F = interp1d(wnew[~masknew], fnew[~masknew], bounds_error=False, fill_value=fill_value)
+        fnew = F(wnew)
+    return fnew
+
 
 ###############################################################################
 

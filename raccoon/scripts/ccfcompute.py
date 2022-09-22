@@ -322,7 +322,6 @@ def main():
     # elif args.bjd == 'serval_header':
     #     pass
 
-
     # RV corrections
     if args.rvshift is not None:
         _, _, lisshift = spectrographutils.serval_header_rvcorrection_lisobs(lisfilobs, args.inst, source=args.rvshift, servalin=args.dirserval, obj=args.obj, notfound=np.nan, ext=0)
@@ -1021,11 +1020,23 @@ def main():
             plt.show()
             plt.close()
 
+        # Apply ESPRESSO quality mask (basically seems to remove pixels with0 flux values at the extremes)
+        w_new, f_new, sf_new, c_new = [], [], [], []
+        if args.inst == 'ESPRESSO' or args.inst == 'ESPRESSO4x2':
+            for o in range(len(w)):
+                mq = dataextra['mq'][o]
+                w_new = w[o][mq]
+                f_new = f[o][mq]
+                sf_new = sf[o][mq]
+                c_new = c[o][mq]
+            w_new, f_new, sf_new, c_new = w, f, sf, c
+
         # Remove extreme pixels
         w = w[:, args.pmin:pmaxp]
         f = f[:, args.pmin:pmaxp]
         sf = sf[:, args.pmin:pmaxp]
         c = c[:, args.pmin:pmaxp]
+
 
         # EXPRES use own mask to remove bad pixels
         if args.inst == 'EXPRES':
@@ -1080,9 +1091,24 @@ def main():
         # More cleaning...
         # - Flux spikes
 
+        # Clip flux spikes
+
+        # Mask with spikes (True)
+        fnew = []
+        for o in ords:
+            maskclip = spectrumutils.mask_spike(f[o], sigma_lower=6, sigma_upper=4, maxiters=2, axis=0)
+            # Make points near spikes (True) also maked (True)
+            maskclip = spectrumutils.extend_mask_1D(maskclip, pointnear=1)
+            # Correct spikes by interpolating
+            fclip = spectrumutils.clean_spike_1D(w[o], f[o], maskclip, clean='interpol')
+            # plt.plot(w[o], f[o], '-', w[o], fclip, '--'), plt.show()
+            fnew.append(fclip)
+        f = fnew
+
+
         # CARMENES (CARACAL) FOX: Reweight flux so that <counts> = SNR^2
-        if args.inst == 'CARM_VIS' or args.inst == 'CARM_NIR' or args.inst == 'EXPRES':
-            f = [f[o] * dataobs.loc[filobs]['snro{:d}'.format(o)]**2 / np.mean(f[o]) for o in ords]
+        if args.inst == 'CARM_VIS' or args.inst == 'CARM_NIR' or args.inst == 'EXPRES' or args.inst == 'ESPRESSO' or args.inst == 'ESPRESSO4x2':
+            f = [f[o] * dataobs.loc[filobs]['snro{:d}'.format(o)]**2 / np.nanmean(f[o]) for o in ords]
             # f2 = [f[o] * dataobs.loc[filobs]['snro{:d}'.format(o)]**2 / np.median(f[o]) for o in ords]
 
         # fig, ax = plt.subplots(4, 1, sharex=True)
@@ -1668,7 +1694,7 @@ def main():
 
     else:
         fig, ax = ccflib.plot_ccfparbasic_servalrvc(dataall, plotserval=False, title='{} CCF parameters  {} obs'.format(args.obj, len(dataall.index)))
-        plotutils.figout(fig, filout=os.path.join(args.dirout, '{}.ccfpar'.format(args.obj)), sv=args.plot_sv, svext=args.plot_ext, sh=args.plot_sh)
+        plotutils.figout(fig, filout=os.path.join(args.dirout, '{}.ccfpar'.format(args.obj)), sv=args.plot_sv, svext=args.plot_ext, sh=True)
 
     # ---------------------------
 

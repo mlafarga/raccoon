@@ -231,7 +231,7 @@ def fitsred_read(filin, inst,
         w, wair, f, sf, q, mq, dll, dllair, header = espressoutils.drs_fitsred_read(filin, qualdata2mask=True, w='vac')
         c = np.ones_like(w)
         # TODO: add data extra
-        dataextra = {}
+        dataextra = {'q': q, 'mq': mq, 'dll': dll}
 
     return w, f, sf, c, header, dataextra
 
