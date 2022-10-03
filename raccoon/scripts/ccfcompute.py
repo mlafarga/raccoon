@@ -100,6 +100,10 @@ def parse_args():
     parser.add_argument('--rvshift', help='Correct spectra RV for BERV, secular acceleration, instrumental drift or other drifts. Options: A) `header`: get corrections (BERV and drift) from FITS header. Secular acceleration and other drift is 0. If nan, use 0. B) `serval`: get corrections (BERV, drift and sa) from SERVAL outputs of the input observations. Must provide SERVAL output directory with `dirserval` (must have run SERVAL previously). C) `serval_header`: get corrections from SERVAL outputs, and if not or nan, get them from header. D) `pathtofile`: File containing the corrections for each obs. Columns: 0) observation name, rest of columns: BERV, drift, sa, other... with header indicating which column is each correction. Can only have a single column with all the corrections already put together. E) `none` (default) then no correction is applied. All in [km/s]', type=str, default=None)
 
     # Flux correction
+    parser.add_argument('--rmvspike', help='Remove flux spikes and interpolate', action='store_true')
+    parser.add_argument('--rmvspike_sigma_lower', help='Remove flux spikes: sigma lower', type=float, default=6)
+    parser.add_argument('--rmvspike_sigma_upper', help='Remove flux spikes: sigma upper', type=float, default=4)
+    parser.add_argument('--rmvspike_maxiters', help='Remove flux spikes: number of iterations', type=int, default=2)
     parser.add_argument('--fcorrorders', help='Correct order flux so that all observations have the same SED', choices=['obshighsnr'], default=None)
 
     # Telluric mask
@@ -1088,22 +1092,19 @@ def main():
             # plt.close()
             # sys.exit()
 
-        # More cleaning...
-        # - Flux spikes
-
         # Clip flux spikes
-
-        # Mask with spikes (True)
-        fnew = []
-        for o in ords:
-            maskclip = spectrumutils.mask_spike(f[o], sigma_lower=6, sigma_upper=4, maxiters=2, axis=0)
-            # Make points near spikes (True) also maked (True)
-            maskclip = spectrumutils.extend_mask_1D(maskclip, pointnear=1)
-            # Correct spikes by interpolating
-            fclip = spectrumutils.clean_spike_1D(w[o], f[o], maskclip, clean='interpol')
-            # plt.plot(w[o], f[o], '-', w[o], fclip, '--'), plt.show()
-            fnew.append(fclip)
-        f = fnew
+        if args.rmvspike:
+            fnew = []
+            for o in ords:
+                # Mask with spikes (True)
+                maskclip = spectrumutils.mask_spike(f[o], sigma_lower=args.rmvspike_sigma_lower, sigma_upper=args.rmvspike_sigma_upper, maxiters=args.rmvspike_maxiters, axis=0)
+                # Make points near spikes (True) also maked (True)
+                maskclip = spectrumutils.extend_mask_1D(maskclip, pointnear=1)
+                # Correct spikes by interpolating
+                fclip = spectrumutils.clean_spike_1D(w[o], f[o], maskclip, clean='interpol')
+                # plt.plot(w[o], f[o], '-', w[o], fclip, '--'), plt.show()
+                fnew.append(fclip)
+            f = fnew
 
 
         # CARMENES (CARACAL) FOX: Reweight flux so that <counts> = SNR^2
