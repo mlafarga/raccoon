@@ -527,6 +527,66 @@ def fitsccf_fluxes_read(filin, inst):
 
 
 
+# -----------------------------------------------------------------------------
+
+
+# Read spectrum model/template
+# ----------------------------
+
+def read_spec_model(filtpl, tpltype):
+    """Read spectrum model.
+
+    Parameters
+    ----------
+    filtpl : str
+        Path to model file.
+    tpltype : str
+        Type of model to be read. Options: `serval`, `phoenix`, `1dtxt`, `espressos1dcoadd`.
+    """
+    if args.tpltype == 'serval':
+        w, f, sf, header = carmenesutils.serval_tpl_read(args.filtpl)
+        nord = len(w)
+        ords = np.arange(0, nord, 1)
+
+    elif args.tpltype == 'phoenix':
+        sys.exit('Template type is phoenix. Not implemented yet!')
+        # TO DO: in parser, specify option for phoenix files
+        # w, f = phoenixutils.read_phoenixfits(filw, filf)
+        nord = 1
+        ords = np.array([0])
+
+    elif args.tpltype == 'espressos1dcoadd':
+        w, f, sf, snr, q, contrib = espressoutils.drs_fitsred_s1dcoadd_read(args.filtpl)
+        w, f = [w], [f]
+        nord = 1
+        ords = np.array([0])
+        # if False:
+        #     fig, ax = plt.subplots(4,1,figsize=(16,8), sharex=True)
+        #     # ax[0].errorbar(w, f, yerr=sf, linestyle='None', marker='o', color='0.2')
+        #     ax[0].plot(w, f, color='0.2')
+        #     ax[0].set_ylabel('Flux')
+        #     ax[1].plot(w, sf, color='0.2')
+        #     ax[1].set_ylabel('Flux error')
+        #     ax[2].plot(w, snr)
+        #     ax[2].set_ylabel('S/N')
+        #     ax[3].plot(w, contrib)
+        #     ax[3].set_ylabel('# input spec.')
+        #     ax[-1].set_xlabel('Wavelength $[\AA]$')
+        #     for a in ax:
+        #         a.minorticks_on()
+        #     plt.tight_layout()
+        #     plt.show(), plt.close()
+
+    elif args.tpltype == '1dtxt':
+        w, f = np.loadtxt(args.filtpl, unpack=True)
+        w, f = [w], [f]
+        nord = 1
+        ords = np.array([0])
+
+    return w, f, sf, nord, ords, header
+
+
+
 
 
 
