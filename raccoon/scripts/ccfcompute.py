@@ -63,13 +63,16 @@ def parse_args():
     parser.add_argument('--expresw', choices=['wavelength', 'bary_wavelength', 'excalibur', 'bary_excalibur'], help='EXPRES wavelength.', default='bary_excalibur')
 
     # Mask
-    parser.add_argument('filmask', help='Path to custom mask file (file with extension `.mas`), or mask ID to use one of the default masks, or (CARM GTO) path to "mask selection file" (file with any other extension that specifies the masks available to choose from). Mask file format: Columns: 0) w (wavelengths), 1) f (weights), separated by whitespaces. Mask-selection file format: Columns: 0) object used to make the mask `objmask`, 1) spectral type of `objmask`, 2) `vsini` of `objmask`, 3) path to mask file (`.mas` extension). There can only be one mask file for each combination of spt-vsini. TODO: Only spt is used to select the mask (not the vsini).', type=str)
+    parser.add_argument('filmask', help='Path to custom mask file (file with extension `.mas`), or mask ID to use one of the default masks, or (CARM GTO) path to "mask selection file" (file with any other extension that specifies the masks available to choose from), or another type of template (see `--tpltype` option). Mask file format: Columns: 0) w (wavelengths), 1) f (weights), separated by whitespaces. Mask-selection file format: Columns: 0) object used to make the mask `objmask`, 1) spectral type of `objmask`, 2) `vsini` of `objmask`, 3) path to mask file (`.mas` extension). There can only be one mask file for each combination of spt-vsini. TODO: Only spt is used to select the mask (not the vsini).', type=str)
     parser.add_argument('--maskformatharp', help='If mask format is w1, w2, f and wavelengths are in air -> it is transformed into w, f and vacuum.', action='store_true')
     parser.add_argument('--maskair', help='If mask wavelengths in air, tranform to vacuum. Not needed if `maskformatharp` is True.', action='store_true')
     parser.add_argument('--objmask', help='Overwrites values from `filmask`.', type=str, default=None)
     parser.add_argument('--sptmask', help='Overwrites values from `filmask`.', type=str, default=None)
     parser.add_argument('--vsinimask', help='Overwrites values from `filmask`.', type=float, default=None)
     # parser.add_argument('--filmaskabserr')
+
+    # Template
+    parser.add_argument('--tpltype', choices=['mask', 'serval', 'phoenix', '1dtxt', 'espressos1dcoadd'], help='', type=str, default='mask')  # 'custommatrix', 'customstepctn'
 
     # Target info
     parser.add_argument('--obj', help='CARMENES ID.', type=str)
@@ -442,77 +445,84 @@ def main():
 
     # -----------------------------------------------------------------------------
 
-    # Get mask
-    # --------
+    # Get template (default is weighted binary mask)
+    # ------------
 
-    # Check if filmask is a valid mask ID
-    dictmask = ccflib.listmask_default()[args.inst]
-    dictmask_ids = dictmask.keys()
+    # Mask
+    if args.tpltype is 'mask':  # (default)
 
-    if args.filmask in dictmask_ids:
-        filmask = dictmask[args.filmask]['filmask']
-        datamask = dictmask[args.filmask]
+        # Check if filmask is a valid mask ID
+        dictmask = ccflib.listmask_default()[args.inst]
+        dictmask_ids = dictmask.keys()
 
-    # If not check if its a mask file or a mask-selection file
-    else:
-        if not os.path.exists(args.filmask): sys.exit('Mask file {} does not exist'.format(args.filmask))
+        if args.filmask in dictmask_ids:
+            filmask = dictmask[args.filmask]['filmask']
+            datamask = dictmask[args.filmask]
 
-        # Mask file
-        if os.path.splitext(args.filmask)[1] == '.mas':
-            filmask = args.filmask
-
-            datamask = {
-                'filmask': filmask,
-                'objmask': args.objmask,
-                'sptmask': args.sptmask,
-                'vsinimask': args.vsinimask,
-            }
-            verboseprint('\nMask: ', datamask['filmask'])
-        # Mask-selection file
+        # If not check if its a mask file or a mask-selection file
         else:
-            verboseprint('\nSelecting mask from list in: {}'.format(args.filmask))
-            # Select mask
-            maskinfo = ccflib.selectmask_carmenesgto(args.filmask, args.spt, args.vsini, sptdefault='M3.5', vsinidefault=2.0, verbose=True)
-            filmask = os.path.expanduser(maskinfo['filmask'])
+            if not os.path.exists(args.filmask): sys.exit('Mask file {} does not exist'.format(args.filmask))
 
-            datamask = {
-                'filmask': filmask,
-                'objmask': maskinfo['obj'] if args.objmask is None else args.objmask,
-                'sptmask': maskinfo['spt'] if args.sptmask is None else args.sptmask,
-                'vsinimask': maskinfo['vsini'] if args.vsinimask is None else args.vsinimask,
-            }
+            # Mask file
+            if os.path.splitext(args.filmask)[1] == '.mas':
+                filmask = args.filmask
 
-    verboseprint('Mask: {}'.format(filmask))
-    verboseprint('  Mask obj {}, SpT {}, vsini {}'.format(datamask['objmask'], datamask['sptmask'], datamask['vsinimask']))
-    verboseprint('  Target {}, SpT {}, vsini {}'.format(args.obj, args.spt, args.vsini))
+                datamask = {
+                    'filmask': filmask,
+                    'objmask': args.objmask,
+                    'sptmask': args.sptmask,
+                    'vsinimask': args.vsinimask,
+                }
+                verboseprint('\nMask: ', datamask['filmask'])
+            # Mask-selection file
+            else:
+                verboseprint('\nSelecting mask from list in: {}'.format(args.filmask))
+                # Select mask
+                maskinfo = ccflib.selectmask_carmenesgto(args.filmask, args.spt, args.vsini, sptdefault='M3.5', vsinidefault=2.0, verbose=True)
+                filmask = os.path.expanduser(maskinfo['filmask'])
 
-    # if not os.path.exists(args.filmask): sys.exit('Mask file {} does not exist'.format(args.filmask))
+                datamask = {
+                    'filmask': filmask,
+                    'objmask': maskinfo['obj'] if args.objmask is None else args.objmask,
+                    'sptmask': maskinfo['spt'] if args.sptmask is None else args.sptmask,
+                    'vsinimask': maskinfo['vsini'] if args.vsinimask is None else args.vsinimask,
+                }
 
-    # Read mask
-    if not args.maskformatharp:
-        wm, fm = np.loadtxt(filmask, usecols=[0, 1], unpack=True)
+        verboseprint('Mask: {}'.format(filmask))
+        verboseprint('  Mask obj {}, SpT {}, vsini {}'.format(datamask['objmask'], datamask['sptmask'], datamask['vsinimask']))
+        verboseprint('  Target {}, SpT {}, vsini {}'.format(args.obj, args.spt, args.vsini))
+
+        # if not os.path.exists(args.filmask): sys.exit('Mask file {} does not exist'.format(args.filmask))
+
+        # Read mask
+        if not args.maskformatharp:
+            wm, fm = np.loadtxt(filmask, usecols=[0, 1], unpack=True)
+        else:
+            wm1, wm2, fm = np.loadtxt(filmask, usecols=[0, 1, 2], unpack=True)
+            wm = (wm1 + wm2) / 2.
+            wm = spectrumutils.wair2vac(wm)
+            args.maskair = False
+        # Transform to vacuum
+        if args.maskair:
+            wm = spectrumutils.wair2vac(wm)
+            args.maskair = False
+
+        wm_original, fm_original = wm.copy(), fm.copy()
+        nlinoriginal = len(wm)
+        verboseprint('  {} lines in mask'.format(nlinoriginal))
+
+        # Cut mask to selected wrange
+        if args.wrange is not None:
+            verboseprint('  Cut mask to range: {} -- {}'.format(args.wrange[0], args.wrange[1]))
+            mask = (wm >= args.wrange[0]) & (wm <= args.wrange[1])
+            wm = wm[mask]
+            fm = fm[mask]
+            nlin = len(wm)
+            verboseprint('  {} lines in mask'.format(nlin))
+
+    # Any other type of template that is not a mask
     else:
-        wm1, wm2, fm = np.loadtxt(filmask, usecols=[0, 1, 2], unpack=True)
-        wm = (wm1 + wm2) / 2.
-        wm = spectrumutils.wair2vac(wm)
-        args.maskair = False
-    # Transform to vacuum
-    if args.maskair:
-        wm = spectrumutils.wair2vac(wm)
-        args.maskair = False
-
-    wm_original, fm_original = wm.copy(), fm.copy()
-    nlinoriginal = len(wm)
-    verboseprint('  {} lines in mask'.format(nlinoriginal))
-
-    # Cut mask to selected wrange
-    if args.wrange is not None:
-        verboseprint('  Cut mask to range: {} -- {}'.format(args.wrange[0], args.wrange[1]))
-        mask = (wm >= args.wrange[0]) & (wm <= args.wrange[1])
-        wm = wm[mask]
-        fm = fm[mask]
-        nlin = len(wm)
-        verboseprint('  {} lines in mask'.format(nlin))
+        
 
     ###########################################################################
 
