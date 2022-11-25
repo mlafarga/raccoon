@@ -910,6 +910,29 @@ def outfits_ccfall(
 def infits_ccfall(filin):
     """Read CCF data from files created with `outfits_ccfall`.
 
+    Returns
+    -------
+    rv : 1d-array
+        RV grid of the CCFs.
+    ccfsum : 1d-array
+        CCF of all orders coadded (same length as `rv`).
+    ccfparsum : dict
+        Parameters of the coadded CCF.
+    ccf : nd-array
+        CCFs of each order. Shape: (number of orders, RV grid length).
+    ccfpar : pandas DataFrame
+        Parameters of the CCF of each order.
+    bxsum : 1d-array
+        Bisector of the coadded CCF (x-axis). Length: 100 points (unless changed when computing the bisector).
+    bysum : 1d-array
+        Bisector of the coadded CCF (y-axis). Length: 100 points (unless changed when computing the bisector).
+    bx : nd-array
+        Bisectors of the CCF of each order (x-axis). Shape: (number of orders, 100 (unless changed when computing the bisector)).
+    by : nd-array
+        Bisectors of the CCF of each order (y-axis). Shape: (number of orders, 100 (unless changed when computing the bisector)).
+    headerobs : astropy Header
+        Header of the original reduced spectrum file.
+
     FITS info example
     -----------------
 
