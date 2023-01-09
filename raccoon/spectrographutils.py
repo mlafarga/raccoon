@@ -543,20 +543,20 @@ def read_spec_model(filtpl, tpltype):
     tpltype : str
         Type of model to be read. Options: `serval`, `phoenix`, `1dtxt`, `espressos1dcoadd`.
     """
-    if args.tpltype == 'serval':
-        w, f, sf, header = carmenesutils.serval_tpl_read(args.filtpl)
+    if tpltype == 'serval':
+        w, f, sf, header = carmenesutils.serval_tpl_read(filtpl)
         nord = len(w)
         ords = np.arange(0, nord, 1)
 
-    elif args.tpltype == 'phoenix':
+    elif tpltype == 'phoenix':
         sys.exit('Template type is phoenix. Not implemented yet!')
         # TO DO: in parser, specify option for phoenix files
         # w, f = phoenixutils.read_phoenixfits(filw, filf)
         nord = 1
         ords = np.array([0])
 
-    elif args.tpltype == 'espressos1dcoadd':
-        w, f, sf, snr, q, contrib = espressoutils.drs_fitsred_s1dcoadd_read(args.filtpl)
+    elif tpltype == 'espressos1dcoadd':
+        w, f, sf, snr, q, contrib = espressoutils.drs_fitsred_s1dcoadd_read(filtpl)
         w, f = [w], [f]
         nord = 1
         ords = np.array([0])
@@ -577,8 +577,8 @@ def read_spec_model(filtpl, tpltype):
         #     plt.tight_layout()
         #     plt.show(), plt.close()
 
-    elif args.tpltype == '1dtxt':
-        w, f = np.loadtxt(args.filtpl, unpack=True)
+    elif tpltype == '1dtxt':
+        w, f = np.loadtxt(filtpl, unpack=True)
         w, f = [w], [f]
         nord = 1
         ords = np.array([0])
