@@ -1609,9 +1609,9 @@ def plot_ccfo_lines_map(rv, ccfo, ccfsum, ccferrsum, lisord=None,
     axsum.errorbar(rv, ccfsum, yerr=ccferrsum, fmt='k.')
     axsum.set_ylabel(ylabelsum)
     # CCFo
-    axo = plot_ccfo_lines(rv, ccfo, cmap=cmapline, lw=lw, alpha=alpha, xlabel=None, ylabel=ylabelline, ax=axo)
+    axo = plot_ccfo_lines(rv, ccfo, cmap=cmapline, lw=lw, alpha=alpha, xlabel=None, ylabel=ylabelline, cblabel=cblabelline, ax=axo)
     # CCFo map
-    axmap = plot_ccfo_map(rv, ccfo, cmap=cmapmap, extent=extent, vmin=vmin, vmax=vmax, extend=extend, xlabel=xlabel, ylabel=ylabelmap, ax=axmap)
+    axmap = plot_ccfo_map(rv, ccfo, cmap=cmapmap, extent=extent, vmin=vmin, vmax=vmax, extend=extend, xlabel=xlabel, ylabel=ylabelmap, cblabel=cblabelmap, ax=axmap)
     # 
     ax[0].set_title(title)
     for a in ax.flatten():
