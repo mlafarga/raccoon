@@ -12,6 +12,8 @@ import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
 from scipy.interpolate import griddata
+from scipy.interpolate import splrep, splev
+from scipy import stats
 
 import ipdb
 
@@ -42,6 +44,8 @@ dirhere = os.path.abspath(os.path.dirname(__file__))
 
 # CCF
 
+
+# Classical CCF (with weighted binary mask)
 
 def computeccf(w, f, c, wm, fm, rv, ron=None, forig=None):
     """
@@ -132,6 +136,97 @@ def sumccf(rv, ccf, ords):
     for o in ords:
         ccfsum += ccf[o]
     return ccfsum
+
+
+# -----------------------------------------------------------------------------
+
+
+# CCF with model + CC-to-logL
+
+def logL2sigma(logl, dof=1):
+    """Compute confidence intervals sigma from logl distribution.
+    Parameters
+    ----------
+    logl : 1d array-like
+    """
+    dlogl = 2. * (np.nanmax(logl) - logl)
+    p_value = stats.chi2.sf(dlogl, dof)
+    sigma_value = stats.norm.isf(p_value/2.)
+    return sigma_value, p_value, dlogl
+
+
+def rverr_from_sig(rv, sig):
+    """Compute 1-sigma RV uncertianty from logL (sigma) distribution.
+    Sigma must cover the value 1. If not, return nan.
+
+    Parameters
+    ----------
+    rv, sig : 1d array-like
+
+    Return
+    ------
+    rverr, rverr_l, rverr_r = floats
+        Average RV uncertianty, left RV uncertainty, and right RV uncertianty.
+    """
+    # Check if sigma reaches 1. If not, return nan
+    if np.max(sig) < 1.:
+        return np.nan, np.nan, np.nan
+
+    # Compute RV err
+    # --- Mask: sigma can be inf/nan. This gives problems with the interpolation after
+    m = np.isfinite(sig)
+    # --- Interpolate sigma function left and right hand sides to get dRV of sigma1 - sigma0. Compute average between left and right
+    imin = np.argmin(sig[m])
+    rvsig0 = rv[m][imin]
+    # ------ Left
+    if len(sig[m][:imin+1]) < 4:  # Check array length, if not long enough issues when interpolating
+        rverr_l = np.nan
+    else:
+        RVfunc_l = interp1d(sig[m][:imin+1], rv[m][:imin+1], kind='cubic', fill_value='extrapolate')
+        if np.max(sig[m][:imin+1]) < 1:  # Check if sigma_left reaches 1
+            rverr_l = np.nan
+        else:
+            rvsig1_l = RVfunc_l(1)
+            rverr_l = np.abs(rvsig1_l - rvsig0)
+    # ------ Right
+    if len(sig[m][imin:]) < 4:
+        rverr_r = np.nan
+    else:
+        RVfunc_r = interp1d(sig[m][imin:], rv[m][imin:], kind='cubic', fill_value='extrapolate')
+        if np.max(sig[m][imin:]) < 1:  # Check if sigma_right reaches 1
+            rverr_r = np.nan
+        else:
+            rvsig1_r = RVfunc_r(1)
+            rverr_r = np.abs(rvsig1_r - rvsig0)
+    # ------ Average
+    rverr = np.mean([rverr_l, rverr_r])
+    return rverr, rverr_l, rverr_r
+
+
+
+# Plot
+def plot_cc_logLZ03_logLBL19_sig(rv, cc, logLZucker2003, logLBrogiLine2019, sigZucker2003, sigBrogiLine2019, title=''):
+    fig, ax = plt.subplots(3,2, sharex=True, figsize=(16,12))
+    ax[0,0].plot(rv, cc)
+    ax[0,0].set_ylabel('CCF')
+    ax[1,0].plot(rv, logLZucker2003)
+    ax[1,0].set_ylabel('$\log L$ Z03')
+    ax[2,0].plot(rv, logLBrogiLine2019)
+    ax[2,0].set_ylabel('$\log L$ B19')
+    ax[1,1].plot(rv, sigZucker2003)
+    ax[1,1].set_ylabel('Confidence interval\n$[\sigma]$ Z03')
+    ax[2,1].plot(rv, sigBrogiLine2019)
+    ax[2,1].set_ylabel('Confidence interval\n$[\sigma]$ B19')
+    ax[-1,0].set_xlabel('RV [km/s]')
+    ax[-1,0].set_xlabel('RV [km/s]')
+    plt.suptitle(title, fontsize='medium')
+    for a in ax.flatten():
+        a.minorticks_on()
+    plt.tight_layout()
+    plt.show()
+    plt.close()
+    return
+
 
 ###############################################################################
 
@@ -1074,6 +1169,193 @@ def outdat_ccfparTS(filout, data, cols=['bjd', 'rv', 'fwhm', 'contrast', 'bis', 
     """
     data.to_csv(filout, columns=cols, sep=sep, na_rep=na_rep, header=header, index=index, float_format=float_format)
     return
+
+
+# -----------------
+
+def outfits_ccflogLall(
+    rv, cc, logLZ03, sigZ03, logLBL19, sigBL19, rvmaxZ03,
+    rvmaxerrZ03, rvmaxerr_lZ03, rvmaxerr_rZ03, 
+    rvmaxBL19, rvmaxerrBL19, rvmaxerr_lBL19, rvmaxerr_rBL19,
+    cc_sum,
+    logLZ03_sum, sigZ03_sum, rvmaxZ03_sum, rvmaxerrZ03_sum, rvmaxerr_lZ03_sum, rvmaxerr_rZ03_sum, 
+    logLBL19_sum, sigBL19_sum, rvmaxBL19_sum, rvmaxerrBL19_sum, rvmaxerr_lBL19_sum, rvmaxerr_rBL19_sum, 
+    header, filout
+    ):
+    # rv,ccfo,ccfsum,fitparo,ccfpar,fitparsum,ccfparsum,headerspec,filout='ccf.fits'):
+    """
+    Save CCF and logL data in a FITS file.
+    To read data use `infits_ccflogLall`.
+
+    Parameters
+    ----------
+    rv : 1D array
+        RV grid of the CC and logL. Shape: (nrvpix).
+    cc : 2D array
+        CC of each order. Shape: (nord, nrvpix).
+
+    logLZ03 : 2D array
+        Zucker2003 logL of each order. Shape: (nord, nrvpix).
+    sigZ03 : 2D array
+        Zucker2003 sigma of each order. Shape: (nord, nrvpix).
+    rvmaxZ03 : 1D array
+        Zucker2003 maximum RV per order. Shape: (nord).
+    rvmaxerrZ03 : 1D array
+        Zucker2003 maximum average RV uncertainty per order. Average of `rvmaxerr_lZ03` and `rvmaxerr_rZ03`. Shape: (nord).
+    rvmaxerr_lZ03 : 1D array
+        Zucker2003 maximum left RV uncertainty per order. Shape: (nord).
+    rvmaxerr_rZ03 : 1D array
+        Zucker2003 maximum right RV uncertainty per order. Shape: (nord).
+ 
+    logLBL19 : 2D array
+        BrogiLine2019 logL of each order. Shape: (nord, nrvpix).
+    sigBL19 : 2D array
+        BrogiLine2019 sigma of each order. Shape: (nord, nrvpix).
+    rvmaxBL19 : 1D array
+        BrogiLine2019 maximum RV per order. Shape: (nord).
+    rvmaxerrBL19 : 1D array
+        BrogiLine2019 maximum average RV uncertainty per order. Average of `rvmaxerr_lBL19` and `rvmaxerr_rBL19`. Shape: (nord).
+    rvmaxerr_lBL19 : 1D array
+        BrogiLine2019 maximum left RV uncertainty per order. Shape: (nord).
+    rvmaxerr_rBL19 : 1D array
+        BrogiLine2019 maximum right RV uncertainty per order. Shape: (nord).
+
+    cc_sum : 1D array
+        Order-coadded CC. Shape: (nrvpix).
+
+    logLZ03_sum : 1D array
+        Zucker2003 order-coadded logL. Shape: (nrvpix).
+    sigZ03_sum : 1D array
+        Zucker2003 order-coadded sigma. Shape: (nrvpix).
+    rvmaxZ03_sum : float
+        Zucker2003 order-coadded maximum RV.
+    rvmaxerrZ03_sum : float
+        Zucker2003 order-coadded maximum average RV uncertainty. Average of `rvmaxerr_lZ03_sum` and `rvmaxerr_rZ03_sum`.
+    rvmaxerr_lZ03_sum : float
+        Zucker2003 order-coadded maximum left RV uncertainty.
+    rvmaxerr_rZ03_sum : float
+        Zucker2003 order-coadded maximum right RV uncertainty.
+
+    logLBL19_sum : 1D array
+        BrogiLine2019 order-coadded logL. Shape: (nrvpix).
+    sigBL19_sum : 1D array
+        BrogiLine2019 order-coadded sigma. Shape: (nrvpix).
+    rvmaxBL19_sum : float
+        BrogiLine2019 order-coadded maximum RV.
+    rvmaxerrBL19_sum : float
+        BrogiLine2019 order-coadded maximum average RV uncertainty. Average of `rvmaxerr_lBL19_sum` and `rvmaxerr_rBL19_sum`.
+    rvmaxerr_lBL19_sum : float
+        BrogiLine2019 order-coadded maximum left RV uncertainty.
+    rvmaxerr_rBL19_sum : float
+        BrogiLine2019 order-coadded maximum right RV uncertainty.
+
+    header : header type
+        Observation header.
+    filout : str
+        Output FITS file name.
+    """
+
+    def rvgrid2header(rv, hdux, axis=1):
+        # Cannot have nan in header. If all nan -> 0
+        if (~np.isfinite(rv)).all(): rv = np.zeros_like(rv)
+        hdux.header['CRPIX{}'.format(axis)] = (1, 'Reference pixel')
+        hdux.header['CRVAL{}'.format(axis)] = (rv[0], 'Value of reference pixel [km/s]')
+        hdux.header['CDELT{}'.format(axis)] = (rv[1]-rv[0], 'Step [km/s]')
+        hdux.header['CUNIT{}'.format(axis)] = ('km/s', 'Units')
+        return hdux
+
+    nord, nrvpix = cc.shape
+    ords = np.arange(0, nord, 1)
+
+    # -----------------------
+
+    # Observation header
+    hdu0 = fits.PrimaryHDU(header=header)
+
+    # -----------------------
+
+    # # CCF orders
+    # hducc = fits.ImageHDU(cc, name='cc')
+    # # RV grid
+    # # hducc.header['CRPIX1'] = (1, 'Reference pixel')
+    # # hducc.header['CRVAL1'] = (rv[0], 'Value of reference pixel [km/s]')
+    # # hducc.header['CDELT1'] = (rv[1]-rv[0], 'Step [km/s]')
+    # # hducc.header['CUNIT1'] = ('km/s', 'Units')
+    # hducc = rvgrid2header(rv, hducc)
+
+    # -----------------------
+
+    # Order data: cc, logL, sig 2D arrays (nord, nrvpix)
+    hducc = fits.ImageHDU(cc, name='cc')
+    hdulogLZ03 = fits.ImageHDU(logLZ03, name='logLZ03')
+    hdusigZ03 = fits.ImageHDU(sigZ03, name='logLZ03')
+    hdulogLBL19 = fits.ImageHDU(logLBL19, name='logLBL19')
+    hdusigBL19 = fits.ImageHDU(sigBL19, name='logLBL19')
+
+    for hdux in [hducc, hdulogLZ03, hdusigZ03, hdulogLBL19, hdusigBL19]:
+        _ = rvgrid2header(rv, hdux)
+
+    # -----------------------
+
+    # Order data: RVmax 1D arrays (nord)
+    # Combine into table
+    cols = ['rvmaxZ03', 'rvmaxerrZ03', 'rvmaxerr_lZ03', 'rvmaxerr_rZ03', 'rvmaxBL19', 'rvmaxerrBL19', 'rvmaxerr_lBL19', 'rvmaxerr_rBL19']
+    # rvmaxtab = np.vstack([rvmaxZ03, rvmaxerrZ03, rvmaxerr_lZ03, rvmaxerr_rZ03, rvmaxBL19, rvmaxerrBL19, rvmaxerr_lBL19, rvmaxerr_rBL19])
+    rvmaxdf = pd.DataFrame([rvmaxZ03, rvmaxerrZ03, rvmaxerr_lZ03, rvmaxerr_rZ03, rvmaxBL19, rvmaxerrBL19, rvmaxerr_lBL19, rvmaxerr_rBL19], index=cols, columns=ords).T
+    rvmaxdf.index.rename('ord', inplace=True)
+    rvmaxrec = rvmaxdf.to_records()
+    hdurvmax = fits.TableHDU(rvmaxrec, name='rvmax')
+    # 
+    # # Each 1D array in an extension of the FITS
+    # hdurvmaxZ03 = fits.ImageHDU(rvmaxZ03, name='rvmaxZ03')
+    # hdurvmaxerrZ03 = fits.ImageHDU(rvmaxerrZ03, name='rvmaxerrZ03')
+    # hdurvmaxerr_lZ03 = fits.ImageHDU(rvmaxerr_lZ03, name='rvmaxerr_lZ03')
+    # hdurvmaxerr_rZ03 = fits.ImageHDU(rvmaxerr_rZ03, name='rvmaxerr_rZ03')
+    # hdurvmaxBL19 = fits.ImageHDU(rvmaxBL19, name='rvmaxBL19')
+    # hdurvmaxerrBL19 = fits.ImageHDU(rvmaxerrBL19, name='rvmaxerrBL19')
+    # hdurvmaxerr_lBL19 = fits.ImageHDU(rvmaxerr_lBL19, name='rvmaxerr_lBL19')
+    # hdurvmaxerr_rBL19 = fits.ImageHDU(rvmaxerr_rBL19, name='rvmaxerr_rBL19')
+
+    # -----------------------
+
+    # Order-coadded data: RVmax floats (final values)
+    # Header keywords in `rvmax` extension
+    hdurvmax.header['HIERARCH rvmaxZ03_sum'] = (rvmaxZ03_sum, '[km/s]')
+    hdurvmax.header['HIERARCH rvmaxerrZ03_sum'] = (rvmaxerrZ03_sum, '[km/s]')
+    hdurvmax.header['HIERARCH rvmaxerr_lZ03_sum'] = (rvmaxerr_lZ03_sum, '[km/s]')
+    hdurvmax.header['HIERARCH rvmaxerr_rZ03_sum'] = (rvmaxerr_rZ03_sum, '[km/s]')
+    hdurvmax.header['HIERARCH rvmaxBL19_sum'] = (rvmaxBL19_sum, '[km/s]')
+    hdurvmax.header['HIERARCH rvmaxerrBL19_sum'] = (rvmaxerrBL19_sum, '[km/s]')
+    hdurvmax.header['HIERARCH rvmaxerr_lBL19_sum'] = (rvmaxerr_lBL19_sum, '[km/s]')
+    hdurvmax.header['HIERARCH rvmaxerr_rBL19_sum'] = (rvmaxerr_rBL19_sum, '[km/s]')
+
+    # -----------------------
+
+    # Order-coadded data: 1D arrays (nrvpix)
+    # Each 1D array in an extension of the FITS
+    hducc_sum = fits.ImageHDU(cc_sum, name='cc_sum')
+    hdulogLZ03_sum = fits.ImageHDU(logLZ03_sum, name='logLZ03_sum')
+    hdusigZ03_sum = fits.ImageHDU(sigZ03_sum, name='sigZ03_sum')
+    hdulogLBL19_sum = fits.ImageHDU(logLBL19_sum, name='logLBL19_sum')
+    hdusigBL19_sum = fits.ImageHDU(sigBL19_sum, name='sigBL19_sum')
+
+    for hdux in [hducc_sum, hdulogLZ03_sum, hdusigZ03_sum, hdulogLBL19_sum, hdusigBL19_sum]:
+        _ = rvgrid2header(rv, hdux)
+
+    # -----------------------
+
+    # Save
+    hdulist = fits.HDUList([hdu0, hducc, hdulogLZ03, hdusigZ03, hdulogLBL19, hdusigBL19, hdurvmax, hducc_sum, hdulogLZ03_sum, hdusigZ03_sum, hdulogLBL19_sum, hdusigBL19_sum])
+    # If problems with original header -> Remove it
+    try:
+        hdulist.writeto(filout, overwrite=True, output_verify='silentfix+warn')
+    except ValueError:
+        hdu0 = fits.PrimaryHDU()  # replace original header
+        hdulist = fits.HDUList([hdu0, hducc, hdulogLZ03, hdusigZ03, hdulogLBL19, hdusigBL19, hdurvmax, hducc_sum, hdulogLZ03_sum, hdusigZ03_sum, hdulogLBL19_sum, hdusigBL19_sum])
+        hdulist.writeto(filout, overwrite=True, output_verify='silentfix+warn')
+    return
+
+
 
 ###############################################################################
 
