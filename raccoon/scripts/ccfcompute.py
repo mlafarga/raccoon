@@ -1851,9 +1851,10 @@ def main():
                 ax[2].plot(ords, rvmaxerr_rBL19, 'x', label='BL19 right')
                 ax[2].set_ylabel('RV uncertainty [km/s]')
                 ax[-1].set_xlabel('Order')
+                ax[0].set_title(os.path.basename(os.path.splitext(filobs)[0]))
                 for a in ax.flatten():
                     a.minorticks_on()
-                    a.legend()
+                    a.legend(fontsize='x-small')
                 plt.tight_layout()
                 plt.show()
                 plt.close()
@@ -1866,7 +1867,7 @@ def main():
             logLZ03_sum = np.nansum(logLZ03, axis=0)
             logLBL19_sum = np.nansum(logLBL19, axis=0)
 
-            # ccferrsum = np.ones_like(cc_sum)*np.nan
+            ccferrsum = np.ones_like(cc_sum)*np.nan
 
             # Compute sigma
             sigZ03_sum, pZ03_sum, dlogLZ03_sum = ccflib.logL2sigma(logLZ03_sum, dof=1)
@@ -1913,7 +1914,7 @@ def main():
 
             # Save data
             filout = os.path.join(args.dirout, os.path.basename(os.path.splitext(filobs)[0]) + '_cclogL.fits')
-            ccflib.outfits_ccflogLall(
+            ccflib.outfits_cclogLall(
                 rv, cc, logLZ03, sigZ03, logLBL19, sigBL19, rvmaxZ03,
                 rvmaxerrZ03, rvmaxerr_lZ03, rvmaxerr_rZ03, 
                 rvmaxBL19, rvmaxerrBL19, rvmaxerr_lBL19, rvmaxerr_rBL19,
@@ -1921,6 +1922,8 @@ def main():
                 logLZ03_sum, sigZ03_sum, rvmaxZ03_sum, rvmaxerrZ03_sum, rvmaxerr_lZ03_sum, rvmaxerr_rZ03_sum, 
                 logLBL19_sum, sigBL19_sum, rvmaxBL19_sum, rvmaxerrBL19_sum, rvmaxerr_lBL19_sum, rvmaxerr_rBL19_sum, 
                 header, filout)
+            # # Read output example:
+            # rv, cc, logLZ03, sigZ03, logLBL19, sigBL19, rvmaxZ03, rvmaxerrZ03, rvmaxerr_lZ03, rvmaxerr_rZ03,  rvmaxBL19, rvmaxerrBL19, rvmaxerr_lBL19, rvmaxerr_rBL19, cc_sum, logLZ03_sum, sigZ03_sum, rvmaxZ03_sum, rvmaxerrZ03_sum, rvmaxerr_lZ03_sum, rvmaxerr_rZ03_sum, logLBL19_sum, sigBL19_sum, rvmaxBL19_sum, rvmaxerrBL19_sum, rvmaxerr_lBL19_sum, rvmaxerr_rBL19_sum, header, rvmaxrec = ccflib.infits_cclogLall(filout)
 
             ipdb.set_trace()
 

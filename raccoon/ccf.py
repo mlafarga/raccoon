@@ -1173,7 +1173,7 @@ def outdat_ccfparTS(filout, data, cols=['bjd', 'rv', 'fwhm', 'contrast', 'bis', 
 
 # -----------------
 
-def outfits_ccflogLall(
+def outfits_cclogLall(
     rv, cc, logLZ03, sigZ03, logLBL19, sigBL19, rvmaxZ03,
     rvmaxerrZ03, rvmaxerr_lZ03, rvmaxerr_rZ03, 
     rvmaxBL19, rvmaxerrBL19, rvmaxerr_lBL19, rvmaxerr_rBL19,
@@ -1185,7 +1185,7 @@ def outfits_ccflogLall(
     # rv,ccfo,ccfsum,fitparo,ccfpar,fitparsum,ccfparsum,headerspec,filout='ccf.fits'):
     """
     Save CCF and logL data in a FITS file.
-    To read data use `infits_ccflogLall`.
+    To read data use `infits_cclogLall`.
 
     Parameters
     ----------
@@ -1288,9 +1288,9 @@ def outfits_ccflogLall(
     # Order data: cc, logL, sig 2D arrays (nord, nrvpix)
     hducc = fits.ImageHDU(cc, name='cc')
     hdulogLZ03 = fits.ImageHDU(logLZ03, name='logLZ03')
-    hdusigZ03 = fits.ImageHDU(sigZ03, name='logLZ03')
+    hdusigZ03 = fits.ImageHDU(sigZ03, name='sigLZ03')
     hdulogLBL19 = fits.ImageHDU(logLBL19, name='logLBL19')
-    hdusigBL19 = fits.ImageHDU(sigBL19, name='logLBL19')
+    hdusigBL19 = fits.ImageHDU(sigBL19, name='sigLBL19')
 
     for hdux in [hducc, hdulogLZ03, hdusigZ03, hdulogLBL19, hdusigBL19]:
         _ = rvgrid2header(rv, hdux)
@@ -1355,6 +1355,102 @@ def outfits_ccflogLall(
         hdulist.writeto(filout, overwrite=True, output_verify='silentfix+warn')
     return
 
+
+def infits_cclogLall(filin):
+    """Read fITs file saved with `outfits_cclogLall`.
+
+    FITS info example
+    -----------------
+
+    >>> hdulist.info()
+    No.    Name      Ver    Type      Cards   Dimensions   Format
+      0  PRIMARY       1 PrimaryHDU     382   ()      
+      1  CC            1 ImageHDU        12   (202, 61)   float64   
+      2  LOGLZ03       1 ImageHDU        12   (202, 61)   float64   
+      3  LOGLZ03       1 ImageHDU        12   (202, 61)   float64   
+      4  LOGLBL19      1 ImageHDU        12   (202, 61)   float64   
+      5  LOGLBL19      1 ImageHDU        12   (202, 61)   float64   
+      6  RVMAX         1 TableHDU        44   61R x 9C   [I21, D25.17, D25.17, D25.17, D25.17, D25.17, D25.17, D25.17, D25.17]   
+      7  CC_SUM        1 ImageHDU        11   (202,)   float64   
+      8  LOGLZ03_SUM    1 ImageHDU        11   (202,)   float64   
+      9  SIGZ03_SUM    1 ImageHDU        11   (202,)   float64   
+     10  LOGLBL19_SUM    1 ImageHDU        11   (202,)   float64   
+     11  SIGBL19_SUM    1 ImageHDU        11   (202,)   float64   
+    """
+
+    with fits.open(filin) as hdulist:
+
+        nord, nrvpix = cc.shape
+        ords = np.arange(0, nord, 1)
+
+        # -----------------------
+
+        # Observation header
+        header = hdulist[0].header
+
+        # -----------------------
+
+        # RV
+        h = hdulist['cc'].header
+        n = h['NAXIS1']
+        stp = h['CDELT1']
+        ini_pix = h['CRPIX1']
+        ini_val = h['CRVAL1']
+        # fin_val = ini_val + (n - (ini_pix - 1)) * stp
+        fin_val = ini_val + n * stp
+        rv = np.arange(ini_val, fin_val, stp)
+
+        # Issue with decimals: rv array can end up having an extra point
+        # E.g. J09439+269: From FITS header, initial RV value is `ini_val = 19.1788947345789` but from the original RV array, initial RV value is `rv[0]=19.178894734578897`.
+        if len(rv) == n+1: rv = rv[:-1]
+        elif len(rv) != n: print('rv array length wrong')
+
+        # -----------------------
+    
+        # Order data: cc, logL, sig 2D arrays (nord, nrvpix)
+        cc = hdulist['cc'].data
+        logLZ03 = hdulist['logLZ03'].data
+        sigZ03 = hdulist['sigZ03'].data
+        logLBL19 = hdulist['logLBL19'].data
+        sigBL19 = hdulist['sigBL19'].data
+
+        # -----------------------
+
+        # Order data: RVmax 1D arrays (nord)
+        rvmaxrec = hdulist['rvmax'].data
+        rvmaxZ03 = rvmaxrec['rvmaxZ03']
+        rvmaxerrZ03 = rvmaxrec['rvmaxerrZ03']
+        rvmaxerr_lZ03 = rvmaxrec['rvmaxerr_lZ03']
+        rvmaxerr_rZ03 = rvmaxrec['rvmaxerr_rZ03']
+        rvmaxBL19 = rvmaxrec['rvmaxBL19']
+        rvmaxerrBL19 = rvmaxrec['rvmaxerrBL19']
+        rvmaxerr_lBL19 = rvmaxrec['rvmaxerr_lBL19']
+        rvmaxerr_rBL19 = rvmaxrec['rvmaxerr_rBL19']
+
+        # -----------------------
+
+        # Order-coadded data: RVmax floats (final values)
+        rvmaxZ03_sum = hdulist['rvmax'].header['HIERARCH rvmaxZ03_sum']
+        rvmaxerrZ03_sum = hdulist['rvmax'].header['HIERARCH rvmaxerrZ03_sum']
+        rvmaxerr_lZ03_sum = hdulist['rvmax'].header['HIERARCH rvmaxerr_lZ03_sum']
+        rvmaxerr_rZ03_sum = hdulist['rvmax'].header['HIERARCH rvmaxerr_rZ03_sum']
+        rvmaxBL19_sum = hdulist['rvmax'].header['HIERARCH rvmaxBL19_sum']
+        rvmaxerrBL19_sum = hdulist['rvmax'].header['HIERARCH rvmaxerrBL19_sum']
+        rvmaxerr_lBL19_sum = hdulist['rvmax'].header['HIERARCH rvmaxerr_lBL19_sum']
+        rvmaxerr_rBL19_sum = hdulist['rvmax'].header['HIERARCH rvmaxerr_rBL19_sum']
+
+        # -----------------------
+
+        # Order-coadded data: 1D arrays (nrvpix)
+        cc_sum = hdulist['cc_sum'].data
+        logLZ03_sum = hdulist['logLZ03_sum'].data
+        sigZ03_sum = hdulist['sigZ03_sum'].data
+        logLBL19_sum = hdulist['logLBL19_sum'].data
+        sigBL19_sum = hdulist['sigBL19_sum'].data
+
+        # -----------------------
+
+    return rv, cc, logLZ03, sigZ03, logLBL19, sigBL19, rvmaxZ03, rvmaxerrZ03, rvmaxerr_lZ03, rvmaxerr_rZ03,  rvmaxBL19, rvmaxerrBL19, rvmaxerr_lBL19, rvmaxerr_rBL19, cc_sum, logLZ03_sum, sigZ03_sum, rvmaxZ03_sum, rvmaxerrZ03_sum, rvmaxerr_lZ03_sum, rvmaxerr_rZ03_sum, logLBL19_sum, sigBL19_sum, rvmaxBL19_sum, rvmaxerrBL19_sum, rvmaxerr_lBL19_sum, rvmaxerr_rBL19_sum, header, rvmaxrec
 
 
 ###############################################################################

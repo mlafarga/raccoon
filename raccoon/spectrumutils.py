@@ -65,6 +65,25 @@ def wair2vac(w):
 ###############################################################################
 
 
+# Doppler shift
+
+def dopplershift(x, v, rel=True):
+    """
+    x : float
+        Wavelength, A
+    v : float
+        Velocity, m/s
+    """
+    C_MS = 2.99792458*1.e8  # Light speed [m/s]
+    if rel: a = np.sqrt((1 - v / C_MS) / (1 + v / C_MS))
+    else: a = (1 - v / C_MS)
+    xprime = x * a
+    return xprime
+
+
+###############################################################################
+
+
 # Clean
 
 def remove_nan(*args):
