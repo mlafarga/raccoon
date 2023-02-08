@@ -1323,6 +1323,18 @@ def outfits_cclogLall(
 
     # Order-coadded data: RVmax floats (final values)
     # Header keywords in `rvmax` extension
+
+    # NaN nor infinite not allowed in FITS header -> str(nan)
+    rvmaxZ03_sum = naninf2nanstr(rvmaxZ03_sum)
+    rvmaxerrZ03_sum = naninf2nanstr(rvmaxerrZ03_sum)
+    rvmaxerr_lZ03_sum = naninf2nanstr(rvmaxerr_lZ03_sum)
+    rvmaxerr_rZ03_sum = naninf2nanstr(rvmaxerr_rZ03_sum)
+    rvmaxBL19_sum = naninf2nanstr(rvmaxBL19_sum)
+    rvmaxerrBL19_sum = naninf2nanstr(rvmaxerrBL19_sum)
+    rvmaxerr_lBL19_sum = naninf2nanstr(rvmaxerr_lBL19_sum)
+    rvmaxerr_rBL19_sum = naninf2nanstr(rvmaxerr_rBL19_sum)
+
+
     hdurvmax.header['HIERARCH rvmaxZ03_sum'] = (rvmaxZ03_sum, '[km/s]')
     hdurvmax.header['HIERARCH rvmaxerrZ03_sum'] = (rvmaxerrZ03_sum, '[km/s]')
     hdurvmax.header['HIERARCH rvmaxerr_lZ03_sum'] = (rvmaxerr_lZ03_sum, '[km/s]')
