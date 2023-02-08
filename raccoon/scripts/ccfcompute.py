@@ -1925,15 +1925,20 @@ def main():
             # # Read output example:
             # rv, cc, logLZ03, sigZ03, logLBL19, sigBL19, rvmaxZ03, rvmaxerrZ03, rvmaxerr_lZ03, rvmaxerr_rZ03,  rvmaxBL19, rvmaxerrBL19, rvmaxerr_lBL19, rvmaxerr_rBL19, cc_sum, logLZ03_sum, sigZ03_sum, rvmaxZ03_sum, rvmaxerrZ03_sum, rvmaxerr_lZ03_sum, rvmaxerr_rZ03_sum, logLBL19_sum, sigBL19_sum, rvmaxBL19_sum, rvmaxerrBL19_sum, rvmaxerr_lBL19_sum, rvmaxerr_rBL19_sum, header, rvmaxrec = ccflib.infits_cclogLall(filout)
 
-            ipdb.set_trace()
 
-
-
-
-
-
-
-
+            # Organize data
+            # ------- TODO: Save only final ord-coadded data
+            # -------       Add per-order data later
+            ccfparsum = {}
+            ccfparsum['rvmaxZ03_sum'] = rvmaxZ03_sum
+            ccfparsum['rvmaxerrZ03_sum'] = rvmaxerrZ03_sum
+            ccfparsum['rvmaxerr_lZ03_sum'] = rvmaxerr_lZ03_sum
+            ccfparsum['rvmaxerr_rZ03_sum'] = rvmaxerr_rZ03_sum
+            ccfparsum['rvmaxBL19_sum'] = rvmaxBL19_sum
+            ccfparsum['rvmaxerrBL19_sum'] = rvmaxerrBL19_sum
+            ccfparsum['rvmaxerr_lBL19_sum'] = rvmaxerr_lBL19_sum
+            ccfparsum['rvmaxerr_rBL19_sum'] = rvmaxerr_rBL19_sum
+            dataccfsumTS[filobs] = ccfparsum
 
        # --- End observations loop ---
 
@@ -1949,6 +1954,8 @@ def main():
     # dataall = pd.concat([dataccfsumTS, dataobs], axis=1, sort=False)
     dataall = dataccfsumTS
 
+    # ----------- TODO: Add BJD!!!!!!!!!!!!!!!!!!!!!!
+
     # Change index from path/obs to obs
     dataall['filobs'] = dataall.index
     dataall['obs'] = [os.path.basename(filobs) for filobs in dataall['filobs']]
@@ -1959,6 +1966,25 @@ def main():
     # filout = os.path.join(args.dirout, '{}.par.dat'.format(args.obj))
     # dataall.to_csv(filout, sep=' ', na_rep=np.nan, columns=cols, header=True, index=True, float_format='%0.8f')
     # verboseprint('\nCCF TS data saved in {}'.format(filout))
+
+
+    # Save TS output: file with all
+    if args.tpltype == 'mask':
+        # --------- TODO
+        pass
+    else:
+        cols = dataall.columns
+        filout = os.path.join(args.dirout, '{}.cclogLpar.dat'.format(args.obj))
+        dataall.to_csv(filout, sep=' ', na_rep=np.nan, columns=cols, header=True, index=True, float_format='%0.8f')
+
+    ipdb.set_trace()
+
+
+
+
+
+
+    # ------- TODO: Indent with an if, only for mask CCFs
 
     # Save in file main output: BJD, RV, FWHM, Contrast, BIS and their errors
     cols = ['bjd', 'rv', 'fwhm', 'contrast', 'bis', 'rverrabs', 'fwhmerr', 'contrasterr', 'biserr']
