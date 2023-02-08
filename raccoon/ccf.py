@@ -1264,6 +1264,9 @@ def outfits_cclogLall(
         hdux.header['CUNIT{}'.format(axis)] = ('km/s', 'Units')
         return hdux
 
+    def naninf2nanstr(x):
+        return x if np.isfinite(x if not isinstance(x, str) else np.nan) else str(x)
+
     nord, nrvpix = cc.shape
     ords = np.arange(0, nord, 1)
 
