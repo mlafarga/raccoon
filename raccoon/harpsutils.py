@@ -599,6 +599,48 @@ def drs_rvcorrection_lisobs(lisobs, inst, name='shift', notfound=np.nan, ext=0):
     return shift, shifterr, data
 
 
+def drs_blazefile(filin, inst, notfound=np.nan, ext=0, outfmt='single'):
+    """
+    Parameters
+    ----------
+    inst : {'harpn', 'harps'}
+    outfmt : {'single', 'dict'}
+
+    Notes
+    -----
+    HIERARCH ESO DRS CCD SIGDET = 4.69431553672547 / CCD Readout Noise [e-]
+    HIERARCH ESO DRS CCD CONAD = 1.36 / CCD conv factor [e-/ADU]
+    """
+
+    # Get instrument kw
+    try: kwinst = headerkwinst(inst.lower(), outfail=np.nan)
+    except: sys.exit('No correct instrument: {}'.format(inst))
+
+    kw = kwinst + 'DRS BLAZE FILE'
+    dic = fitsutils.read_header_keywords(filin, kw, notfound=notfound, ext=ext)
+    if outfmt == 'single': return dic[kw]
+    elif outfmt == 'dict': return dic
+    else: sys.exit('`outfmt`={} not valid!'.format(outfmt))
+
+
+def drs_blazefile_lisobs(lisobs, inst, notfound=np.nan, ext=0):
+    """
+    Parameters
+    ----------
+    inst : {'harpn', 'harps'}
+
+    Return
+    ------
+    data : pandas dataframe
+    """
+    # Get instrument kw
+    try: kwinst = headerkwinst(inst.lower(), outfail=np.nan)
+    except: sys.exit('No correct instrument: {}'.format(inst))
+
+    kw = kwinst + 'DRS BLAZE FILE'
+    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext)
+    return data
+
 
 # CCF
 
