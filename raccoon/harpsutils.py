@@ -443,9 +443,51 @@ def drs_exptime_lisobs(lisobs, notfound=np.nan, ext=0):
     return data
 
 
+# Airmass
+
 def drs_airmass_lisobs(lisobs, notfound=np.nan, ext=0):
     kw = 'AIRMASS'
     data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext)
+    return data
+
+
+# Seeing
+
+def drs_seeingambi_start_lisobs(lisobs, inst, notfound=np.nan, ext=0, units='is'):
+    """
+    Parameters
+    ----------
+    inst : {'harpn', 'harps'}
+
+    Return
+    ------
+    data : pandas dataframe
+    """
+    # Get instrument kw
+    try: kwinst = headerkwinst(inst.lower(), outfail=np.nan)
+    except: sys.exit('No correct instrument: {}'.format(inst))
+
+    kw = kwinst + 'TEL AMBI FWHM START'
+    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext, units=units)
+    return data
+
+
+def drs_seeingambi_start_lisobs(lisobs, inst, notfound=np.nan, ext=0, units='is'):
+    """
+    Parameters
+    ----------
+    inst : {'harpn', 'harps'}
+
+    Return
+    ------
+    data : pandas dataframe
+    """
+    # Get instrument kw
+    try: kwinst = headerkwinst(inst.lower(), outfail=np.nan)
+    except: sys.exit('No correct instrument: {}'.format(inst))
+
+    kw = kwinst + 'TEL AMBI FWHM END'
+    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext, units=units)
     return data
 
 
@@ -608,8 +650,6 @@ def drs_blazefile(filin, inst, notfound=np.nan, ext=0, outfmt='single'):
 
     Notes
     -----
-    HIERARCH ESO DRS CCD SIGDET = 4.69431553672547 / CCD Readout Noise [e-]
-    HIERARCH ESO DRS CCD CONAD = 1.36 / CCD conv factor [e-/ADU]
     """
 
     # Get instrument kw
@@ -623,7 +663,7 @@ def drs_blazefile(filin, inst, notfound=np.nan, ext=0, outfmt='single'):
     else: sys.exit('`outfmt`={} not valid!'.format(outfmt))
 
 
-def drs_blazefile_lisobs(lisobs, inst, notfound=np.nan, ext=0):
+def drs_blazefile_lisobs(lisobs, inst, drop_duplicates=False, notfound=np.nan, ext=0):
     """
     Parameters
     ----------
@@ -639,6 +679,8 @@ def drs_blazefile_lisobs(lisobs, inst, notfound=np.nan, ext=0):
 
     kw = kwinst + 'DRS BLAZE FILE'
     data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext)
+    if drop_duplicates:
+        data = data.drop_duplicates()
     return data
 
 
