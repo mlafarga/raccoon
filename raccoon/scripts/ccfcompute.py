@@ -15,7 +15,6 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from scipy.interpolate import splrep, splev
 from tqdm import tqdm
 
 from raccoon import ccf as ccflib
@@ -64,21 +63,13 @@ def parse_args():
     parser.add_argument('--expresw', choices=['wavelength', 'bary_wavelength', 'excalibur', 'bary_excalibur'], help='EXPRES wavelength.', default='bary_excalibur')
 
     # Mask
-    parser.add_argument('filmask', help='Path to custom mask file (file with extension `.mas`), or mask ID to use one of the default masks, or (CARM GTO) path to "mask selection file" (file with any other extension that specifies the masks available to choose from), or another type of template (see `--tpltype` option). Mask file format: Columns: 0) w (wavelengths), 1) f (weights), separated by whitespaces. Mask-selection file format: Columns: 0) object used to make the mask `objmask`, 1) spectral type of `objmask`, 2) `vsini` of `objmask`, 3) path to mask file (`.mas` extension). There can only be one mask file for each combination of spt-vsini. TODO: Only spt is used to select the mask (not the vsini).', type=str)
+    parser.add_argument('filmask', help='Path to custom mask file (file with extension `.mas`), or mask ID to use one of the default masks, or (CARM GTO) path to "mask selection file" (file with any other extension that specifies the masks available to choose from). Mask file format: Columns: 0) w (wavelengths), 1) f (weights), separated by whitespaces. Mask-selection file format: Columns: 0) object used to make the mask `objmask`, 1) spectral type of `objmask`, 2) `vsini` of `objmask`, 3) path to mask file (`.mas` extension). There can only be one mask file for each combination of spt-vsini. TODO: Only spt is used to select the mask (not the vsini).', type=str)
     parser.add_argument('--maskformatharp', help='If mask format is w1, w2, f and wavelengths are in air -> it is transformed into w, f and vacuum.', action='store_true')
     parser.add_argument('--maskair', help='If mask wavelengths in air, tranform to vacuum. Not needed if `maskformatharp` is True.', action='store_true')
     parser.add_argument('--objmask', help='Overwrites values from `filmask`.', type=str, default=None)
     parser.add_argument('--sptmask', help='Overwrites values from `filmask`.', type=str, default=None)
     parser.add_argument('--vsinimask', help='Overwrites values from `filmask`.', type=float, default=None)
     # parser.add_argument('--filmaskabserr')
-
-    # Template
-    parser.add_argument('--tpltype', choices=['mask', 'serval', 'phoenix', '1dtxt', 'espressos1dcoadd'], help='', type=str, default='mask')  # 'custommatrix', 'customstepctn'
-
-    parser.add_argument('--tplrv', help='RV shift of the template [km/s] (default is 0)', default=0.0, type=float)
-
-    # MCMC
-    parser.add_argument('--mcmc', help='Compute MCMC in logL to get RV. Only if tpltype is not `mask`.')
 
     # Target info
     parser.add_argument('--obj', help='CARMENES ID.', type=str)
@@ -147,10 +138,6 @@ def parse_args():
     parser.add_argument('--bisbotmax', help='BIS bottom region maximum [percent]', type=float, default=40.)
     parser.add_argument('--bistopmin', help='BIS top region minimum [percent]', type=float, default=60.)
     parser.add_argument('--bistopmax', help='BIS top region maximum [percent]', type=float, default=90.)
-
-    # logL
-    parser.add_argument('--cc2logL', help='Compute logLikelihood (logL) with the CC-to-logL mapping (false if not present).', action='store_true')
-    parser.add_argument('--logLmapping', help='Type of CC-to-logL mapping', choices=['zucker2003', 'brogiline2019'])
 
     # Output
     parser.add_argument('--dirout', help='Output directory.', default='./ccf_output/', type=str)
@@ -455,130 +442,77 @@ def main():
 
     # -----------------------------------------------------------------------------
 
-    # Get template (default is weighted binary mask)
-    # ------------
+    # Get mask
+    # --------
 
-    # Mask
-    if args.tpltype == 'mask':  # (default)
+    # Check if filmask is a valid mask ID
+    dictmask = ccflib.listmask_default()[args.inst]
+    dictmask_ids = dictmask.keys()
 
-        # Check if filmask is a valid mask ID
-        dictmask = ccflib.listmask_default()[args.inst]
-        dictmask_ids = dictmask.keys()
+    if args.filmask in dictmask_ids:
+        filmask = dictmask[args.filmask]['filmask']
+        datamask = dictmask[args.filmask]
 
-        if args.filmask in dictmask_ids:
-            filmask = dictmask[args.filmask]['filmask']
-            datamask = dictmask[args.filmask]
-
-        # If not check if its a mask file or a mask-selection file
-        else:
-            if not os.path.exists(args.filmask): sys.exit('Mask file {} does not exist'.format(args.filmask))
-
-            # Mask file
-            if os.path.splitext(args.filmask)[1] == '.mas':
-                filmask = args.filmask
-
-                datamask = {
-                    'filmask': filmask,
-                    'objmask': args.objmask,
-                    'sptmask': args.sptmask,
-                    'vsinimask': args.vsinimask,
-                }
-                verboseprint('\nMask: ', datamask['filmask'])
-            # Mask-selection file
-            else:
-                verboseprint('\nSelecting mask from list in: {}'.format(args.filmask))
-                # Select mask
-                maskinfo = ccflib.selectmask_carmenesgto(args.filmask, args.spt, args.vsini, sptdefault='M3.5', vsinidefault=2.0, verbose=True)
-                filmask = os.path.expanduser(maskinfo['filmask'])
-
-                datamask = {
-                    'filmask': filmask,
-                    'objmask': maskinfo['obj'] if args.objmask is None else args.objmask,
-                    'sptmask': maskinfo['spt'] if args.sptmask is None else args.sptmask,
-                    'vsinimask': maskinfo['vsini'] if args.vsinimask is None else args.vsinimask,
-                }
-
-        verboseprint('Mask: {}'.format(filmask))
-        verboseprint('  Mask obj {}, SpT {}, vsini {}'.format(datamask['objmask'], datamask['sptmask'], datamask['vsinimask']))
-        verboseprint('  Target {}, SpT {}, vsini {}'.format(args.obj, args.spt, args.vsini))
-
-        # if not os.path.exists(args.filmask): sys.exit('Mask file {} does not exist'.format(args.filmask))
-
-        # Read mask
-        if not args.maskformatharp:
-            wm, fm = np.loadtxt(filmask, usecols=[0, 1], unpack=True)
-        else:
-            wm1, wm2, fm = np.loadtxt(filmask, usecols=[0, 1, 2], unpack=True)
-            wm = (wm1 + wm2) / 2.
-            wm = spectrumutils.wair2vac(wm)
-            args.maskair = False
-        # Transform to vacuum
-        if args.maskair:
-            wm = spectrumutils.wair2vac(wm)
-            args.maskair = False
-
-        wm_original, fm_original = wm.copy(), fm.copy()
-        nlinoriginal = len(wm)
-        verboseprint('  {} lines in mask'.format(nlinoriginal))
-
-        # Cut mask to selected wrange
-        if args.wrange is not None:
-            verboseprint('  Cut mask to range: {} -- {}'.format(args.wrange[0], args.wrange[1]))
-            mask = (wm >= args.wrange[0]) & (wm <= args.wrange[1])
-            wm = wm[mask]
-            fm = fm[mask]
-            nlin = len(wm)
-            verboseprint('  {} lines in mask'.format(nlin))
-
-        nordm = 1
-        ordsm = np.array([0])
-        ordsm_use = ordsm
-
-    # Any other type of template that is not a mask
+    # If not check if its a mask file or a mask-selection file
     else:
-        filmask = args.filmask
-        wm, fm, sfm, nordm, ordsm, headerm = spectrographutils.read_spec_model(filmask, args.tpltype)  # `m` stands for mask or model
+        if not os.path.exists(args.filmask): sys.exit('Mask file {} does not exist'.format(args.filmask))
 
-        # Flag bad orders in model
-        # ------------------------
+        # Mask file
+        if os.path.splitext(args.filmask)[1] == '.mas':
+            filmask = args.filmask
 
-        # If order empty -> Do not use, remove from args.ords_use
-        omempty = [o for o in ordsm if len(wm[o]) == 0]
-        # maskoempty = ~np.asarray([len(w[o])==0 if o in args.ords_use else False for o in ords])
-        # args.ords_use = args.ords_use[maskoempty]
-
-        # If wavelength or flux of an order is all nan -> Do not use, remove from args.ords_use
-        omwnan = [o for o in ordsm if ~np.isfinite(wm[o]).all()]
-        omfnan = [o for o in ordsm if ~np.isfinite(fm[o]).all()]
-
-        # If wavelength or flux of an order is all 0 -> Do not use, remove from ordsm
-        omw0 = [o for o in ordsm if not np.any(wm[o])]
-        omf0 = [o for o in ordsm if not np.any(fm[o])]
-
-        # Total orders to remove
-        omrmv = np.sort(np.unique(omempty + omwnan + omfnan + omw0 + omf0))
-        ordsm_use_new = []
-        for o in ordsm:
-            if o in omrmv:
-                continue
-            else:
-                ordsm_use_new.append(o)
-        ordsm_use = np.asarray(ordsm_use_new, dtype=int)
-        nordm_use = len(ordsm_use)
-
-    # Shift model if `tplrv` is != 0
-    if args.tplrv != 0.0:
-        if nordm > 1:
-            wm = np.array([wm[o] * (1 - args.tplrv / C_KMS) if o in ordsm_use else wm[o] for o in range(len(wm))])
-            # wm = np.concatenate(wm).reshape(61,)
-
-            # for o in range(len(wm)):
-            #     if o in ordsm_use:
-            #         wm[o] * (1 - args.tplrv / C_KMS)
-            #     else:
-            #         wm 
+            datamask = {
+                'filmask': filmask,
+                'objmask': args.objmask,
+                'sptmask': args.sptmask,
+                'vsinimask': args.vsinimask,
+            }
+            verboseprint('\nMask: ', datamask['filmask'])
+        # Mask-selection file
         else:
-            wm = wm * (1 - args.tplrv / C_KMS)
+            verboseprint('\nSelecting mask from list in: {}'.format(args.filmask))
+            # Select mask
+            maskinfo = ccflib.selectmask_carmenesgto(args.filmask, args.spt, args.vsini, sptdefault='M3.5', vsinidefault=2.0, verbose=True)
+            filmask = os.path.expanduser(maskinfo['filmask'])
+
+            datamask = {
+                'filmask': filmask,
+                'objmask': maskinfo['obj'] if args.objmask is None else args.objmask,
+                'sptmask': maskinfo['spt'] if args.sptmask is None else args.sptmask,
+                'vsinimask': maskinfo['vsini'] if args.vsinimask is None else args.vsinimask,
+            }
+
+    verboseprint('Mask: {}'.format(filmask))
+    verboseprint('  Mask obj {}, SpT {}, vsini {}'.format(datamask['objmask'], datamask['sptmask'], datamask['vsinimask']))
+    verboseprint('  Target {}, SpT {}, vsini {}'.format(args.obj, args.spt, args.vsini))
+
+    # if not os.path.exists(args.filmask): sys.exit('Mask file {} does not exist'.format(args.filmask))
+
+    # Read mask
+    if not args.maskformatharp:
+        wm, fm = np.loadtxt(filmask, usecols=[0, 1], unpack=True)
+    else:
+        wm1, wm2, fm = np.loadtxt(filmask, usecols=[0, 1, 2], unpack=True)
+        wm = (wm1 + wm2) / 2.
+        wm = spectrumutils.wair2vac(wm)
+        args.maskair = False
+    # Transform to vacuum
+    if args.maskair:
+        wm = spectrumutils.wair2vac(wm)
+        args.maskair = False
+
+    wm_original, fm_original = wm.copy(), fm.copy()
+    nlinoriginal = len(wm)
+    verboseprint('  {} lines in mask'.format(nlinoriginal))
+
+    # Cut mask to selected wrange
+    if args.wrange is not None:
+        verboseprint('  Cut mask to range: {} -- {}'.format(args.wrange[0], args.wrange[1]))
+        mask = (wm >= args.wrange[0]) & (wm <= args.wrange[1])
+        wm = wm[mask]
+        fm = fm[mask]
+        nlin = len(wm)
+        verboseprint('  {} lines in mask'.format(nlin))
 
     ###########################################################################
 
@@ -586,161 +520,160 @@ def main():
     # CCF test: Determine CCF RV center and range
     # -------------------------------------------
 
-    if args.tpltype == 'mask':  # TO DO. HARDCODED. SKIP TEMPORALY IF MODEL IS NOT A MASK. Remove when having a simple function to compute the CCF with either mask or full model. Means need to provide args.rvcen and args.rvrng manually
-        if args.rvcen is None or args.rvrng is None:
+    if args.rvcen is None or args.rvrng is None:
 
-            verboseprint('\nCompute CCF test: determine CCF RV center and range')
+        verboseprint('\nCompute CCF test: determine CCF RV center and range')
 
-            # Spectrum
-            filblaze = lisobs2blaze[filobsref] if args.filobs2blaze is not None else None
-            w, f, sf, c, header, dataextra = spectrographutils.fitsred_read(filobsref, args.inst, carmnirdiv=carmnirordssplit, harpblaze=True, dirblaze=None, filblaze=filblaze, expresw=args.expresw)
-            # nord = len(w)
-            # ords = np.arange(0, nord, 1)
+        # Spectrum
+        filblaze = lisobs2blaze[filobsref] if args.filobs2blaze is not None else None
+        w, f, sf, c, header, dataextra = spectrographutils.fitsred_read(filobsref, args.inst, carmnirdiv=carmnirordssplit, harpblaze=True, dirblaze=None, filblaze=filblaze, expresw=args.expresw)
+        # nord = len(w)
+        # ords = np.arange(0, nord, 1)
 
-            # EXPRES use own mask to remove bad pixels
-            if args.inst == 'EXPRES':
-                w, f, sf, c = expresutils.apply_expres_masks_spec(w, f, sf, c, dataextra['pixel_mask'], excalibur_mask=dataextra['excalibur_mask'] if args.expresw == 'bary_excalibur' or args.expresw == 'excalibur' else None)
+        # EXPRES use own mask to remove bad pixels
+        if args.inst == 'EXPRES':
+            w, f, sf, c = expresutils.apply_expres_masks_spec(w, f, sf, c, dataextra['pixel_mask'], excalibur_mask=dataextra['excalibur_mask'] if args.expresw == 'bary_excalibur' or args.expresw == 'excalibur' else None)
 
-            # Transform spectra to vacuum (only HARPS/N)
-            if args.inst == 'HARPS' or args.inst == 'HARPN':
-                w = spectrumutils.wair2vac(w)
+        # Transform spectra to vacuum (only HARPS/N)
+        if args.inst == 'HARPS' or args.inst == 'HARPN':
+            w = spectrumutils.wair2vac(w)
 
-            # Remove pixels with nan or negative wavelengths
-            spec_removenan, masknan = spectrumutils.remove_nan_echelle(w, f, sf, c, ords_use=args.ords_use, returntype='original')
-            w, f, sf, c = spec_removenan
+        # Remove pixels with nan or negative wavelengths
+        spec_removenan, masknan = spectrumutils.remove_nan_echelle(w, f, sf, c, ords_use=args.ords_use, returntype='original')
+        w, f, sf, c = spec_removenan
 
 
-            # Correct spectrum wavelength
-            shift = dataobs.loc[filobsref]['shift']
-            wcorr = [w[o] * (1. - (shift) / C_MS) for o in ords]
+        # Correct spectrum wavelength
+        shift = dataobs.loc[filobsref]['shift']
+        wcorr = [w[o] * (1. - (shift) / C_MS) for o in ords]
 
-            # Correct spectrum cont
-            f = [f[o] / c[o] for o in ords]
+        # Correct spectrum cont
+        f = [f[o] / c[o] for o in ords]
 
-            # Correct spectrum slope
-            if args.inst == 'HARPS' or args.inst == 'HARPN':
-                fraw = f.copy()
-                for o in ords:
-                    SpecFitPar = np.polyfit(w[o], f[o], 1)
-                    f[o] = np.array(f[o] / np.poly1d(SpecFitPar)(w[o]) * np.mean(f[o]))
+        # Correct spectrum slope
+        if args.inst == 'HARPS' or args.inst == 'HARPN':
+            fraw = f.copy()
+            for o in ords:
+                SpecFitPar = np.polyfit(w[o], f[o], 1)
+                f[o] = np.array(f[o] / np.poly1d(SpecFitPar)(w[o]) * np.mean(f[o]))
 
-            # Velocity array
-            if args.rvcen is not None: args.ccftestrvcen = args.rvcen
-            rvtest = np.arange(args.ccftestrvcen - args.ccftestrvrng, args.ccftestrvcen + args.ccftestrvrng + args.ccftestrvstp, args.ccftestrvstp)
+        # Velocity array
+        if args.rvcen is not None: args.ccftestrvcen = args.rvcen
+        rvtest = np.arange(args.ccftestrvcen - args.ccftestrvrng, args.ccftestrvcen + args.ccftestrvrng + args.ccftestrvstp, args.ccftestrvstp)
 
-            # Order
-            if args.ccftesto is None:
-                args.ccftesto = oref
+        # Order
+        if args.ccftesto is None:
+            args.ccftesto = oref
 
-            verboseprint('  Test RV center: {}'.format(args.ccftestrvcen))
-            verboseprint('  Test RV range: {}'.format(args.ccftestrvrng))
-            verboseprint('  Test RV step: {}'.format(args.ccftestrvstp))
-            verboseprint('  Obs: {}\n  Order: {}\n'.format(os.path.basename(filobsref), args.ccftesto))
+        verboseprint('  Test RV center: {}'.format(args.ccftestrvcen))
+        verboseprint('  Test RV range: {}'.format(args.ccftestrvrng))
+        verboseprint('  Test RV step: {}'.format(args.ccftestrvstp))
+        verboseprint('  Obs: {}\n  Order: {}\n'.format(os.path.basename(filobsref), args.ccftesto))
 
-            # Compute CCF test
-            ccftest, _ = ccflib.computeccf(wcorr[args.ccftesto], f[args.ccftesto], c[args.ccftesto], wm, fm, rvtest, ron=None)
+        # Compute CCF test
+        ccftest, _ = ccflib.computeccf(wcorr[args.ccftesto], f[args.ccftesto], c[args.ccftesto], wm, fm, rvtest, ron=None)
 
-            # plt.plot(rvtest, ccftest), plt.show(), plt.close()
+        # plt.plot(rvtest, ccftest), plt.show(), plt.close()
 
-            # Plot spectrum+mask and CCF test
-            if doplottest:
-                fig, ax = plt.subplots(2, 1, figsize=(16, 10))
-                # fig, ax = plt.subplots(1,2, figsize=(16, 5), gridspec_kw={'width_ratios': [2,1]})
-                # Spec
-                args.ccftesto = 45
-                fmax = np.nanmax(f[args.ccftesto])
-                fn = (f[args.ccftesto]) / fmax
-                fmaxn = np.nanmax(fn)  # 1.
-                fminn = np.nanmin(fn)
-                ax[0].plot(wcorr[args.ccftesto], fn, 'k', label='Spec norm shift')
-                # Mask
-                ax[0].vlines(wm, fminn, fminn + fm / np.nanmax(fm) * fmaxn, colors='C1', label='Mask norm')
-                # Tellurics
-                wt, ft = telluricutils.read_mask(args.filtell)
-                telluricutils.plot_mask(wt, ft*fmaxn, ax=ax[0], leglab='Telluric mask', alpha=.3, color='k')
-                ax[0].set_xlim(np.nanmin(wcorr[args.ccftesto]), np.nanmax(wcorr[args.ccftesto]))
-                ax[0].set_ylim(fminn, fmaxn)
-                ax[0].set_ylabel('Flux')
-                ax[0].set_xlabel('Wavelength')
-                ax[0].set_title('{}\norder {}, SNR {:.0f}'.format(os.path.basename(filobsref), args.ccftesto, dataobs['snro{:d}'.format(oref)].loc[filobsref]))
-                # CCF
-                ccfmax = np.nanmax(ccftest)
-                ax[1].plot(rvtest, ccftest/ccfmax, marker='.', label='CCF max {:.2e}'.format(ccfmax))
-                ax[1].set_xlabel('RV [km/s]')
-                ax[1].set_ylabel('CCF norm')
-                for a in ax:
-                    a.legend(loc='upper right')
-                plotutils.figout(fig, filout=os.path.join(args.dirout, 'ccftest_{}_{}'.format(os.path.basename(os.path.splitext(filobsref)[0]), args.ccftesto)), sv=args.plottest_sv, svext=args.plot_ext, sh=args.plottest_sh)
+        # Plot spectrum+mask and CCF test
+        if doplottest:
+            fig, ax = plt.subplots(2, 1, figsize=(16, 10))
+            # fig, ax = plt.subplots(1,2, figsize=(16, 5), gridspec_kw={'width_ratios': [2,1]})
+            # Spec
+            args.ccftesto = 45
+            fmax = np.nanmax(f[args.ccftesto])
+            fn = (f[args.ccftesto]) / fmax
+            fmaxn = np.nanmax(fn)  # 1.
+            fminn = np.nanmin(fn)
+            ax[0].plot(wcorr[args.ccftesto], fn, 'k', label='Spec norm shift')
+            # Mask
+            ax[0].vlines(wm, fminn, fminn + fm / np.nanmax(fm) * fmaxn, colors='C1', label='Mask norm')
+            # Tellurics
+            wt, ft = telluricutils.read_mask(args.filtell)
+            telluricutils.plot_mask(wt, ft*fmaxn, ax=ax[0], leglab='Telluric mask', alpha=.3, color='k')
+            ax[0].set_xlim(np.nanmin(wcorr[args.ccftesto]), np.nanmax(wcorr[args.ccftesto]))
+            ax[0].set_ylim(fminn, fmaxn)
+            ax[0].set_ylabel('Flux')
+            ax[0].set_xlabel('Wavelength')
+            ax[0].set_title('{}\norder {}, SNR {:.0f}'.format(os.path.basename(filobsref), args.ccftesto, dataobs['snro{:d}'.format(oref)].loc[filobsref]))
+            # CCF
+            ccfmax = np.nanmax(ccftest)
+            ax[1].plot(rvtest, ccftest/ccfmax, marker='.', label='CCF max {:.2e}'.format(ccfmax))
+            ax[1].set_xlabel('RV [km/s]')
+            ax[1].set_ylabel('CCF norm')
+            for a in ax:
+                a.legend(loc='upper right')
+            plotutils.figout(fig, filout=os.path.join(args.dirout, 'ccftest_{}_{}'.format(os.path.basename(os.path.splitext(filobsref)[0]), args.ccftesto)), sv=args.plottest_sv, svext=args.plot_ext, sh=args.plottest_sh)
 
-            # ---------------------------------
+        # ---------------------------------
 
-            # Determine CCF center
-            if args.rvcen is None:
-                imin = np.nanargmin(ccftest)
-                args.rvcen = rvtest[imin]
-                verboseprint('  CCF RV cen: {} km/s'.format(args.rvcen))
-            else:
-                verboseprint('  CCF RV cen fixed by user: {} km/s'.format(args.rvcen))
+        # Determine CCF center
+        if args.rvcen is None:
+            imin = np.nanargmin(ccftest)
+            args.rvcen = rvtest[imin]
+            verboseprint('  CCF RV cen: {} km/s'.format(args.rvcen))
+        else:
+            verboseprint('  CCF RV cen fixed by user: {} km/s'.format(args.rvcen))
 
-            # ---------------------------------
+        # ---------------------------------
 
-            # Determine CCF range by fitting a Gaussian and getting its width
-            if args.rvrng is None:
+        # Determine CCF range by fitting a Gaussian and getting its width
+        if args.rvrng is None:
 
-                # Determine fit range: CCF maxima closest to absolute minimum
-                # - CCF minima and maxima
-                #    Mask nans
-                masknan = np.isfinite(ccftest)
-                limin, limax1, limax2 = peakutils.find_abspeaks(ccftest[masknan], method='custom')
-                # - Maxima closest to CCF minimum
-                imin = np.nanargmin(ccftest[masknan])
-                i = np.where(limin == imin)[0][0]
-                imax1, imax2 = limax1[i], limax2[i]
-                # Handle array ends
-                if imax2 < len(ccftest[masknan]): imax2p = imax2 + 1  # imax2 plus 1
+            # Determine fit range: CCF maxima closest to absolute minimum
+            # - CCF minima and maxima
+            #    Mask nans
+            masknan = np.isfinite(ccftest)
+            limin, limax1, limax2 = peakutils.find_abspeaks(ccftest[masknan], method='custom')
+            # - Maxima closest to CCF minimum
+            imin = np.nanargmin(ccftest[masknan])
+            i = np.where(limin == imin)[0][0]
+            imax1, imax2 = limax1[i], limax2[i]
+            # Handle array ends
+            if imax2 < len(ccftest[masknan]): imax2p = imax2 + 1  # imax2 plus 1
+            else: imax2p = imax2
+
+            # Check that the distance in RV between maxima is at least args.ccftestdmin
+            # If not, select next maxima until it happens
+            # If never happens, will fit all RV range
+            i1, i2 = i, i
+            while rvtest[masknan][imax2p] - rvtest[masknan][imax1] < args.ccftestdmin:
+                # If reached end of RV array, the fit limits are all the range
+                if imax1 == limax1[0] or imax2p == limax2[-1]:
+                    imax1 = limax1[0]
+                    imax2p = limax2[-1]
+                    verboseprint('  Cannot constrain CCF minimum range. Using all range ({} -- {}) to fit a Gaussian and determine width.'.format(rvtest[masknan][imax1], rvtest[masknan][imax2p]))
+                    break
+
+                # Go to next closest maxima at each side
+                i1 = i1 - 1
+                i2 = i2 + 1
+                imax1, imax2 = limax1[i1], limax2[i2]
+                if imax2 != limax2[-1]: imax2p = imax2 + 1  # imax2 plus 1
                 else: imax2p = imax2
 
-                # Check that the distance in RV between maxima is at least args.ccftestdmin
-                # If not, select next maxima until it happens
-                # If never happens, will fit all RV range
-                i1, i2 = i, i
-                while rvtest[masknan][imax2p] - rvtest[masknan][imax1] < args.ccftestdmin:
-                    # If reached end of RV array, the fit limits are all the range
-                    if imax1 == limax1[0] or imax2p == limax2[-1]:
-                        imax1 = limax1[0]
-                        imax2p = limax2[-1]
-                        verboseprint('  Cannot constrain CCF minimum range. Using all range ({} -- {}) to fit a Gaussian and determine width.'.format(rvtest[masknan][imax1], rvtest[masknan][imax2p]))
-                        break
+            # Fit Gaussian
+            x = rvtest[masknan][imax1:imax2p]
+            y = ccftest[masknan][imax1:imax2p]
+            lmfitresult = peakutils.fit_gaussian_peak(x, y, amp_hint=np.nanmin(y) - np.nanmax(y), cen_hint=rvtest[masknan][imin], wid_hint=1., shift_hint=np.nanmax(y), minmax='min')
 
-                    # Go to next closest maxima at each side
-                    i1 = i1 - 1
-                    i2 = i2 + 1
-                    imax1, imax2 = limax1[i1], limax2[i2]
-                    if imax2 != limax2[-1]: imax2p = imax2 + 1  # imax2 plus 1
-                    else: imax2p = imax2
+            fitpartest = {}
+            for p in lmfitresult.params.keys():
+                if lmfitresult.params[p].value is not None: fitpartest['fit'+p] = lmfitresult.params[p].value
+                else: fitpartest['fit'+p] = np.nan
+                if lmfitresult.params[p].stderr is not None: fitpartest['fit'+p+'err'] = lmfitresult.params[p].stderr
+                else: fitpartest['fit'+p+'err'] = np.nan
+            fitpartest['fwhm'] = peakutils.gaussian_fwhm(wid=fitpartest['fitwid'])
+            fitpartest['fitredchi2'] = lmfitresult.redchi
 
-                # Fit Gaussian
-                x = rvtest[masknan][imax1:imax2p]
-                y = ccftest[masknan][imax1:imax2p]
-                lmfitresult = peakutils.fit_gaussian_peak(x, y, amp_hint=np.nanmin(y) - np.nanmax(y), cen_hint=rvtest[masknan][imin], wid_hint=1., shift_hint=np.nanmax(y), minmax='min')
+            # Determine CCF width: About 3 * FWHM
+            args.rvrng = round(np.ceil(fitpartest['fwhm']*3.))  # [km/s]
+            # args.rvrng = round(np.ceil(fitpartest['fwhm']*3.)/5)*5 # [km/s], round to 5
+            verboseprint('  RV range: {} km/s'.format(args.rvrng))
+        else:
+            verboseprint('  RV range fixed by user: {} km/s'.format(args.rvrng))
 
-                fitpartest = {}
-                for p in lmfitresult.params.keys():
-                    if lmfitresult.params[p].value is not None: fitpartest['fit'+p] = lmfitresult.params[p].value
-                    else: fitpartest['fit'+p] = np.nan
-                    if lmfitresult.params[p].stderr is not None: fitpartest['fit'+p+'err'] = lmfitresult.params[p].stderr
-                    else: fitpartest['fit'+p+'err'] = np.nan
-                fitpartest['fwhm'] = peakutils.gaussian_fwhm(wid=fitpartest['fitwid'])
-                fitpartest['fitredchi2'] = lmfitresult.redchi
-
-                # Determine CCF width: About 3 * FWHM
-                args.rvrng = round(np.ceil(fitpartest['fwhm']*3.))  # [km/s]
-                # args.rvrng = round(np.ceil(fitpartest['fwhm']*3.)/5)*5 # [km/s], round to 5
-                verboseprint('  RV range: {} km/s'.format(args.rvrng))
-            else:
-                verboseprint('  RV range fixed by user: {} km/s'.format(args.rvrng))
-
-            # ---------------------------------
+        # ---------------------------------
 
     # Determine RV steps
 
@@ -870,16 +803,9 @@ def main():
             if args.inst == 'HARPS' or args.inst == 'HARPN':
                 w = spectrumutils.wair2vac(w)
             wspecmin, wspecmax = min(np.concatenate(w)), max(np.concatenate(w))
-
         # wt_broaden_join = np.concatenate(([wspecmin], wt_broaden_join, [wspecmax]))
-        if nordm > 1: 
-            wm0 = np.nanmin(wm[ordsm_use])
-            wm1 = np.nanmax(wm[ordsm_use])
-        else:
-            wm0 = wm[0]
-            wm1 = wm[-1]
-        wmin = np.nanmin([wspecmin, wm0, wt_broaden_join[0]]) - 500.
-        wmax = np.nanmax([wspecmax, wm1, wt_broaden_join[-1]]) + 500.
+        wmin = np.nanmin([wspecmin, wm[0], wt_broaden_join[0]]) - 500.
+        wmax = np.nanmax([wspecmax, wm[-1], wt_broaden_join[-1]]) + 500.
         wt_broaden_join = np.concatenate(([wmin], wt_broaden_join, [wmax]))
         ft_broaden_join = np.concatenate(([0], ft_broaden_join, [0]))
 
@@ -903,71 +829,31 @@ def main():
         else:
             rvnew = rv
 
-        # Binary masks
-        if nordm == 1:
-            mask = [[]] * len(rvnew)
-            for i, maskshift in enumerate(rvnew):
-                wm_shift = wm * (1 + maskshift / C_KMS)  # works for 1D and 2D wm
+        mask = [[]] * len(rvnew)
+        for i, maskshift in enumerate(rvnew):
+            wm_shift = wm * (1 + maskshift / C_KMS)
 
-                # Flag lines in bad regions: False in bad region, True otherwise
-                mask[i] = np.array(Maskbad_inv(wm_shift), dtype=bool)
+            # Flag lines in bad regions: False in bad region, True otherwise
+            mask[i] = np.array(Maskbad_inv(wm_shift), dtype=bool)
 
-            # Join masks for each RV shift
-            maskjoin = np.prod(mask, axis=0, dtype=bool)
+        # Join masks for each RV shift
+        maskjoin = np.prod(mask, axis=0, dtype=bool)
 
-            # # Plot: Check mask join is OK
-            # for i in range(len(mask)):
-            #     plt.plot(np.arange(len(mask[0])), mask[i], 'o')
-            # plt.plot(np.arange(len(mask[0])), maskjoin, '+', ms=10)
-            # plt.show()
-            # plt.close()
+        # # Plot: Check mask join is OK
+        # for i in range(len(mask)):
+        #     plt.plot(np.arange(len(mask[0])), mask[i], 'o')
+        # plt.plot(np.arange(len(mask[0])), maskjoin, '+', ms=10)
+        # plt.show()
+        # plt.close()
 
-            # Remove lines in telluric regions
-            wm = wm[maskjoin]
-            fm = fm[maskjoin]
+        # Remove lines in telluric regions
+        wm = wm[maskjoin]
+        fm = fm[maskjoin]
 
-            nlin = len(wm)
+        nlin = len(wm)
 
-            verboseprint('Remove mask lines affected by tellurics')
-            verboseprint('  {} lines in mask after removing tellurics'.format(nlin))
-
-        # Full templates: Cannot really remove tellurics (make them nan or 0) because the template is interpolated and there's issues with that. Plus we also need the mean to having tellurics set as 0 causes issues.
-        # Instead of making them 0, keep model as is, and keep track of the bad wavelength with the function Maskbad_inv above. Remove them for each RV shift when actually computing the CCF
-        else:
-            """
-            for o in ordsm_use:
-                mask = [[]] * len(rvnew)
-                for i, maskshift in enumerate(rvnew):
-                    wm_shift = wm[o] * (1 + maskshift / C_KMS)  # works for 1D and 2D wm
-
-                    # Flag lines in bad regions: False in bad region, True otherwise
-                    mask[i] = np.array(Maskbad_inv(wm_shift), dtype=bool)
-
-                # Join masks for each RV shift
-                maskjoin = np.prod(mask, axis=0, dtype=bool)
-
-                # # Remove pixels in telluric regions -> Issues is wm is an array, changing dimensions of each row gives problems
-                # wm[o] = wm[o][maskjoin]
-                # fm[o] = fm[o][maskjoin]
-                # # Make bad pixels nan to conserve array shape -> Issues when inter/extrapolating with nan
-                # wm[o][~maskjoin] = np.nan
-                # fm[o][~maskjoin] = np.nan
-
-                # Conserve wm as is, make flux 0 so it doesn't contribute to the CCF
-                # ---> Interpolating issues
-                fm[o][~maskjoin] = 0.0
-                
-                # # Set to nan
-                # # -> Issues when interpolating
-                # fm[o][~maskjoin] = np.nan
-
-                # Keep track of the bad wavelength with the mask function Maskbad_inv
-
-                # nlin = len(wm)
-            """
-
-            # Include the RVshifts in the Maskbad_inv function (now only contains the BERV shifts)
-            # TODO
+        verboseprint('Remove mask lines affected by tellurics')
+        verboseprint('  {} lines in mask after removing tellurics'.format(nlin))
 
         # # Plot telluric regions, mask lines and mask lines removed
         # fig, ax = plt.subplots()
@@ -1042,18 +928,11 @@ def main():
     # ----
 
     # Lines per order usable at any epoch
-
     wmords, fmords = [[]]*nord, [[]]*nord
-    if nordm > 1:
-        for o in ords:
-            mask = (wm[o] >= wominshift[o]) & (wm[o] <= womaxshift[o])
-            wmords[o] = wm[o][mask]
-            fmords[o] = fm[o][mask]
-    else:
-        for o in ords:
-            mask = (wm >= wominshift[o]) & (wm <= womaxshift[o])
-            wmords[o] = wm[mask]
-            fmords[o] = fm[mask]
+    for o in ords:
+        mask = (wm >= wominshift[o]) & (wm <= womaxshift[o])
+        wmords[o] = wm[mask]
+        fmords[o] = fm[mask]
 
     # ----
 
@@ -1103,18 +982,19 @@ def main():
 
     ###########################################################################
 
-    # Compute CCF
+
+    # Compute CCF and params: Observations loop
+    # -----------------------------------------
+
+    verboseprint('\nCompute CCF and parameters')
 
     # --- Start observations loop ---
     # ccf, ccferr, ccfreal, ccferrreal = {}, {}, {}, {}
     # ccfpar = {}
     dataccfsumTS = {}
-    # dataccfoTS = {}
-    dataccfoTS = []
     first, firsto = True, True
     for i, obs in enumerate(tqdm(lisfilobs)):
         filobs = lisfilobs[i]
-        obsid = os.path.basename(os.path.splitext(filobs)[0])
         # verboseprint('{}/{} {}'.format(i+1, nobs, filobs))
 
         # Get blaze file (if indicated)
@@ -1280,870 +1160,508 @@ def main():
         # Readout noise
         ron = dataobs.loc[filobs]['ron']
 
-        #######################################################################
+        # ---------------------------------------------------------------------
 
-        # Compute classical CCF and params
-        # --------------------------------
+        # Orders loop
 
-        if args.tpltype == 'mask':
+        # Prepare objects to store data
+        ccf, ccferr, ccfreal, ccferrreal = [[]]*nord, [[]]*nord, [[]]*nord, [[]]*nord
+        bx, by, bxerr = [[]]*nord, [[]]*nord, [[]]*nord
+        ccfpar = {}
 
-            verboseprint('\nCompute CCF and parameters')
+        # Use only orders where the mask has lines
+        ords_use_lines = [o for o in args.ords_use if len(wmords[o]) > 0]
 
-            # Orders loop
+        # --- Start orders loop ---
+        for o in ords_use_lines:
 
-            # Prepare objects to store data
-            ccf, ccferr, ccfreal, ccferrreal = [[]]*nord, [[]]*nord, [[]]*nord, [[]]*nord
-            bx, by, bxerr = [[]]*nord, [[]]*nord, [[]]*nord
-            ccfpar = {}
+            # Compute CCF
+            #  If no nan in spectrum nor in mask, and if mask lines fall on spectrum, this shouldn't fail
+            ccfo, ccferro = ccflib.computeccf(wcorr[o], f[o], c[o], wmords[o], fmords[o], rv, ron=ron)
+            # ccforeal, ccferroreal = ccflib.computeccf(wcorr[o], f[o], c[o], wmords[o], fmords[o], rvreal, ron=ron, forig=fsnroriginal[o])
+            ccforeal, ccferroreal = ccflib.computeccf(wcorr[o], f[o], c[o], wmords[o], fmords[o], rvreal, ron=ron, forig=fsnroriginal if fsnroriginal is None else fsnroriginal[o])
 
-            # Use only orders where the mask has lines
-            ords_use_lines = [o for o in args.ords_use if len(wmords[o]) > 0]
+            # # Test
+            # if o == 36:
+            #     plt.plot(rv, ccfo, '.')
+            #     plt.tight_layout()
+            #     plt.show()
+            #     plt.close()
 
-            # --- Start orders loop ---
-            for o in ords_use_lines:
+            # Plot spectrum
+            """
+            if args.plot_ccfproc:
+                print('----------------plotting')
+                fig, ax = plt.subplots(2, 1, figsize=(10, 6))
 
-                # Compute CCF
-                #  If no nan in spectrum nor in mask, and if mask lines fall on spectrum, this shouldn't fail
-                ccfo, ccferro = ccflib.computeccf(wcorr[o], f[o], c[o], wmords[o], fmords[o], rv, ron=ron)
-                # ccforeal, ccferroreal = ccflib.computeccf(wcorr[o], f[o], c[o], wmords[o], fmords[o], rvreal, ron=ron, forig=fsnroriginal[o])
-                ccforeal, ccferroreal = ccflib.computeccf(wcorr[o], f[o], c[o], wmords[o], fmords[o], rvreal, ron=ron, forig=fsnroriginal if fsnroriginal is None else fsnroriginal[o])
+                fig = plt.figure(constrained_layout=True)
+                gs = fig.add_gridspec(ncols=2, nrows=2, width_ratios=[3, 1], height_ratios=[1, 1])
+                axspec = fig.add_subplot(gs[0, 0])  # [y, x]
+                axspecnorm = fig.add_subplot(gs[1, 0])
+                axccf = fig.add_subplot(gs[:, 1])
 
-                # # Test
-                # if o == 36:
-                #     plt.plot(rv, ccfo, '.')
-                #     plt.tight_layout()
-                #     plt.show()
-                #     plt.close()
+                axspec.plot(w[o], f[o], linewidth=0.5, marker='.', color='k')
 
-                # Plot spectrum
-                """
-                if args.plot_ccfproc:
-                    print('----------------plotting')
-                    fig, ax = plt.subplots(2, 1, figsize=(10, 6))
+                ylim = axspec.get_ylim()
+                axspec.vlines(wmords[o], ylim[0], fmords[o]*0.5*ylim[1], color='C1', alpha=0.8, zorder=10)
+                axspec.vlines(wmords[o]*()SHIFT!!!!!!!!!!, ylim[0], fmords[o]*0.5*ylim[1], color='C2', alpha=0.8, zorder=10, linestyle='dashed')
+                axspec.vlines(wmords[o]-SHIFT!!!!!!!!!!, ylim[0], fmords[o]*0.5*ylim[1], color='C3', alpha=0.8, zorder=10, linestyle='dashed')
+                axspec.set_ylim(ylim)
 
-                    fig = plt.figure(constrained_layout=True)
-                    gs = fig.add_gridspec(ncols=2, nrows=2, width_ratios=[3, 1], height_ratios=[1, 1])
-                    axspec = fig.add_subplot(gs[0, 0])  # [y, x]
-                    axspecnorm = fig.add_subplot(gs[1, 0])
-                    axccf = fig.add_subplot(gs[:, 1])
+                axspecnorm.plot(w[o], f[o]/c[o], linewidth=0.5, marker='.', color='k')
 
-                    axspec.plot(w[o], f[o], linewidth=0.5, marker='.', color='k')
+                ylim = axspecnorm.get_ylim()
+                axspecnorm.vlines(wmords[o], ylim[0], fmords[o]*0.5*ylim[1], color='C1', alpha=0.8, zorder=10)
+                axspecnorm.set_ylim(ylim)
 
-                    ylim = axspec.get_ylim()
-                    axspec.vlines(wmords[o], ylim[0], fmords[o]*0.5*ylim[1], color='C1', alpha=0.8, zorder=10)
-                    axspec.vlines(wmords[o]*()SHIFT!!!!!!!!!!, ylim[0], fmords[o]*0.5*ylim[1], color='C2', alpha=0.8, zorder=10, linestyle='dashed')
-                    axspec.vlines(wmords[o]-SHIFT!!!!!!!!!!, ylim[0], fmords[o]*0.5*ylim[1], color='C3', alpha=0.8, zorder=10, linestyle='dashed')
-                    axspec.set_ylim(ylim)
-
-                    axspecnorm.plot(w[o], f[o]/c[o], linewidth=0.5, marker='.', color='k')
-
-                    ylim = axspecnorm.get_ylim()
-                    axspecnorm.vlines(wmords[o], ylim[0], fmords[o]*0.5*ylim[1], color='C1', alpha=0.8, zorder=10)
-                    axspecnorm.set_ylim(ylim)
-
-                    axccf.plot(rv, ccfo, linewidth=0.5, marker='.', color='k')
-                    # ax[1].plot(w[o], f[o]/c[o], linewidth=0.5, marker='.', color=c)
-                    plt.tight_layout()
-                    plotutils.figout(fig, filout=os.path.join(args.dirout, '{}_spec_ccf_o{}'.format(os.path.basename(os.path.splitext(filobs)[0]), o)), sv=args.plot_sv, svext=args.plot_ext, sh=args.plot_sh)
-                    # plt.show()
-                    # plt.close()
-                """
-
-                # -------------------
-
-                # Fit Gaussian
-
-                # Determine fit range
-                # - Fit range for each observation
-                if args.fitrngeach:
-                    imin = np.nanargmin(ccfo)
-                    ifit1, ifit2 = ccflib.determine_fitrng(args.fitrng, rv, ccfo, imin=imin, verb=args.verbose)
-                # - Fit range of the first observation
-                else:
-                    if firsto:
-                        imin = np.nanargmin(ccfo)
-                        ifit1, ifit2 = ccflib.determine_fitrng(args.fitrng, rv, ccfo, imin=imin, verb=args.verbose)
-                        firsto = False
-
-                # Fit
-                try:
-                    x = rv[ifit1:ifit2]
-                    y = ccfo[ifit1:ifit2]
-                    lmfitresult = peakutils.fit_gaussian_peak(x, y, amp_hint=np.nanmin(y) - np.nanmax(y), cen_hint=x[np.nanargmin(y)], wid_hint=1., shift_hint=np.nanmax(y), minmax='min')
-
-                    paro = {}
-                    for p in lmfitresult.params.keys():
-                        if lmfitresult.params[p].value is not None: paro['fit'+p] = lmfitresult.params[p].value
-                        else: paro['fit'+p] = np.nan
-                        if lmfitresult.params[p].stderr is not None: paro['fit'+p+'err'] = lmfitresult.params[p].stderr
-                        else: paro['fit'+p+'err'] = np.nan
-                    fwhm, fwhmerr = peakutils.gaussian_fwhmerr(wid=paro['fitwid'], widerr=paro['fitwiderr'])
-                    paro['fwhm'] = fwhm
-                    paro['fwhmerr'] = fwhmerr
-                    paro['fitredchi2'] = lmfitresult.redchi
-
-                except:
-                    paro = {
-                        'fitamp': np.nan, 'fitcen': np.nan, 'fitwid': np.nan, 'fitshift': np.nan, 'fwhm': np.nan,
-                        'fitamperr': np.nan, 'fitcenerr': np.nan, 'fitwiderr': np.nan, 'fitshifterr': np.nan, 'fwhmerr': np.nan,
-                        'fitredchi2': np.nan,
-                    }
-
-                # -------------------
-
-                # Compute RV error
-
-                rverrto, dero, rverro = ccflib.computerverr(rv, ccfo/np.nanmean(fmords[o]), ccferro, returnall=True)
-                rverrtoreal, deroreal, rverroreal = ccflib.computerverr(rvreal, ccforeal/np.nanmean(fmords[o]), ccferroreal, returnall=True)
-
-                # Add shift error to RV to get "absolute" RV error
-                rverrtoabs = np.sqrt(rverrto**2 + (shifterr_use*1.e-3)**2)
-                rverrtorealabs = np.sqrt(rverrto**2 + (shifterr_use*1.e-3)**2)
-
-                # Add data
-                paro['rv'] = paro['fitcen']
-                paro['rverr'] = rverrtoreal  # From real sampling
-                paro['rverrabs'] = rverrtorealabs  # From real sampling
-
-                # # Plot RV error
-                # if doplottest:
-                #     fig, ax = plt.subplots(4,1, sharex=True)
-                #     ax[0].plot(rvreal, ccforeal, 'o')
-                #     ax[0].set_ylabel('CCF')
-                #     ax[1].plot(rvreal, ccferroreal, 'o')
-                #     ax[1].set_ylabel('CCFerr')
-                #     ax[2].plot(rvreal, dero, 'o')
-                #     ax[2].set_ylabel('dCCF/dRV')
-                #     ax[3].plot(rvreal, rverro, 'o')
-                #     ax[3].set_ylabel('RVerr')
-                #     for a in ax:
-                #         a.minorticks_on()
-                #         # a.legend()
-                #     plotutils.figout(fig, filout=os.path.join(args.dirout, 'rverr_{}_o{}'.format(os.path.basename(os.path.splitext(filobsref)[0]), o)), sv=args.plottest_sv, svext=args.plot_ext, sh=args.plottest_sh)
-
-                # -------------------
-
-                # Compute contrast
-
-                contrasto, contrastoerr = peakutils.gaussian_contrasterr(paro['fitamp'], paro['fitshift'], amperr=paro['fitamperr'], shifterr=paro['fitshifterr'])
-
-                # Add data
-                paro['contrast'] = contrasto
-                paro['contrasterr'] = contrastoerr
-
-                # -------------------
-
-                # Compute bisector
-
-                try:
-                    bxo, byo, bxoerr, biso, bisoerr = ccflib.computebisector_biserr(rv, ccfo, rverro, n=args.bisectorn, bybotmin_percent=args.bisbotmin, bybotmax_percent=args.bisbotmax, bytopmin_percent=args.bistopmin, bytopmax_percent=args.bistopmax, xrealsampling=args.rvstpreal, verb=False, returnall=False)
-                except:
-                    bxo, byo, bxoerr, biso, bisoerr = [np.nan]*args.bisectorn, [np.nan]*args.bisectorn, [np.nan]*args.bisectorn, np.nan, np.nan
-
-                # Add data
-                paro['bis'] = biso
-                paro['biserr'] = bisoerr
-
-                # -------------------
-
-                # Organize data
-                ccf[o] = ccfo
-                ccferr[o] = ccferro
-                ccfreal[o] = ccforeal
-                ccferrreal[o] = ccferroreal
-                ccfpar[o] = paro
-                bx[o] = bxo
-                by[o] = byo
-                bxerr[o] = bxoerr
-
-            # -----------------------
-
-            # --- End orders loop ---
-
-            # Deal with orders with no CCF: Add nans
-            ords_empty = [o for o in ords if o not in ords_use_lines]
-
-            for o in ords_empty:
-                # Add nan in arrays
-                ccf[o] = np.ones_like(rv) * np.nan
-                ccferr[o] = np.ones_like(rv) * np.nan
-                ccfreal[o] = np.ones_like(rv) * np.nan
-                ccferrreal[o] = np.ones_like(rv) * np.nan
-                bx[o] = np.ones(args.bisectorn) * np.nan
-                by[o] = np.ones(args.bisectorn) * np.nan
-                bxerr[o] = np.ones(args.bisectorn) * np.nan
-
-                # Add nan in dict
-                ccfpar[o] = {
-                    'fitamp': np.nan, 'fitcen': np.nan, 'fitwid': np.nan, 'fitshift': np.nan, 'fwhm': np.nan,
-                    'fitamperr': np.nan, 'fitcenerr': np.nan, 'fitwiderr': np.nan, 'fitshifterr': np.nan, 'fwhmerr': np.nan,
-                    'fitredchi2': np.nan,
-                    'rv': np.nan, 'rverr': np.nan,
-                    'contrast': np.nan, 'contrasterr': np.nan,
-                    'bis': np.nan, 'biserr': np.nan,
-                    }
-
-            # --- End orders loop ---
-
-            # Organize orders data
-            ccfpar = pd.DataFrame.from_dict(ccfpar, orient='index')
-            ccfpar.index.set_names('orders', inplace=True)
-            ccfpar.sort_index(inplace=True)
-
-            # Sum CCF
-            ccfsum = ccflib.sumccf(rv, ccf, ords_use_lines)
-            ccfsumreal = ccflib.sumccf(rvreal, ccfreal, ords_use_lines)
-
-            # if doplottest:
-            if False:
-                fig, ax = plt.subplots()
-                ax.plot(rv, ccfsum, marker='.')
+                axccf.plot(rv, ccfo, linewidth=0.5, marker='.', color='k')
+                # ax[1].plot(w[o], f[o]/c[o], linewidth=0.5, marker='.', color=c)
                 plt.tight_layout()
-                if args.plottest_sh: plt.show()
-                plt.close()
+                plotutils.figout(fig, filout=os.path.join(args.dirout, '{}_spec_ccf_o{}'.format(os.path.basename(os.path.splitext(filobs)[0]), o)), sv=args.plot_sv, svext=args.plot_ext, sh=args.plot_sh)
+                # plt.show()
+                # plt.close()
+            """
 
-            # -----------------------
+            # -------------------
 
             # Fit Gaussian
 
             # Determine fit range
             # - Fit range for each observation
             if args.fitrngeach:
-                imin = np.nanargmin(ccfsum)
-                ifit1sum, ifit2sum = ccflib.determine_fitrng(args.fitrng, rv, ccfsum, imin=imin, verb=args.verbose)
+                imin = np.nanargmin(ccfo)
+                ifit1, ifit2 = ccflib.determine_fitrng(args.fitrng, rv, ccfo, imin=imin, verb=args.verbose)
             # - Fit range of the first observation
             else:
-                if first:
-                    imin = np.nanargmin(ccfsum)
-                    ifit1sum, ifit2sum = ccflib.determine_fitrng(args.fitrng, rv, ccfsum, imin=imin, verb=args.verbose)
-                    first = False
+                if firsto:
+                    imin = np.nanargmin(ccfo)
+                    ifit1, ifit2 = ccflib.determine_fitrng(args.fitrng, rv, ccfo, imin=imin, verb=args.verbose)
+                    firsto = False
 
             # Fit
             try:
-                x = rv[ifit1sum:ifit2sum]
-                y = ccfsum[ifit1sum:ifit2sum]
+                x = rv[ifit1:ifit2]
+                y = ccfo[ifit1:ifit2]
                 lmfitresult = peakutils.fit_gaussian_peak(x, y, amp_hint=np.nanmin(y) - np.nanmax(y), cen_hint=x[np.nanargmin(y)], wid_hint=1., shift_hint=np.nanmax(y), minmax='min')
-                # Old
-                # fitpar = ccflib.fitgaussianfortran(rv, ccfsum, 'maxabs', funcfitnam='gaussian', nfitpar=4)
 
-                # Add data
-                ccfparsum = {}
+                paro = {}
                 for p in lmfitresult.params.keys():
-                    if lmfitresult.params[p].value is not None: ccfparsum['fit'+p] = lmfitresult.params[p].value
-                    else: ccfparsum['fit'+p] = np.nan
-                    if lmfitresult.params[p].stderr is not None: ccfparsum['fit'+p+'err'] = lmfitresult.params[p].stderr
-                    else: ccfparsum['fit'+p+'err'] = np.nan
-                ccfparsum['fitredchi2'] = lmfitresult.redchi
+                    if lmfitresult.params[p].value is not None: paro['fit'+p] = lmfitresult.params[p].value
+                    else: paro['fit'+p] = np.nan
+                    if lmfitresult.params[p].stderr is not None: paro['fit'+p+'err'] = lmfitresult.params[p].stderr
+                    else: paro['fit'+p+'err'] = np.nan
+                fwhm, fwhmerr = peakutils.gaussian_fwhmerr(wid=paro['fitwid'], widerr=paro['fitwiderr'])
+                paro['fwhm'] = fwhm
+                paro['fwhmerr'] = fwhmerr
+                paro['fitredchi2'] = lmfitresult.redchi
 
             except:
-                ccfparsum = {
-                    'fitamp': np.nan, 'fitcen': np.nan, 'fitwid': np.nan, 'fitshift': np.nan,
-                    'fitamperr': np.nan, 'fitcenerr': np.nan, 'fitwiderr': np.nan, 'fitshifterr': np.nan,
+                paro = {
+                    'fitamp': np.nan, 'fitcen': np.nan, 'fitwid': np.nan, 'fitshift': np.nan, 'fwhm': np.nan,
+                    'fitamperr': np.nan, 'fitcenerr': np.nan, 'fitwiderr': np.nan, 'fitshifterr': np.nan, 'fwhmerr': np.nan,
                     'fitredchi2': np.nan,
                 }
 
-            # -----------------------
+            # -------------------
 
             # Compute RV error
 
-            # - Compute flux error of CCF sum from the flux error of the CCF of each order
-            # \sig_{CCFsum}^2(RV) = \sum_{o} \sig_CCFo^2(RV)
-            ccfsumerr = np.zeros_like(rv)
-            ccfsumrealerr = np.zeros_like(rvreal)
-            for o in ords_use_lines:
-                ccfsumerr += ccferr[o]**2  # for each RV point
-                ccfsumrealerr += ccferrreal[o]**2  # for each RV point
-            ccfsumerr = np.sqrt(ccfsumerr)
-            ccfsumrealerr = np.sqrt(ccfsumrealerr)
-
-            # - Compute RV error of CCF sum
-            # -- Oversampled -> Needed for bisector error
-            rverrtsum, dersum, rverrsum = ccflib.computerverr(rv, ccfsum/np.nanmean(fmall_use), ccfsumerr, returnall=True)
-            # -- Real sampling -> Needed for real RV error
-            rverrtsumreal, dersumreal, rverrsumreal = ccflib.computerverr(rvreal, ccfsumreal/np.nanmean(fmall_use), ccfsumrealerr, returnall=True)
+            rverrto, dero, rverro = ccflib.computerverr(rv, ccfo/np.nanmean(fmords[o]), ccferro, returnall=True)
+            rverrtoreal, deroreal, rverroreal = ccflib.computerverr(rvreal, ccforeal/np.nanmean(fmords[o]), ccferroreal, returnall=True)
 
             # Add shift error to RV to get "absolute" RV error
-            rverrtsumabs = np.sqrt(rverrtsum**2 + (shifterr_use*1.e-3)**2)
-            rverrtsumrealabs = np.sqrt(rverrtsumreal**2 + (shifterr_use*1.e-3)**2)
+            rverrtoabs = np.sqrt(rverrto**2 + (shifterr_use*1.e-3)**2)
+            rverrtorealabs = np.sqrt(rverrto**2 + (shifterr_use*1.e-3)**2)
 
             # Add data
-            ccfparsum['rv'] = ccfparsum['fitcen']
-            ccfparsum['rverr'] = rverrtsumreal  # From real sampling
-            ccfparsum['rverrabs'] = rverrtsumrealabs  # From real sampling
+            paro['rv'] = paro['fitcen']
+            paro['rverr'] = rverrtoreal  # From real sampling
+            paro['rverrabs'] = rverrtorealabs  # From real sampling
 
-            # -----------------------
+            # # Plot RV error
+            # if doplottest:
+            #     fig, ax = plt.subplots(4,1, sharex=True)
+            #     ax[0].plot(rvreal, ccforeal, 'o')
+            #     ax[0].set_ylabel('CCF')
+            #     ax[1].plot(rvreal, ccferroreal, 'o')
+            #     ax[1].set_ylabel('CCFerr')
+            #     ax[2].plot(rvreal, dero, 'o')
+            #     ax[2].set_ylabel('dCCF/dRV')
+            #     ax[3].plot(rvreal, rverro, 'o')
+            #     ax[3].set_ylabel('RVerr')
+            #     for a in ax:
+            #         a.minorticks_on()
+            #         # a.legend()
+            #     plotutils.figout(fig, filout=os.path.join(args.dirout, 'rverr_{}_o{}'.format(os.path.basename(os.path.splitext(filobsref)[0]), o)), sv=args.plottest_sv, svext=args.plot_ext, sh=args.plottest_sh)
 
-            # Compute FWHM
-            #  fwhm = 2 * sqrt(2*ln(2)) * wid
-            #  fwhmerr = 2 * sqrt(2*ln(2)) * widerr
-            fwhm, fwhmerr = peakutils.gaussian_fwhmerr(wid=ccfparsum['fitwid'], widerr=ccfparsum['fitwiderr'])
-
-            # Add data
-            ccfparsum['fwhm'] = fwhm
-            ccfparsum['fwhmerr'] = fwhmerr
-
-            # -----------------------
+            # -------------------
 
             # Compute contrast
-            #   contrast = - (amp/shift) * 100
-            #   contrasterr = 100/shift**2 * sqrt( (shift*amperr)**2  + (ampshifterr)**2 )
-            contrast, contrasterr = peakutils.gaussian_contrasterr(ccfparsum['fitamp'], ccfparsum['fitshift'], amperr=ccfparsum['fitamperr'], shifterr=ccfparsum['fitshifterr'])
+
+            contrasto, contrastoerr = peakutils.gaussian_contrasterr(paro['fitamp'], paro['fitshift'], amperr=paro['fitamperr'], shifterr=paro['fitshifterr'])
 
             # Add data
-            ccfparsum['contrast'] = contrast
-            ccfparsum['contrasterr'] = contrasterr
+            paro['contrast'] = contrasto
+            paro['contrasterr'] = contrastoerr
 
-            # -----------------------
+            # -------------------
 
             # Compute bisector
-            # "Absolute" RV error not taken into account: use rverrsum instead of rverrsumabs
+
             try:
-                bxsum, bysum, bxsumerr, bissum, bissumerr = ccflib.computebisector_biserr(rv, ccfsum, rverrsum, n=100, bybotmin_percent=args.bisbotmin, bybotmax_percent=args.bisbotmax, bytopmin_percent=args.bistopmin, bytopmax_percent=args.bistopmax, xrealsampling=args.rvstpreal, verb=False, returnall=False)
+                bxo, byo, bxoerr, biso, bisoerr = ccflib.computebisector_biserr(rv, ccfo, rverro, n=args.bisectorn, bybotmin_percent=args.bisbotmin, bybotmax_percent=args.bisbotmax, bytopmin_percent=args.bistopmin, bytopmax_percent=args.bistopmax, xrealsampling=args.rvstpreal, verb=False, returnall=False)
             except:
-                bxsum, bysum, bxsumerr, bissum, bissumerr = [np.nan]*args.bisectorn, [np.nan]*args.bisectorn, [np.nan]*args.bisectorn, np.nan, np.nan
+                bxo, byo, bxoerr, biso, bisoerr = [np.nan]*args.bisectorn, [np.nan]*args.bisectorn, [np.nan]*args.bisectorn, np.nan, np.nan
 
             # Add data
-            ccfparsum['bis'] = bissum
-            ccfparsum['biserr'] = bissumerr
+            paro['bis'] = biso
+            paro['biserr'] = bisoerr
 
-            # -----------------------
-
-            # Add shift (RV correction) data
-            ccfparsum['berv'] = dataobs.loc[filobs]['berv']
-            ccfparsum['drift'] = dataobs.loc[filobs]['drift']
-            ccfparsum['sa'] = dataobs.loc[filobs]['sa']
-            ccfparsum['berverr'] = dataobs.loc[filobs]['berverr']
-            ccfparsum['drifterr'] = dataobs.loc[filobs]['drifterr']
-            ccfparsum['saerr'] = dataobs.loc[filobs]['saerr']
-            ccfparsum['shift'] = dataobs.loc[filobs]['shift']
-            ccfparsum['shifterr'] = dataobs.loc[filobs]['shifterr']
-            ccfparsum['otherdrift'] = dataobs.loc[filobs]['otherdrift']
-            ccfparsum['otherdrifterr'] = dataobs.loc[filobs]['otherdrifterr']
-
-            # Add other observation data
-            ccfparsum['bjd'] = dataobs.loc[filobs]['bjd']
-            ccfparsum['oref'] = oref
-            ccfparsum['snroref'] = dataobs.loc[filobs]['snro{}'.format(oref)]
-            ccfparsum['ron'] = dataobs.loc[filobs]['ron']
-            ccfparsum['exptime'] = dataobs.loc[filobs]['exptime']
-            ccfparsum['airmass'] = dataobs.loc[filobs]['airmass']
-
-            # Add mask and mask number of lines
-            ccfparsum['filmask'] = datamask['filmask']
-            ccfparsum['filmaskname'] = os.path.basename(datamask['filmask'])
-            ccfparsum['objmask'] = datamask['objmask']
-            ccfparsum['sptmask'] = datamask['sptmask']
-            ccfparsum['vsinimask'] = datamask['vsinimask']
-            for o in ords:
-                ccfparsum['nlino{}'.format(o)] = nlinords[o]
-            ccfparsum['nlint'] = nlin_use
-            ccfparsum['nlintallords'] = nlin
-            ccfparsum['nlinoriginal'] = nlinoriginal
-
-            # -----------------------
+            # -------------------
 
             # Organize data
-            dataccfsumTS[filobs] = ccfparsum
+            ccf[o] = ccfo
+            ccferr[o] = ccferro
+            ccfreal[o] = ccforeal
+            ccferrreal[o] = ccferroreal
+            ccfpar[o] = paro
+            bx[o] = bxo
+            by[o] = byo
+            bxerr[o] = bxoerr
 
-            # Save CCF data in FITS (one per obs)
-            filout = os.path.join(args.dirout, os.path.basename(os.path.splitext(filobs)[0]) + '_ccf.fits')
-            ccflib.outfits_ccfall(rv, ccfsum, ccfparsum, ccf, ccfpar, bxsum, bysum, bx, by, header, filout)
-            # verboseprint('  CCF data saved in {}'.format(filout))
+        # -----------------------
 
-            # How to read these FITS files: `ccflib.infits_ccfall`
-            # Example:
-            # rv2, ccfsum2, ccfparsum2, ccf2, ccfpar2, bxsum2, bysum2, bx2, by2, headerobs2 = ccflib.infits_ccfall(filout)
+        # Deal with orders with no CCF: Add nans
+        ords_empty = [o for o in ords if o not in ords_use_lines]
 
-            # Save CCF data txt
-            if args.output is None:
-                filout = os.path.join(args.dirout, os.path.basename(os.path.splitext(filobs)[0]) + '_ccf.dat')
-                ccflib.outdat_ccf(filout, rv, ccfsum)
-                # verboseprint('  CCF data saved in {}'.format(filout))
-            elif args.output == 'gto':
-                pass
+        for o in ords_empty:
+            # Add nan in arrays
+            ccf[o] = np.ones_like(rv) * np.nan
+            ccferr[o] = np.ones_like(rv) * np.nan
+            ccfreal[o] = np.ones_like(rv) * np.nan
+            ccferrreal[o] = np.ones_like(rv) * np.nan
+            bx[o] = np.ones(args.bisectorn) * np.nan
+            by[o] = np.ones(args.bisectorn) * np.nan
+            bxerr[o] = np.ones(args.bisectorn) * np.nan
 
+            # Add nan in dict
+            ccfpar[o] = {
+                'fitamp': np.nan, 'fitcen': np.nan, 'fitwid': np.nan, 'fitshift': np.nan, 'fwhm': np.nan,
+                'fitamperr': np.nan, 'fitcenerr': np.nan, 'fitwiderr': np.nan, 'fitshifterr': np.nan, 'fwhmerr': np.nan,
+                'fitredchi2': np.nan,
+                'rv': np.nan, 'rverr': np.nan,
+                'contrast': np.nan, 'contrasterr': np.nan,
+                'bis': np.nan, 'biserr': np.nan,
+                }
 
+        # --- End orders loop ---
 
-        #######################################################################
+        # Organize orders data
+        ccfpar = pd.DataFrame.from_dict(ccfpar, orient='index')
+        ccfpar.index.set_names('orders', inplace=True)
+        ccfpar.sort_index(inplace=True)
 
-        # Compute CCF with full model and logL (CC-to-logL)
-        # -------------------------------------------------
+        # Sum CCF
+        ccfsum = ccflib.sumccf(rv, ccf, ords_use_lines)
+        ccfsumreal = ccflib.sumccf(rvreal, ccfreal, ords_use_lines)
 
+        # if doplottest:
+        if False:
+            fig, ax = plt.subplots()
+            ax.plot(rv, ccfsum, marker='.')
+            plt.tight_layout()
+            if args.plottest_sh: plt.show()
+            plt.close()
+
+        # -----------------------
+
+        # Fit Gaussian
+
+        # Determine fit range
+        # - Fit range for each observation
+        if args.fitrngeach:
+            imin = np.nanargmin(ccfsum)
+            ifit1sum, ifit2sum = ccflib.determine_fitrng(args.fitrng, rv, ccfsum, imin=imin, verb=args.verbose)
+        # - Fit range of the first observation
         else:
+            if first:
+                imin = np.nanargmin(ccfsum)
+                ifit1sum, ifit2sum = ccflib.determine_fitrng(args.fitrng, rv, ccfsum, imin=imin, verb=args.verbose)
+                first = False
 
-            # Use only orders where the flux is not all zeros
-            # ords_use_lines = [o for o in args.ords_use if len(wmords[o]) > 0]
-            ords_use_lines = [o for o in args.ords_use if np.any(fmords[o])]
+        # Fit
+        try:
+            x = rv[ifit1sum:ifit2sum]
+            y = ccfsum[ifit1sum:ifit2sum]
+            lmfitresult = peakutils.fit_gaussian_peak(x, y, amp_hint=np.nanmin(y) - np.nanmax(y), cen_hint=x[np.nanargmin(y)], wid_hint=1., shift_hint=np.nanmax(y), minmax='min')
+            # Old
+            # fitpar = ccflib.fitgaussianfortran(rv, ccfsum, 'maxabs', funcfitnam='gaussian', nfitpar=4)
 
-            # Whole template interpolation
-            # Interpolation coefficients of the template
-            #   If model is 1D: single list of coefficients, if multiple orders, multiple lists of coefficients
-            # if nordm > 1:
-            #     liscs = [splrep(wm[om], fm[om], s=0) for om in ordsm]
-            # else:
-            #     cs = splrep(wm, fm, s=0)
-
-            # ipdb.set_trace()
-            # for om in ordsm:
-            #     print(om)
-            #     if om in ords_use_lines:
-            #         splrep(wmords[om], fmords[om], s=0)
-
-            # # No yerr
-            # liscs = [splrep(wmords[om], fmords[om], s=0) if om in ords_use_lines else np.nan for om in ordsm ]
-            liscs = [splrep(wmords[om], fmords[om], k=1) if om in ords_use_lines else np.nan for om in ordsm ]
-            # liscs = [splrep(wmords[om], fmords[om], w=1./sfm[o], s=0) if om in ords_use_lines else np.nan for om in ordsm ]  # using weight w results in all nan when interpolating
-            # TODO: This can be done outside the observation loop
-
-
-            # Variables to store data
-            cc = np.empty((nord, len(rv)))*np.nan
-            logLZ03, sigZ03 = np.empty((nord, len(rv)))*np.nan, np.empty((nord, len(rv)))*np.nan
-            rvmaxZ03, rvmaxerrZ03, rvmaxerrlZ03, rvmaxerrrZ03 = np.empty(nord)*np.nan, np.empty(nord)*np.nan, np.empty(nord)*np.nan, np.empty(nord)*np.nan
-            logLBL19, sigBL19 = np.empty((nord, len(rv)))*np.nan, np.empty((nord, len(rv)))*np.nan
-            rvmaxBL19, rvmaxerrBL19, rvmaxerrlBL19, rvmaxerrrBL19 = np.empty(nord)*np.nan, np.empty(nord)*np.nan, np.empty(nord)*np.nan, np.empty(nord)*np.nan
-            
-            # --- Start orders loop ---
-            for o in ords_use_lines:
-            # for o in [35]:
-
-                # Function to make tellurics 0
-                mtell_obs = np.array(Maskbad_inv(wcorr[o]), dtype=bool)
-                # TODO: this should also include order extremes
-
-                # Number of datapoints
-                # TODO: Should be without tellurics
-                N_full = len(f[o])
-                N = len(f[o][mtell_obs])  # accounting for tellurics
-                Id = np.ones(N_full)  # for matrix operations
-                
-                fVec = f[o].copy()
-
-                # Make tellurics zero
-                fVec[~mtell_obs] = 0.0
-
-                # Stdev of the spectrum
-                fVec -= (fVec[mtell_obs] @ Id[mtell_obs]) / N  # subtract mean
-                sf2 = (fVec[mtell_obs] @ fVec[mtell_obs]) / N  # stdev spectrum
-
-                # Temporal variables to append Doppler-shift values
-                cc_i, logLZ03_i, logLBL19_i = [], [], []
-
-                # For each RV shift in the CCF grid
-                for irvshift, rvshift in enumerate(rv):
-
-                    # Fast CCF: shift observation w minus the RV shift of the CCF
-                    # --------
-
-                    # Doppler shift obs w minus rvshift
-                    wobs_shift = spectrumutils.dopplershift(wcorr[o], -rvshift * 1.e3, rel=True)
-                    
-                    # # First and last orders, check if w observation out of model range, and cut accordingly. If not, will have issues with the logL
-                    # if io == iords_use[0] or io == iords_use[1]:
-                    #     pass
-                    # if io == iords_use[-2] or io == iords_use[-1]:
-                    #     if wobs_shift[-1] > wtpl[-1]:
-                    #         mask = wobs_shift > wtpl[-1]
-                    #         wobs_shift[mask] = np.nan
-
-                    # Interpolate model to shifted obs w
-                    if nordm > 1: cs = liscs[o]
-                    fm_obsgrid = splev(wobs_shift, cs, der=0, ext=3)  # ext=0 means return extrapolated value, if ext=3, return the boundary value
-                    # ISSUE TODO: Different lines (pixels) for different shifts. Extremes (+- CCF RV shift (and BERV)) should be set to 0.
-
-                    # Make tellurics nan
-                    # mtell_i = np.array(Maskbad_inv(wobs_shift), dtype=bool)
-                    # fm_obsgrid[~mtell_i] = 0.0
-                    # fm_obsgrid[~mtell_obs] = 0.0  # -> Should be mtell_obs because tellurics do not move
-
-                    # if np.array_equiv(~mtell_obs, ~mtell_i) is False:
-                    #     print('----', i, o, irvshift, np.array_equiv(mtell_obs, mtell_i))
-                    # ipdb.set_trace()
-
-                    # Stdev of the model
-                    gVec = fm_obsgrid.copy()
-                    gVec[~mtell_obs] = 0.0
-                    gVec -= (gVec[mtell_obs] @ Id[mtell_obs]) / N  # subtract mean  ----------> CAREFUL WITH TELLURICS
-                    sg2 = (gVec[mtell_obs] @ gVec[mtell_obs]) / N  # stdev model
-
-                    """
-                    if irvshift == 0 and (o == 25 or o == 35 or o == 43):
-                        fig, ax = plt.subplots(2,1, figsize=(16,8), sharex=True)
-                        # ax[0].plot(wcorr[o], f[o])
-                        ax[0].plot(wcorr[o], fVec, label='sf2 {:.3f}'.format(sf2))
-                        ax[1].plot(wmords[o], fmords[o]) 
-                        ax[1].plot(wobs_shift, fm_obsgrid) 
-                        ax[1].plot(wobs_shift, gVec, label='sg2 {:.3f}'.format(sg2))
-                        for a in ax: a.legend()
-                        plt.tight_layout()
-                        plt.show(), plt.close()
-                    """
-
-
-                    # Cross-covariance function
-                    R = (fVec[mtell_obs] @ gVec[mtell_obs]) / N
-                    # Compute the CCF between the obs f and the interpolated model f
-                    cc_rv = R / np.sqrt(sf2*sg2)
-
-                    # Compute logL Z03
-                    logLZ03_rv = - N/2. * np.log(1 - cc_rv**2)
-
-                    # Compute logL BL19
-                    logLBL19_rv = - N/2. * np.log(sf2 + sg2 - 2.*R)
-
-                    # Save
-                    cc_i.append(cc_rv)
-                    logLZ03_i.append(logLZ03_rv)
-                    logLBL19_i.append(logLBL19_rv)
-                # --- End RV shift loop ---
-
-                # Save
-                cc[o] = cc_i
-                logLZ03[o] = logLZ03_i
-                logLBL19[o] = logLBL19_i
-
-                # Compute sigma
-                sigZ03[o], pZ03, dlogLZ03 = ccflib.logL2sigma(logLZ03[o], dof=1)
-                sigBL19[o], pBL19, dlogLBL19 = ccflib.logL2sigma(logLBL19[o], dof=1)
-
-                # ---------------
-
-                # # Plot CC, logL and sigma
-                # ccflib.plot_cc_logLZ03_logLBL19_sig(rv, cc[o], logLZ03[o], logLBL19[o], sigZ03[o], sigBL19[o], title='Order {}'.format(o))
-
-                # ---------------
-
-                # RV from maximum logL
-                rvmaxZ03[o] = rv[np.argmax(logLZ03[o])]
-                rvmaxBL19[o] = rv[np.argmax(logLBL19[o])]
-
-                # ---------------
-
-                # Compute RV err
-                # # --- Mask: sigma can be inf/nan. This gives problems with the interpolation after
-                # mask_sigZ03 = np.isfinite(sigZ03[o])
-                # # --- Interpolate sigma function left and right hand sides to get dRV of sigma1 - sigma0. Compute average between left and right
-                # imin = np.argmin(sigZ03[o][mask_sigZ03])
-                # rvsig0 = rv[mask_sigZ03][imin]
-                # # ------ Left
-                # RVfunc_l = interp1d(sigZ03[o][mask_sigZ03][:imin+1], rv[mask_sigZ03][:imin+1], kind='cubic')
-                # rvsig1_l = RVfunc_l(1)
-                # rvmaxerrlZ03 = np.abs(rvsig1_l - rvsig0)
-                # # ------ Right
-                # RVfunc_r = interp1d(sigZ03[o][mask_sigZ03][imin:], rv[mask_sigZ03][imin:], kind='cubic')
-                # rvsig1_r = RVfunc_r(1)
-                # rvmaxerrrZ03 = np.abs(rvsig1_r - rvsig0)
-                # # ------ Average
-                # rvmaxerrZ03 = np.nanmean([rvmaxerrlZ03, rvmaxerrrZ03])
-                rvmaxerrZ03[o], rvmaxerrlZ03[o], rvmaxerrrZ03[o] = ccflib.rverr_from_sig(rv, sigZ03[o])
-                rvmaxerrBL19[o], rvmaxerrlBL19[o], rvmaxerrrBL19[o] = ccflib.rverr_from_sig(rv, sigBL19[o])
-
-
-                # ipdb.set_trace()
-            # --- End orders loop ---
-
-            if False:
-                fig, ax = plt.subplots(3,1, sharex=True, figsize=(8,12))
-                ax[0].errorbar(ords, rvmaxZ03, yerr=[rvmaxerrlZ03, rvmaxerrrZ03], fmt='o', label='Z03')
-                ax[0].errorbar(ords, rvmaxBL19, yerr=[rvmaxerrlBL19, rvmaxerrrBL19], fmt='o', label='BL19')
-                ax[0].set_ylabel('RV [km/s]')
-                ax[1].errorbar(ords, rvmaxZ03 - rvmaxBL19, fmt='o', label='Z03 - BL19, std {:.3f}'.format(np.nanstd(rvmaxZ03 - rvmaxBL19)))
-                ax[1].set_ylabel('RV diff [km/s]')
-                ax[2].plot(ords, rvmaxerrZ03, '.', label='Z03 average')
-                ax[2].plot(ords, rvmaxerrlZ03, '+', label='Z03 left')
-                ax[2].plot(ords, rvmaxerrrZ03, 'x', label='Z03 right')
-                ax[2].plot(ords, rvmaxerrBL19, '.', label='BL19 average')
-                ax[2].plot(ords, rvmaxerrlBL19, '+', label='BL19 left')
-                ax[2].plot(ords, rvmaxerrrBL19, 'x', label='BL19 right')
-                ax[2].set_ylabel('RV uncertainty [km/s]')
-                ax[-1].set_xlabel('Order')
-                ax[0].set_title(os.path.basename(os.path.splitext(filobs)[0]))
-                for a in ax.flatten():
-                    a.minorticks_on()
-                    a.legend(fontsize='x-small')
-                plt.tight_layout()
-                plt.show()
-                plt.close()
-
-            # -----------------------
-            
-            # Coadd
-
-            ccsum = np.nansum(cc, axis=0)
-            logLZ03sum = np.nansum(logLZ03, axis=0)
-            logLBL19sum = np.nansum(logLBL19, axis=0)
-
-            ccferrsum = np.ones_like(ccsum)*np.nan
-
-            # Compute sigma
-            sigZ03sum, pZ03sum, dlogLZ03sum = ccflib.logL2sigma(logLZ03sum, dof=1)
-            sigBL19sum, pBL19sum, dlogLBL19sum = ccflib.logL2sigma(logLBL19sum, dof=1)
-
-            # RV from maximum logL
-            rvmaxZ03sum = rv[np.argmax(logLZ03sum)]
-            rvmaxBL19sum = rv[np.argmax(logLBL19sum)]
-
-            # Compute RV err
-            rvmaxerrZ03sum, rvmaxerrlZ03sum, rvmaxerrrZ03sum = ccflib.rverr_from_sig(rv, sigZ03sum)
-            rvmaxerrBL19sum, rvmaxerrlBL19sum, rvmaxerrrBL19sum = ccflib.rverr_from_sig(rv, sigBL19sum)
-
-            # -----------------------
-
-            # Plots
-            if False:
-                # CC
-                fig, axsum, axo, axmap = ccflib.plot_ccfo_lines_map(rv, cc, ccsum, ccferrsum, lisord=None, title='{}'.format(obsid))
-                plotutils.figout_simple(fig, sv=args.plot_sv, filout=os.path.join(args.dirout, '{}_cc'.format(obsid)), svext=args.plot_ext, sh=args.plot_sh)
-                # plt.show(), plt.close()
-
-                # logLZ03
-                fig, axsum, axo, axmap = ccflib.plot_ccfo_lines_map(rv, logLZ03, logLZ03sum, ccferrsum, lisord=None, title='{} $\logL$ Z03'.format(obsid), ylabelsum = 'Coadd. $\logL$', ylabelline='Order $\logL$', cblabelmap='$\logL$')
-                plotutils.figout_simple(fig, sv=args.plot_sv, filout=os.path.join(args.dirout, '{}_logLZ03'.format(obsid)), svext=args.plot_ext, sh=args.plot_sh)
-                # plt.show(), plt.close()
-
-                # logLBL19
-                fig, axsum, axo, axmap = ccflib.plot_ccfo_lines_map(rv, logLBL19, logLBL19sum, ccferrsum, lisord=None, title='{} $\logL$ BL19'.format(obsid), ylabelsum = 'Coadd. $\logL$', ylabelline='Order $\logL$', cblabelmap='$\logL$')
-                plotutils.figout_simple(fig, sv=args.plot_sv, filout=os.path.join(args.dirout, '{}_logLBL19'.format(obsid)), svext=args.plot_ext, sh=args.plot_sh)
-                # plt.show(), plt.close()
-
-                # sigZ03
-                fig, axsum, axo, axmap = ccflib.plot_ccfo_lines_map(rv, sigZ03, sigZ03sum, ccferrsum, lisord=None, title='{} $\sigma$ Z03'.format(obsid), ylabelsum = 'Coadd. $\sigma$', ylabelline='Order $\sigma$', cblabelmap='$\sigma$')
-                plotutils.figout_simple(fig, sv=args.plot_sv, filout=os.path.join(args.dirout, '{}_sigZ03'.format(obsid)), svext=args.plot_ext, sh=args.plot_sh)
-                # plt.show(), plt.close()
-
-                # sigBL19
-                fig, axsum, axo, axmap = ccflib.plot_ccfo_lines_map(rv, sigBL19, sigBL19sum, ccferrsum, lisord=None, title='{} $\sigma$ BL19'.format(obsid), ylabelsum = 'Coadd. $\sigma$', ylabelline='Order $\sigma$', cblabelmap='$\sigma$')
-                plotutils.figout_simple(fig, sv=args.plot_sv, filout=os.path.join(args.dirout, '{}_sigBL19'.format(obsid)), svext=args.plot_ext, sh=args.plot_sh)
-                # plt.show(), plt.close()
-
-            # -----------------------
-
-            # Save data
-            filout = os.path.join(args.dirout, os.path.basename(os.path.splitext(filobs)[0]) + '_cclogL.fits')
-            ccflib.outfits_cclogLall(
-                rv, cc, logLZ03, sigZ03, logLBL19, sigBL19, rvmaxZ03,
-                rvmaxerrZ03, rvmaxerrlZ03, rvmaxerrrZ03, 
-                rvmaxBL19, rvmaxerrBL19, rvmaxerrlBL19, rvmaxerrrBL19,
-                ccsum,
-                logLZ03sum, sigZ03sum, rvmaxZ03sum, rvmaxerrZ03sum, rvmaxerrlZ03sum, rvmaxerrrZ03sum, 
-                logLBL19sum, sigBL19sum, rvmaxBL19sum, rvmaxerrBL19sum, rvmaxerrlBL19sum, rvmaxerrrBL19sum, 
-                header, filout)
-            # # Read output example:
-            # rv, cc, logLZ03, sigZ03, logLBL19, sigBL19, rvmaxZ03, rvmaxerrZ03, rvmaxerrlZ03, rvmaxerrrZ03,  rvmaxBL19, rvmaxerrBL19, rvmaxerrlBL19, rvmaxerrrBL19, ccsum, logLZ03sum, sigZ03sum, rvmaxZ03sum, rvmaxerrZ03sum, rvmaxerrlZ03sum, rvmaxerrrZ03sum, logLBL19sum, sigBL19sum, rvmaxBL19sum, rvmaxerrBL19sum, rvmaxerrlBL19sum, rvmaxerrrBL19sum, header, rvmaxrec = ccflib.infits_cclogLall(filout)
-
-
-            # Organize data
-            # ------- TODO: Save only final ord-coadded data
-            # -------       Add per-order data later
+            # Add data
             ccfparsum = {}
-            ccfparsum['rvmaxZ03sum'] = rvmaxZ03sum
-            ccfparsum['rvmaxerrZ03sum'] = rvmaxerrZ03sum
-            ccfparsum['rvmaxerrlZ03sum'] = rvmaxerrlZ03sum
-            ccfparsum['rvmaxerrrZ03sum'] = rvmaxerrrZ03sum
-            ccfparsum['rvmaxBL19sum'] = rvmaxBL19sum
-            ccfparsum['rvmaxerrBL19sum'] = rvmaxerrBL19sum
-            ccfparsum['rvmaxerrlBL19sum'] = rvmaxerrlBL19sum
-            ccfparsum['rvmaxerrrBL19sum'] = rvmaxerrrBL19sum
-            dataccfsumTS[filobs] = ccfparsum
+            for p in lmfitresult.params.keys():
+                if lmfitresult.params[p].value is not None: ccfparsum['fit'+p] = lmfitresult.params[p].value
+                else: ccfparsum['fit'+p] = np.nan
+                if lmfitresult.params[p].stderr is not None: ccfparsum['fit'+p+'err'] = lmfitresult.params[p].stderr
+                else: ccfparsum['fit'+p+'err'] = np.nan
+            ccfparsum['fitredchi2'] = lmfitresult.redchi
 
-            ccfparo = {}
-            ccfparo['rvmaxZ03'] = rvmaxZ03
-            ccfparo['rvmaxerrZ03'] = rvmaxerrZ03
-            ccfparo['rvmaxerrlZ03'] = rvmaxerrlZ03
-            ccfparo['rvmaxerrrZ03'] = rvmaxerrrZ03
-            ccfparo['rvmaxBL19'] = rvmaxBL19
-            ccfparo['rvmaxerrBL19'] = rvmaxerrBL19
-            ccfparo['rvmaxerrlBL19'] = rvmaxerrlBL19
-            ccfparo['rvmaxerrrBL19'] = rvmaxerrrBL19
-            for p in ['rvmaxZ03', 'rvmaxerrZ03', 'rvmaxerrlZ03', 'rvmaxerrrZ03', 'rvmaxBL19', 'rvmaxerrBL19', 'rvmaxerrlBL19', 'rvmaxerrrBL19']:
-                # ccfparo[p] = pd.DataFrame(ccfparo[p]).transpose()
-                # rename_cols = {o: '{}o{}'.format(p, o) for o in ccfparo[p].columns}
-                # ccfparo[p].rename(rename_cols, axis=1, inplace=True)
-                index_p = ['{}o{}'.format(p, o) for o in range(len(ccfparo[p]))]
-                ccfparo[p] = pd.DataFrame(ccfparo[p], index=index_p, columns=[filobs])
+        except:
+            ccfparsum = {
+                'fitamp': np.nan, 'fitcen': np.nan, 'fitwid': np.nan, 'fitshift': np.nan,
+                'fitamperr': np.nan, 'fitcenerr': np.nan, 'fitwiderr': np.nan, 'fitshifterr': np.nan,
+                'fitredchi2': np.nan,
+            }
 
-            # Merge order data from dict of dataframes into single dataframe
-            # ccfparo = pd.concat(ccfparo.values(), axis=1)
-            ccfparo = pd.concat(ccfparo.values()).transpose()
-            # dataccfoTS[filobs] = ccfparo
-            dataccfoTS.append(ccfparo)
+        # -----------------------
 
-        # --- End observations loop ---
+        # Compute RV error
 
-    ###########################################################################
+        # - Compute flux error of CCF sum from the flux error of the CCF of each order
+        # \sig_{CCFsum}^2(RV) = \sum_{o} \sig_CCFo^2(RV)
+        ccfsumerr = np.zeros_like(rv)
+        ccfsumrealerr = np.zeros_like(rvreal)
+        for o in ords_use_lines:
+            ccfsumerr += ccferr[o]**2  # for each RV point
+            ccfsumrealerr += ccferrreal[o]**2  # for each RV point
+        ccfsumerr = np.sqrt(ccfsumerr)
+        ccfsumrealerr = np.sqrt(ccfsumrealerr)
 
+        # - Compute RV error of CCF sum
+        # -- Oversampled -> Needed for bisector error
+        rverrtsum, dersum, rverrsum = ccflib.computerverr(rv, ccfsum/np.nanmean(fmall_use), ccfsumerr, returnall=True)
+        # -- Real sampling -> Needed for real RV error
+        rverrtsumreal, dersumreal, rverrsumreal = ccflib.computerverr(rvreal, ccfsumreal/np.nanmean(fmall_use), ccfsumrealerr, returnall=True)
 
-    # Outputs
+        # Add shift error to RV to get "absolute" RV error
+        rverrtsumabs = np.sqrt(rverrtsum**2 + (shifterr_use*1.e-3)**2)
+        rverrtsumrealabs = np.sqrt(rverrtsumreal**2 + (shifterr_use*1.e-3)**2)
 
-    if args.tpltype == 'mask':
+        # Add data
+        ccfparsum['rv'] = ccfparsum['fitcen']
+        ccfparsum['rverr'] = rverrtsumreal  # From real sampling
+        ccfparsum['rverrabs'] = rverrtsumrealabs  # From real sampling
 
-        # Save sum TS data
+        # -----------------------
 
-        # Convert to pandas dataframe
-        dataccfsumTS = pd.DataFrame.from_dict(dataccfsumTS, orient='index')
+        # Compute FWHM
+        #  fwhm = 2 * sqrt(2*ln(2)) * wid
+        #  fwhmerr = 2 * sqrt(2*ln(2)) * widerr
+        fwhm, fwhmerr = peakutils.gaussian_fwhmerr(wid=ccfparsum['fitwid'], widerr=ccfparsum['fitwiderr'])
 
-        # Join observations input data and CCF data
-        # dataall = pd.concat([dataccfsumTS, dataobs], axis=1, sort=False)
-        dataall = dataccfsumTS  # dataobs added manually above
+        # Add data
+        ccfparsum['fwhm'] = fwhm
+        ccfparsum['fwhmerr'] = fwhmerr
 
-        # Change index from path/obs to obs
-        dataall['filobs'] = dataall.index
-        dataall['obs'] = [os.path.basename(filobs) for filobs in dataall['filobs']]
-        dataall.set_index('obs', inplace=True, drop=False)
+        # -----------------------
 
-        # # Save in file: CCF data, some input data ---> NEW Moved below
-        # cols = dataall.columns
-        # filout = os.path.join(args.dirout, '{}.par.dat'.format(args.obj))
-        # dataall.to_csv(filout, sep=' ', na_rep=np.nan, columns=cols, header=True, index=True, float_format='%0.8f')
-        # verboseprint('\nCCF TS data saved in {}'.format(filout))
+        # Compute contrast
+        #   contrast = - (amp/shift) * 100
+        #   contrasterr = 100/shift**2 * sqrt( (shift*amperr)**2  + (ampshifterr)**2 )
+        contrast, contrasterr = peakutils.gaussian_contrasterr(ccfparsum['fitamp'], ccfparsum['fitshift'], amperr=ccfparsum['fitamperr'], shifterr=ccfparsum['fitshifterr'])
 
-        # Save in file main output: BJD, RV, FWHM, Contrast, BIS and their errors
-        cols = ['bjd', 'rv', 'fwhm', 'contrast', 'bis', 'rverrabs', 'fwhmerr', 'contrasterr', 'biserr']
+        # Add data
+        ccfparsum['contrast'] = contrast
+        ccfparsum['contrasterr'] = contrasterr
+
+        # -----------------------
+
+        # Compute bisector
+        # "Absolute" RV error not taken into account: use rverrsum instead of rverrsumabs
+        try:
+            bxsum, bysum, bxsumerr, bissum, bissumerr = ccflib.computebisector_biserr(rv, ccfsum, rverrsum, n=100, bybotmin_percent=args.bisbotmin, bybotmax_percent=args.bisbotmax, bytopmin_percent=args.bistopmin, bytopmax_percent=args.bistopmax, xrealsampling=args.rvstpreal, verb=False, returnall=False)
+        except:
+            bxsum, bysum, bxsumerr, bissum, bissumerr = [np.nan]*args.bisectorn, [np.nan]*args.bisectorn, [np.nan]*args.bisectorn, np.nan, np.nan
+
+        # Add data
+        ccfparsum['bis'] = bissum
+        ccfparsum['biserr'] = bissumerr
+
+        # -----------------------
+
+        # Add shift (RV correction) data
+        ccfparsum['berv'] = dataobs.loc[filobs]['berv']
+        ccfparsum['drift'] = dataobs.loc[filobs]['drift']
+        ccfparsum['sa'] = dataobs.loc[filobs]['sa']
+        ccfparsum['berverr'] = dataobs.loc[filobs]['berverr']
+        ccfparsum['drifterr'] = dataobs.loc[filobs]['drifterr']
+        ccfparsum['saerr'] = dataobs.loc[filobs]['saerr']
+        ccfparsum['shift'] = dataobs.loc[filobs]['shift']
+        ccfparsum['shifterr'] = dataobs.loc[filobs]['shifterr']
+        ccfparsum['otherdrift'] = dataobs.loc[filobs]['otherdrift']
+        ccfparsum['otherdrifterr'] = dataobs.loc[filobs]['otherdrifterr']
+
+        # Add other observation data
+        ccfparsum['bjd'] = dataobs.loc[filobs]['bjd']
+        ccfparsum['oref'] = oref
+        ccfparsum['snroref'] = dataobs.loc[filobs]['snro{}'.format(oref)]
+        ccfparsum['ron'] = dataobs.loc[filobs]['ron']
+        ccfparsum['exptime'] = dataobs.loc[filobs]['exptime']
+        ccfparsum['airmass'] = dataobs.loc[filobs]['airmass']
+
+        # Add mask and mask number of lines
+        ccfparsum['filmask'] = datamask['filmask']
+        ccfparsum['filmaskname'] = os.path.basename(datamask['filmask'])
+        ccfparsum['objmask'] = datamask['objmask']
+        ccfparsum['sptmask'] = datamask['sptmask']
+        ccfparsum['vsinimask'] = datamask['vsinimask']
+        for o in ords:
+            ccfparsum['nlino{}'.format(o)] = nlinords[o]
+        ccfparsum['nlint'] = nlin_use
+        ccfparsum['nlintallords'] = nlin
+        ccfparsum['nlinoriginal'] = nlinoriginal
+
+        # -----------------------
+
+        # Organize data
+        dataccfsumTS[filobs] = ccfparsum
+
+        # Save CCF data in FITS (one per obs)
+        filout = os.path.join(args.dirout, os.path.basename(os.path.splitext(filobs)[0]) + '_ccf.fits')
+        ccflib.outfits_ccfall(rv, ccfsum, ccfparsum, ccf, ccfpar, bxsum, bysum, bx, by, header, filout)
+        # verboseprint('  CCF data saved in {}'.format(filout))
+
+        # How to read these FITS files: `ccflib.infits_ccfall`
+        # Example:
+        # rv2, ccfsum2, ccfparsum2, ccf2, ccfpar2, bxsum2, bysum2, bx2, by2, headerobs2 = ccflib.infits_ccfall(filout)
+
+        # Save CCF data txt
         if args.output is None:
-            filout = os.path.join(args.dirout, '{}.ccfpar.dat'.format(args.obj))
-        elif args.output == 'gto':
-            filout = os.path.join(args.dirout, '{}.ccf.ccfpar.dat'.format(args.obj))
-        dataall.to_csv(filout, sep=' ', na_rep=np.nan, columns=cols, header=False, index=False, float_format='%0.8f')
-        # verboseprint('CCF TS data saved in {}'.format(filout))
-
-        # Save file info.csv
-        cols = ['bjd', 'obs', 'berv', 'drift', 'sa', 'rverr', 'drifterr', 'exptime', 'airmass', 'snroref', 'objmask', 'sptmask', 'vsinimask', 'nlinoriginal', 'nlint']
-        if args.output is None:
-            filout = os.path.join(args.dirout, '{}.info.csv'.format(args.obj))
-        elif args.output == 'gto':
-            filout = os.path.join(args.dirout, '{}.ccf.info.csv'.format(args.obj))
-        dataall.to_csv(filout, sep=';', na_rep=np.nan, columns=cols, header=False, index=False, float_format='%0.8f')
-        # verboseprint('CCF extra data saved in {}'.format(filout))
-
-        ###########################################################################
-
-        # Save individual order data (read FITS files)
-
-        # lisccforv, lisccfofwhm, lisccfocontrast, lisccfobis = {}, {}, {}, {}
-        # lisccforverr, lisccfofwhmerr, lisccfocontrasterr, lisccfobiserr = {}, {}, {}, {}
-        # Main params
-        lisparam = ['rv', 'fwhm', 'contrast', 'bis', 'rverr', 'fwhmerr', 'contrasterr', 'biserr']
-        dataorder = {'rv': {}, 'fwhm': {}, 'contrast': {}, 'bis': {}, 'rverr': {}, 'fwhmerr': {}, 'contrasterr': {}, 'biserr': {}}
-        # All params
-        lisparam_all = ['rv', 'rverr', 'fwhm', 'fwhmerr', 'contrast', 'contrasterr', 'bis', 'biserr', 'fitamp', 'fitamperr', 'fitcen', 'fitcenerr', 'fitwid', 'fitwiderr', 'fitshift', 'fitshifterr', 'fitredchi2']
-        dataorder_all = {'rv': {}, 'rverr': {}, 'fwhm': {}, 'fwhmerr': {}, 'contrast': {}, 'contrasterr': {}, 'bis': {}, 'biserr': {}, 'fitamp': {}, 'fitamperr': {}, 'fitcen': {}, 'fitcenerr': {}, 'fitwid': {}, 'fitwiderr': {}, 'fitshift': {}, 'fitshifterr': {}, 'fitredchi2': {}}
-        # CCF
-        lisccfs = []
-        for i, obs in enumerate(lisfilobs):
-            # Read CCF order data
-            filobs = lisfilobs[i]
-            filccf = os.path.join(args.dirout, os.path.basename(os.path.splitext(filobs)[0]) + '_ccf.fits')
-            if not os.path.exists(filccf):
-                print('No FITS file', filobs)
-                continue
-            rv, ccfsum, ccfparsum, ccf, ccfpar, bxsum, bysum, bx, by, headerobs = ccflib.infits_ccfall(filccf)
-            
-            # Organise data main CCF params
-            for p in lisparam:
-                dataorder[p][ccfparsum['bjd']] = ccfpar[p]
-            
-            #  Organise data all CCF params
-            for p in lisparam_all:
-                # dataorder_all[p][ccfparsum['bjd']] = ccfpar[p]
-                dataorder_all[p][os.path.basename(obs)] = ccfpar[p]
-            
-            # Organise CCFs
-            lisccfs.append(np.vstack([rv, ccfsum, ccf]))
-
-        # Join and save data (main params)
-        for p in lisparam:
-            # Main params
-            dataorder[p] = pd.DataFrame.from_dict(dataorder[p], orient='index')
-            if args.output is None:
-                filout = os.path.join(args.dirout, '{}.{}o.dat'.format(args.obj, p))
-            elif args.output == 'gto':
-                pname = 'e_{}'.format(p.replace('err', '')) if p.endswith('err') else p
-                filout = os.path.join(args.dirout, '{}.ccf.{}o.dat'.format(args.obj, pname))
-            dataorder[p].to_csv(filout, sep=' ', na_rep=np.nan, header=False)
-
-        ###########################################################################
-
-        # Save all data (TS and order) in a single file
-
-        # Join data (all params), as above with main params
-        for p in lisparam_all:
-            dataorder_all[p] = pd.DataFrame.from_dict(dataorder_all[p], orient='index')
-            rename_cols = {o: '{}o{}'.format(p, o) for o in dataorder_all[p].columns}
-            dataorder_all[p].rename(rename_cols, axis=1, inplace=True)
-
-        # Merge order data from dict of dataframes into single dataframe
-        dataorder_all = pd.concat(dataorder_all.values(), axis=1)
-
-        # Merge order data `dataorder_all` and TS data `dataall`
-        datafinal = pd.concat([dataall, dataorder_all], axis=1)
-
-        # Save in file: CCF data (TS and order), and some input data
-        if args.output is None:
-            cols = datafinal.columns
-            filout = os.path.join(args.dirout, '{}.par.dat'.format(args.obj))
-            datafinal.to_csv(filout, sep=' ', na_rep=np.nan, columns=cols, header=True, index=True, float_format='%0.8f')
-            # verboseprint('\nCCF TS data saved in {}'.format(filout))
+            filout = os.path.join(args.dirout, os.path.basename(os.path.splitext(filobs)[0]) + '_ccf.dat')
+            ccflib.outdat_ccf(filout, rv, ccfsum)
+            # verboseprint('  CCF data saved in {}'.format(filout))
         elif args.output == 'gto':
             pass
 
-        ###########################################################################
-
-        # Save CCFs: RVgrid, TS CCF, and each order CCF, one file per observation
-        header = 'rv ccfsum '
-        headero = ['ccfo{}'.format(o) for o in ords]
-        header += ' '.join(headero)
-        for i, obs in enumerate(lisfilobs):
-            if args.output is None:
-                filout = os.path.join(args.dirout, os.path.basename(os.path.splitext(obs)[0]) + '_ccfall.dat')
-            elif args.output == 'gto':
-                # filout = os.path.join(args.dirout, os.path.basename(os.path.splitext(obs)[0]) + '_ccf.dat')
-                filout = os.path.join(args.dirout, args.obj + '.' + os.path.basename(os.path.splitext(obs)[0]) + '.ccf.dat')
-            np.savetxt(filout, lisccfs[i].T, fmt='%0.8f', delimiter=' ', newline='\n', header=header, comments='')
-
-    else:
-
-        # Save all data (TS and order) in a single file
-
-        # Convert to pandas dataframe
-        dataccfsumTS = pd.DataFrame.from_dict(dataccfsumTS, orient='index')
-        dataccfoTS = pd.concat(dataccfoTS)
-
-        # Join observations input data and CCF data
-        # dataall = pd.concat([dataccfsumTS, dataobs], axis=1, sort=False)
-        dataall = pd.concat([dataccfsumTS, dataccfoTS, dataobs], axis=1, sort=False)
-
-        # Change index from path/obs to obs
-        dataall['filobs'] = dataall.index
-        dataall['obs'] = [os.path.basename(filobs) for filobs in dataall['filobs']]
-        dataall.set_index('obs', inplace=True, drop=False)
-
-        # Save
-        cols = dataall.columns
-        filout = os.path.join(args.dirout, '{}.cclogLpar.dat'.format(args.obj))
-        dataall.to_csv(filout, sep=' ', na_rep=np.nan, columns=cols, header=True, index=True, float_format='%0.8f')
-
-        # Quick plot
-    # if True:
-        fig, ax = plt.subplots()
-        ax.errorbar(dataall['bjd'], dataall['rvmaxZ03sum'], yerr=dataall['rvmaxerrZ03sum'], linestyle='None', marker='o', label='Z03')
-        ax.errorbar(dataall['bjd'], dataall['rvmaxBL19sum'], yerr=dataall['rvmaxerrBL19sum'], linestyle='None', marker='o', label='BL19')
-        ax.legend(fontsize='small')
-        ax.minorticks_on()
-        ax.set_xlabel('BJD [d]')
-        ax.set_ylabel('RV [km/s]')
-        plt.tight_layout()
-        plotutils.figout_simple(fig, sv=args.plot_sv, filout=os.path.join(args.dirout, 'ts_rv_quickcompare'.format(obsid)), svext=args.plot_ext, sh=args.plot_sh)
-        ipdb.set_trace()
-
-
-
-
-    # ipdb.set_trace()
-
+   # --- End observations loop ---
 
     ###########################################################################
 
-    # ------- TODO: Indent with an if, only for mask CCFs
+
+    # Save sum TS data
+
+    # Convert to pandas dataframe
+    dataccfsumTS = pd.DataFrame.from_dict(dataccfsumTS, orient='index')
+
+    # Join observations input data and CCF data
+    # dataall = pd.concat([dataccfsumTS, dataobs], axis=1, sort=False)
+    dataall = dataccfsumTS
+
+    # Change index from path/obs to obs
+    dataall['filobs'] = dataall.index
+    dataall['obs'] = [os.path.basename(filobs) for filobs in dataall['filobs']]
+    dataall.set_index('obs', inplace=True, drop=False)
+
+    # # Save in file: CCF data, some input data ---> NEW Moved below
+    # cols = dataall.columns
+    # filout = os.path.join(args.dirout, '{}.par.dat'.format(args.obj))
+    # dataall.to_csv(filout, sep=' ', na_rep=np.nan, columns=cols, header=True, index=True, float_format='%0.8f')
+    # verboseprint('\nCCF TS data saved in {}'.format(filout))
+
+    # Save in file main output: BJD, RV, FWHM, Contrast, BIS and their errors
+    cols = ['bjd', 'rv', 'fwhm', 'contrast', 'bis', 'rverrabs', 'fwhmerr', 'contrasterr', 'biserr']
+    if args.output is None:
+        filout = os.path.join(args.dirout, '{}.ccfpar.dat'.format(args.obj))
+    elif args.output == 'gto':
+        filout = os.path.join(args.dirout, '{}.ccf.ccfpar.dat'.format(args.obj))
+    dataall.to_csv(filout, sep=' ', na_rep=np.nan, columns=cols, header=False, index=False, float_format='%0.8f')
+    # verboseprint('CCF TS data saved in {}'.format(filout))
+
+    # Save file info.csv
+    cols = ['bjd', 'obs', 'berv', 'drift', 'sa', 'rverr', 'drifterr', 'exptime', 'airmass', 'snroref', 'objmask', 'sptmask', 'vsinimask', 'nlinoriginal', 'nlint']
+    if args.output is None:
+        filout = os.path.join(args.dirout, '{}.info.csv'.format(args.obj))
+    elif args.output == 'gto':
+        filout = os.path.join(args.dirout, '{}.ccf.info.csv'.format(args.obj))
+    dataall.to_csv(filout, sep=';', na_rep=np.nan, columns=cols, header=False, index=False, float_format='%0.8f')
+    # verboseprint('CCF extra data saved in {}'.format(filout))
+
+    ###########################################################################
+
+    # Save individual order data (read FITS files)
+
+    # lisccforv, lisccfofwhm, lisccfocontrast, lisccfobis = {}, {}, {}, {}
+    # lisccforverr, lisccfofwhmerr, lisccfocontrasterr, lisccfobiserr = {}, {}, {}, {}
+    # Main params
+    lisparam = ['rv', 'fwhm', 'contrast', 'bis', 'rverr', 'fwhmerr', 'contrasterr', 'biserr']
+    dataorder = {'rv': {}, 'fwhm': {}, 'contrast': {}, 'bis': {}, 'rverr': {}, 'fwhmerr': {}, 'contrasterr': {}, 'biserr': {}}
+    # All params
+    lisparam_all = ['rv', 'rverr', 'fwhm', 'fwhmerr', 'contrast', 'contrasterr', 'bis', 'biserr', 'fitamp', 'fitamperr', 'fitcen', 'fitcenerr', 'fitwid', 'fitwiderr', 'fitshift', 'fitshifterr', 'fitredchi2']
+    dataorder_all = {'rv': {}, 'rverr': {}, 'fwhm': {}, 'fwhmerr': {}, 'contrast': {}, 'contrasterr': {}, 'bis': {}, 'biserr': {}, 'fitamp': {}, 'fitamperr': {}, 'fitcen': {}, 'fitcenerr': {}, 'fitwid': {}, 'fitwiderr': {}, 'fitshift': {}, 'fitshifterr': {}, 'fitredchi2': {}}
+    # CCF
+    lisccfs = []
+    for i, obs in enumerate(lisfilobs):
+        # Read CCF order data
+        filobs = lisfilobs[i]
+        filccf = os.path.join(args.dirout, os.path.basename(os.path.splitext(filobs)[0]) + '_ccf.fits')
+        if not os.path.exists(filccf):
+            print('No FITS file', filobs)
+            continue
+        rv, ccfsum, ccfparsum, ccf, ccfpar, bxsum, bysum, bx, by, headerobs = ccflib.infits_ccfall(filccf)
+        
+        # Organise data main CCF params
+        for p in lisparam:
+            dataorder[p][ccfparsum['bjd']] = ccfpar[p]
+        
+        #  Organise data all CCF params
+        for p in lisparam_all:
+            # dataorder_all[p][ccfparsum['bjd']] = ccfpar[p]
+            dataorder_all[p][os.path.basename(obs)] = ccfpar[p]
+        
+        # Organise CCFs
+        lisccfs.append(np.vstack([rv, ccfsum, ccf]))
+
+    # Join and save data (main params)
+    for p in lisparam:
+        # Main params
+        dataorder[p] = pd.DataFrame.from_dict(dataorder[p], orient='index')
+        if args.output is None:
+            filout = os.path.join(args.dirout, '{}.{}o.dat'.format(args.obj, p))
+        elif args.output == 'gto':
+            pname = 'e_{}'.format(p.replace('err', '')) if p.endswith('err') else p
+            filout = os.path.join(args.dirout, '{}.ccf.{}o.dat'.format(args.obj, pname))
+        dataorder[p].to_csv(filout, sep=' ', na_rep=np.nan, header=False)
+
+    ###########################################################################
+
+    # Save all data (TS and order) in a single file
+
+    # Join data (all params), as above with main params
+    for p in lisparam_all:
+        dataorder_all[p] = pd.DataFrame.from_dict(dataorder_all[p], orient='index')
+        rename_cols = {o: '{}o{}'.format(p, o) for o in dataorder_all[p].columns}
+        dataorder_all[p].rename(rename_cols, axis=1, inplace=True)
+
+    # Merge order data from dict of dataframes into single dataframe
+    dataorder_all = pd.concat(dataorder_all.values(), axis=1)
+
+    # Merge order data `dataorder_all` and TS data `dataall`
+    datafinal = pd.concat([dataall, dataorder_all], axis=1)
+
+    # Save in file: CCF data (TS and order), and some input data
+    if args.output is None:
+        cols = datafinal.columns
+        filout = os.path.join(args.dirout, '{}.par.dat'.format(args.obj))
+        datafinal.to_csv(filout, sep=' ', na_rep=np.nan, columns=cols, header=True, index=True, float_format='%0.8f')
+        # verboseprint('\nCCF TS data saved in {}'.format(filout))
+    elif args.output == 'gto':
+        pass
+
+    ###########################################################################
+
+    # Save CCFs: RVgrid, TS CCF, and each order CCF, one file per observation
+    header = 'rv ccfsum '
+    headero = ['ccfo{}'.format(o) for o in ords]
+    header += ' '.join(headero)
+    for i, obs in enumerate(lisfilobs):
+        if args.output is None:
+            filout = os.path.join(args.dirout, os.path.basename(os.path.splitext(obs)[0]) + '_ccfall.dat')
+        elif args.output == 'gto':
+            # filout = os.path.join(args.dirout, os.path.basename(os.path.splitext(obs)[0]) + '_ccf.dat')
+            filout = os.path.join(args.dirout, args.obj + '.' + os.path.basename(os.path.splitext(obs)[0]) + '.ccf.dat')
+        np.savetxt(filout, lisccfs[i].T, fmt='%0.8f', delimiter=' ', newline='\n', header=header, comments='')
+
+    ###########################################################################
 
     # Plots
 
@@ -2168,27 +1686,23 @@ def main():
 
     # Plot CCF parameters TS (and SERVAL rvc if available)
 
-    if args.tpltype == 'mask':
+    if dataserval is not None:
+        fig, ax = ccflib.plot_ccfparbasic_servalrvc(dataall, title='{} CCF parameters  {} obs'.format(args.obj, len(dataall.index)))
+        plotutils.figout(fig, filout=os.path.join(args.dirout, '{}.ccfpar_servalrvc'.format(args.obj)), sv=args.plot_sv, svext=args.plot_ext, sh=args.plot_sh)
 
-        if dataserval is not None:
-            fig, ax = ccflib.plot_ccfparbasic_servalrvc(dataall, title='{} CCF parameters  {} obs'.format(args.obj, len(dataall.index)))
-            plotutils.figout(fig, filout=os.path.join(args.dirout, '{}.ccfpar_servalrvc'.format(args.obj)), sv=args.plot_sv, svext=args.plot_ext, sh=args.plot_sh)
+        fig, ax = ccflib.plot_ccfparbasic_servalrvc_separated(dataall, dataserval=dataserval, title='{} CCF parameters'.format(args.obj))
+        plotutils.figout(fig, filout=os.path.join(args.dirout, '{}.ccfpar_servalrvc_separated'.format(args.obj)), sv=args.plot_sv, svext=args.plot_ext, sh=args.plot_sh)
 
-            fig, ax = ccflib.plot_ccfparbasic_servalrvc_separated(dataall, dataserval=dataserval, title='{} CCF parameters'.format(args.obj))
-            plotutils.figout(fig, filout=os.path.join(args.dirout, '{}.ccfpar_servalrvc_separated'.format(args.obj)), sv=args.plot_sv, svext=args.plot_ext, sh=args.plot_sh)
+    else:
+        fig, ax = ccflib.plot_ccfparbasic_servalrvc(dataall, plotserval=False, title='{} CCF parameters  {} obs'.format(args.obj, len(dataall.index)))
+        plotutils.figout(fig, filout=os.path.join(args.dirout, '{}.ccfpar'.format(args.obj)), sv=args.plot_sv, svext=args.plot_ext, sh=True)
 
-        else:
-            fig, ax = ccflib.plot_ccfparbasic_servalrvc(dataall, plotserval=False, title='{} CCF parameters  {} obs'.format(args.obj, len(dataall.index)))
-            plotutils.figout(fig, filout=os.path.join(args.dirout, '{}.ccfpar'.format(args.obj)), sv=args.plot_sv, svext=args.plot_ext, sh=True)
+    # ---------------------------
 
-        # ---------------------------
-
-        # Plot RV CCF and SERVAL, and difference
-        if dataserval is not None:
-            fig, ax = ccflib.plot_ccfrv_servalrvc_diff(dataall, shiftserval=True, title='{}  {} obs'.format(args.obj, len(dataall.index)))
-            plotutils.figout(fig, filout=os.path.join(args.dirout, '{}.ccfrv_servalrvc_diff'.format(args.obj)), sv=args.plot_sv, svext=args.plot_ext, sh=args.plot_sh)
-
-
+    # Plot RV CCF and SERVAL, and difference
+    if dataserval is not None:
+        fig, ax = ccflib.plot_ccfrv_servalrvc_diff(dataall, shiftserval=True, title='{}  {} obs'.format(args.obj, len(dataall.index)))
+        plotutils.figout(fig, filout=os.path.join(args.dirout, '{}.ccfrv_servalrvc_diff'.format(args.obj)), sv=args.plot_sv, svext=args.plot_ext, sh=args.plot_sh)
 
     return
 
