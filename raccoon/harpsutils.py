@@ -453,7 +453,7 @@ def drs_airmass_lisobs(lisobs, notfound=np.nan, ext=0):
 
 # Seeing
 
-def drs_seeingambi_start_lisobs(lisobs, inst, notfound=np.nan, ext=0, units='is'):
+def drs_seeingambi_start_lisobs(lisobs, inst, notfound=np.nan, ext=0):
     """
     Parameters
     ----------
@@ -468,11 +468,11 @@ def drs_seeingambi_start_lisobs(lisobs, inst, notfound=np.nan, ext=0, units='is'
     except: sys.exit('No correct instrument: {}'.format(inst))
 
     kw = kwinst + 'TEL AMBI FWHM START'
-    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext, units=units)
+    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext)
     return data
 
 
-def drs_seeingambi_start_lisobs(lisobs, inst, notfound=np.nan, ext=0, units='is'):
+def drs_seeingambi_end_lisobs(lisobs, inst, notfound=np.nan, ext=0):
     """
     Parameters
     ----------
@@ -487,7 +487,26 @@ def drs_seeingambi_start_lisobs(lisobs, inst, notfound=np.nan, ext=0, units='is'
     except: sys.exit('No correct instrument: {}'.format(inst))
 
     kw = kwinst + 'TEL AMBI FWHM END'
-    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext, units=units)
+    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext)
+    return data
+
+
+def drs_seeingambi_lisobs(lisobs, inst, notfound=np.nan, ext=0):
+    """
+    Parameters
+    ----------
+    inst : {'harpn', 'harps'}
+
+    Return
+    ------
+    data : pandas dataframe
+    """
+    # Get instrument kw
+    try: kwinst = headerkwinst(inst.lower(), outfail=np.nan)
+    except: sys.exit('No correct instrument: {}'.format(inst))
+
+    kw = [kwinst + 'TEL AMBI FWHM START', kwinst + 'TEL AMBI FWHM END']
+    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext)
     return data
 
 
@@ -704,3 +723,44 @@ def drs_ccf_read(filin):
         header = hdulist[0].header
         lisccf = hdulist[0].data
     return header, lisccf
+
+
+def drs_ccfparams_lisobs(lisobs, inst, notfound=np.nan, ext=0):
+    """Get basic CCF parameters from header of BIS (or CCF) FITS files.
+
+    If CCF FITS instead of BIS, no bisector data.
+
+    Notes
+    -----
+    HIERARCH ESO DRS CCF RVC = -22.6998204732851 / Baryc RV (drift corrected) (km/s)
+    HIERARCH ESO DRS CCF CONTRAST = 47.2760444153151 / Contrast of  CCF (%)         
+    HIERARCH ESO DRS CCF FWHM = 6.27192594067383 / FWHM of CCF (km/s)               
+    HIERARCH ESO DRS CCF RV = -22.6998204732851 / Baryc RV (no drift correction) (km
+    HIERARCH ESO DRS DVRMS = 0.192473380599434 / Estimated RV uncertainty [m/s]   
+    HIERARCH ESO DRS CCF LINES = 7099 / nbr of lines used                           
+    HIERARCH ESO DRS CCF MAXCPP = 17018 / max count/pixel of CCF (e-)               
+    HIERARCH ESO DRS CCF MASK = 'K5      ' / Mask filename                          
+    HIERARCH ESO DRS CCF NOISE = 0.000258129786521812 / Photon noise on CCF RV (km/s
+
+    HIERARCH ESO DRS BIS RV = -22.6998204866241 / Bisector mean velocity [km/s]     
+    HIERARCH ESO DRS BIS SPAN = 0.0117052755450899 / Bisector velocity span [km/s] 
+    """
+    # Get instrument kw
+    try: kwinst = headerkwinst(inst.lower(), outfail=np.nan)
+    except: sys.exit('No correct instrument: {}'.format(inst))
+
+    kw = [kwinst+'DRS CCF RVC', kwinst+'DRS CCF CONTRAST', kwinst+'DRS CCF FWHM', kwinst+'DRS CCF RV', kwinst+'DRS DVRMS', kwinst+'DRS CCF LINES', kwinst+'DRS CCF MAXCPP', kwinst+'DRS CCF MASK', kwinst+'DRS CCF NOISE', kwinst+'DRS BIS RV', kwinst+'DRS BIS SPAN']
+    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext)
+
+    # km/s -> m/s
+    data[kwinst+'DRS CCF RVC'] = data[kwinst+'DRS CCF RVC'] * 1.e3
+    data[kwinst+'DRS CCF RV'] = data[kwinst+'DRS CCF RV'] * 1.e3
+    data[kwinst+'DRS BIS RV'] = data[kwinst+'DRS BIS RV'] * 1.e3
+    data[kwinst+'DRS BIS SPAN'] = data[kwinst+'DRS BIS SPAN'] * 1.e3
+
+    # Change dataframe keywords
+    data.rename(columns={kwinst+'DRS CCF RVC': 'ccfrv', kwinst+'DRS CCF CONTRAST': 'ccfcontrast', kwinst+'DRS CCF FWHM': 'ccffwhm', kwinst+'DRS CCF RV': 'ccfrv_nodrift', kwinst+'DRS DVRMS': 'ccfrverr', kwinst+'DRS CCF NOISE': 'ccfphotonnoise', kwinst+'DRS CCF MASK': 'ccfmask', kwinst+'DRS CCF LINES': 'ccfmasklines', kwinst+'DRS CCF MAXCPP': 'ccfmaxcountpix', kwinst+'DRS BIS RV': 'ccfbisrv', kwinst+'DRS BIS SPAN': 'ccfbis'}, inplace=True)
+
+    return data
+
+
