@@ -453,7 +453,7 @@ def drs_airmass_lisobs(lisobs, notfound=np.nan, ext=0):
 
 # Seeing
 
-def drs_seeingambi_start_lisobs(lisobs, inst, notfound=np.nan, ext=0, units='is'):
+def drs_seeingambi_start_lisobs(lisobs, inst, notfound=np.nan, ext=0):
     """
     Parameters
     ----------
@@ -468,11 +468,11 @@ def drs_seeingambi_start_lisobs(lisobs, inst, notfound=np.nan, ext=0, units='is'
     except: sys.exit('No correct instrument: {}'.format(inst))
 
     kw = kwinst + 'TEL AMBI FWHM START'
-    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext, units=units)
+    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext)
     return data
 
 
-def drs_seeingambi_start_lisobs(lisobs, inst, notfound=np.nan, ext=0, units='is'):
+def drs_seeingambi_end_lisobs(lisobs, inst, notfound=np.nan, ext=0):
     """
     Parameters
     ----------
@@ -487,7 +487,26 @@ def drs_seeingambi_start_lisobs(lisobs, inst, notfound=np.nan, ext=0, units='is'
     except: sys.exit('No correct instrument: {}'.format(inst))
 
     kw = kwinst + 'TEL AMBI FWHM END'
-    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext, units=units)
+    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext)
+    return data
+
+
+def drs_seeingambi_lisobs(lisobs, inst, notfound=np.nan, ext=0):
+    """
+    Parameters
+    ----------
+    inst : {'harpn', 'harps'}
+
+    Return
+    ------
+    data : pandas dataframe
+    """
+    # Get instrument kw
+    try: kwinst = headerkwinst(inst.lower(), outfail=np.nan)
+    except: sys.exit('No correct instrument: {}'.format(inst))
+
+    kw = [kwinst + 'TEL AMBI FWHM START', kwinst + 'TEL AMBI FWHM END']
+    data = fitsutils.read_header_keywords_lisobs(lisobs, kw, notfound=notfound, ext=ext)
     return data
 
 
