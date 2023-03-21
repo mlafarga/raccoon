@@ -56,7 +56,7 @@ def parse_args():
 
     # Spectra
     parser.add_argument('fil_or_list_spec', help='File with the names of the reduced FITS spectra or directly the file names (names must include the absolute path to the files). The file with the list cannot end in `.fits`.', nargs='+', type=str)
-    parser.add_argument('inst', choices=['HARPS', 'HARPN', 'CARM_VIS', 'CARM_NIR', 'EXPRES', 'ESPRESSO', 'ESPRESSO4x2'], help='Instrument.')
+    parser.add_argument('inst', choices=['HARPS', 'HARPN', 'CARM_VIS', 'CARM_NIR', 'EXPRES', 'ESPRESSO', 'ESPRESSO4x2', 'HARPNSOLAR'], help='Instrument.')
 
     parser.add_argument('--filobs2blaze', help='List of blaze file corresponding to each observation. Format: Column 1) filspec (e2ds), Column 2) filblaze. Full paths. For HARPS/N data. Needed if do not want to use the default from the header. If None, get file names from each observation header.', type=str, default=None)
     # parser.add_argument('--dirblaze', help='Directory containing blaze files. For HARPS/N data.', type=str, default=None)
