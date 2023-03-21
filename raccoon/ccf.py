@@ -1175,11 +1175,11 @@ def outdat_ccfparTS(filout, data, cols=['bjd', 'rv', 'fwhm', 'contrast', 'bis', 
 
 def outfits_cclogLall(
     rv, cc, logLZ03, sigZ03, logLBL19, sigBL19, rvmaxZ03,
-    rvmaxerrZ03, rvmaxerr_lZ03, rvmaxerr_rZ03, 
-    rvmaxBL19, rvmaxerrBL19, rvmaxerr_lBL19, rvmaxerr_rBL19,
-    cc_sum,
-    logLZ03_sum, sigZ03_sum, rvmaxZ03_sum, rvmaxerrZ03_sum, rvmaxerr_lZ03_sum, rvmaxerr_rZ03_sum, 
-    logLBL19_sum, sigBL19_sum, rvmaxBL19_sum, rvmaxerrBL19_sum, rvmaxerr_lBL19_sum, rvmaxerr_rBL19_sum, 
+    rvmaxerrZ03, rvmaxerrlZ03, rvmaxerrrZ03, 
+    rvmaxBL19, rvmaxerrBL19, rvmaxerrlBL19, rvmaxerrrBL19,
+    ccsum,
+    logLZ03sum, sigZ03sum, rvmaxZ03sum, rvmaxerrZ03sum, rvmaxerrlZ03sum, rvmaxerrrZ03sum, 
+    logLBL19sum, sigBL19sum, rvmaxBL19sum, rvmaxerrBL19sum, rvmaxerrlBL19sum, rvmaxerrrBL19sum, 
     header, filout
     ):
     # rv,ccfo,ccfsum,fitparo,ccfpar,fitparsum,ccfparsum,headerspec,filout='ccf.fits'):
@@ -1201,10 +1201,10 @@ def outfits_cclogLall(
     rvmaxZ03 : 1D array
         Zucker2003 maximum RV per order. Shape: (nord).
     rvmaxerrZ03 : 1D array
-        Zucker2003 maximum average RV uncertainty per order. Average of `rvmaxerr_lZ03` and `rvmaxerr_rZ03`. Shape: (nord).
-    rvmaxerr_lZ03 : 1D array
+        Zucker2003 maximum average RV uncertainty per order. Average of `rvmaxerrlZ03` and `rvmaxerrrZ03`. Shape: (nord).
+    rvmaxerrlZ03 : 1D array
         Zucker2003 maximum left RV uncertainty per order. Shape: (nord).
-    rvmaxerr_rZ03 : 1D array
+    rvmaxerrrZ03 : 1D array
         Zucker2003 maximum right RV uncertainty per order. Shape: (nord).
  
     logLBL19 : 2D array
@@ -1214,39 +1214,39 @@ def outfits_cclogLall(
     rvmaxBL19 : 1D array
         BrogiLine2019 maximum RV per order. Shape: (nord).
     rvmaxerrBL19 : 1D array
-        BrogiLine2019 maximum average RV uncertainty per order. Average of `rvmaxerr_lBL19` and `rvmaxerr_rBL19`. Shape: (nord).
-    rvmaxerr_lBL19 : 1D array
+        BrogiLine2019 maximum average RV uncertainty per order. Average of `rvmaxerrlBL19` and `rvmaxerrrBL19`. Shape: (nord).
+    rvmaxerrlBL19 : 1D array
         BrogiLine2019 maximum left RV uncertainty per order. Shape: (nord).
-    rvmaxerr_rBL19 : 1D array
+    rvmaxerrrBL19 : 1D array
         BrogiLine2019 maximum right RV uncertainty per order. Shape: (nord).
 
-    cc_sum : 1D array
+    ccsum : 1D array
         Order-coadded CC. Shape: (nrvpix).
 
-    logLZ03_sum : 1D array
+    logLZ03sum : 1D array
         Zucker2003 order-coadded logL. Shape: (nrvpix).
-    sigZ03_sum : 1D array
+    sigZ03sum : 1D array
         Zucker2003 order-coadded sigma. Shape: (nrvpix).
-    rvmaxZ03_sum : float
+    rvmaxZ03sum : float
         Zucker2003 order-coadded maximum RV.
-    rvmaxerrZ03_sum : float
-        Zucker2003 order-coadded maximum average RV uncertainty. Average of `rvmaxerr_lZ03_sum` and `rvmaxerr_rZ03_sum`.
-    rvmaxerr_lZ03_sum : float
+    rvmaxerrZ03sum : float
+        Zucker2003 order-coadded maximum average RV uncertainty. Average of `rvmaxerrlZ03sum` and `rvmaxerrrZ03sum`.
+    rvmaxerrlZ03sum : float
         Zucker2003 order-coadded maximum left RV uncertainty.
-    rvmaxerr_rZ03_sum : float
+    rvmaxerrrZ03sum : float
         Zucker2003 order-coadded maximum right RV uncertainty.
 
-    logLBL19_sum : 1D array
+    logLBL19sum : 1D array
         BrogiLine2019 order-coadded logL. Shape: (nrvpix).
-    sigBL19_sum : 1D array
+    sigBL19sum : 1D array
         BrogiLine2019 order-coadded sigma. Shape: (nrvpix).
-    rvmaxBL19_sum : float
+    rvmaxBL19sum : float
         BrogiLine2019 order-coadded maximum RV.
-    rvmaxerrBL19_sum : float
-        BrogiLine2019 order-coadded maximum average RV uncertainty. Average of `rvmaxerr_lBL19_sum` and `rvmaxerr_rBL19_sum`.
-    rvmaxerr_lBL19_sum : float
+    rvmaxerrBL19sum : float
+        BrogiLine2019 order-coadded maximum average RV uncertainty. Average of `rvmaxerrlBL19sum` and `rvmaxerrrBL19sum`.
+    rvmaxerrlBL19sum : float
         BrogiLine2019 order-coadded maximum left RV uncertainty.
-    rvmaxerr_rBL19_sum : float
+    rvmaxerrrBL19sum : float
         BrogiLine2019 order-coadded maximum right RV uncertainty.
 
     header : header type
@@ -1302,9 +1302,9 @@ def outfits_cclogLall(
 
     # Order data: RVmax 1D arrays (nord)
     # Combine into table
-    cols = ['rvmaxZ03', 'rvmaxerrZ03', 'rvmaxerr_lZ03', 'rvmaxerr_rZ03', 'rvmaxBL19', 'rvmaxerrBL19', 'rvmaxerr_lBL19', 'rvmaxerr_rBL19']
-    # rvmaxtab = np.vstack([rvmaxZ03, rvmaxerrZ03, rvmaxerr_lZ03, rvmaxerr_rZ03, rvmaxBL19, rvmaxerrBL19, rvmaxerr_lBL19, rvmaxerr_rBL19])
-    rvmaxdf = pd.DataFrame([rvmaxZ03, rvmaxerrZ03, rvmaxerr_lZ03, rvmaxerr_rZ03, rvmaxBL19, rvmaxerrBL19, rvmaxerr_lBL19, rvmaxerr_rBL19], index=cols, columns=ords).T
+    cols = ['rvmaxZ03', 'rvmaxerrZ03', 'rvmaxerrlZ03', 'rvmaxerrrZ03', 'rvmaxBL19', 'rvmaxerrBL19', 'rvmaxerrlBL19', 'rvmaxerrrBL19']
+    # rvmaxtab = np.vstack([rvmaxZ03, rvmaxerrZ03, rvmaxerrlZ03, rvmaxerrrZ03, rvmaxBL19, rvmaxerrBL19, rvmaxerrlBL19, rvmaxerrrBL19])
+    rvmaxdf = pd.DataFrame([rvmaxZ03, rvmaxerrZ03, rvmaxerrlZ03, rvmaxerrrZ03, rvmaxBL19, rvmaxerrBL19, rvmaxerrlBL19, rvmaxerrrBL19], index=cols, columns=ords).T
     rvmaxdf.index.rename('ord', inplace=True)
     rvmaxrec = rvmaxdf.to_records()
     hdurvmax = fits.TableHDU(rvmaxrec, name='rvmax')
@@ -1312,12 +1312,12 @@ def outfits_cclogLall(
     # # Each 1D array in an extension of the FITS
     # hdurvmaxZ03 = fits.ImageHDU(rvmaxZ03, name='rvmaxZ03')
     # hdurvmaxerrZ03 = fits.ImageHDU(rvmaxerrZ03, name='rvmaxerrZ03')
-    # hdurvmaxerr_lZ03 = fits.ImageHDU(rvmaxerr_lZ03, name='rvmaxerr_lZ03')
-    # hdurvmaxerr_rZ03 = fits.ImageHDU(rvmaxerr_rZ03, name='rvmaxerr_rZ03')
+    # hdurvmaxerrlZ03 = fits.ImageHDU(rvmaxerrlZ03, name='rvmaxerrlZ03')
+    # hdurvmaxerrrZ03 = fits.ImageHDU(rvmaxerrrZ03, name='rvmaxerrrZ03')
     # hdurvmaxBL19 = fits.ImageHDU(rvmaxBL19, name='rvmaxBL19')
     # hdurvmaxerrBL19 = fits.ImageHDU(rvmaxerrBL19, name='rvmaxerrBL19')
-    # hdurvmaxerr_lBL19 = fits.ImageHDU(rvmaxerr_lBL19, name='rvmaxerr_lBL19')
-    # hdurvmaxerr_rBL19 = fits.ImageHDU(rvmaxerr_rBL19, name='rvmaxerr_rBL19')
+    # hdurvmaxerrlBL19 = fits.ImageHDU(rvmaxerrlBL19, name='rvmaxerrlBL19')
+    # hdurvmaxerrrBL19 = fits.ImageHDU(rvmaxerrrBL19, name='rvmaxerrrBL19')
 
     # -----------------------
 
@@ -1325,48 +1325,48 @@ def outfits_cclogLall(
     # Header keywords in `rvmax` extension
 
     # NaN nor infinite not allowed in FITS header -> str(nan)
-    rvmaxZ03_sum = naninf2nanstr(rvmaxZ03_sum)
-    rvmaxerrZ03_sum = naninf2nanstr(rvmaxerrZ03_sum)
-    rvmaxerr_lZ03_sum = naninf2nanstr(rvmaxerr_lZ03_sum)
-    rvmaxerr_rZ03_sum = naninf2nanstr(rvmaxerr_rZ03_sum)
-    rvmaxBL19_sum = naninf2nanstr(rvmaxBL19_sum)
-    rvmaxerrBL19_sum = naninf2nanstr(rvmaxerrBL19_sum)
-    rvmaxerr_lBL19_sum = naninf2nanstr(rvmaxerr_lBL19_sum)
-    rvmaxerr_rBL19_sum = naninf2nanstr(rvmaxerr_rBL19_sum)
+    rvmaxZ03sum = naninf2nanstr(rvmaxZ03sum)
+    rvmaxerrZ03sum = naninf2nanstr(rvmaxerrZ03sum)
+    rvmaxerrlZ03sum = naninf2nanstr(rvmaxerrlZ03sum)
+    rvmaxerrrZ03sum = naninf2nanstr(rvmaxerrrZ03sum)
+    rvmaxBL19sum = naninf2nanstr(rvmaxBL19sum)
+    rvmaxerrBL19sum = naninf2nanstr(rvmaxerrBL19sum)
+    rvmaxerrlBL19sum = naninf2nanstr(rvmaxerrlBL19sum)
+    rvmaxerrrBL19sum = naninf2nanstr(rvmaxerrrBL19sum)
 
 
-    hdurvmax.header['HIERARCH rvmaxZ03_sum'] = (rvmaxZ03_sum, '[km/s]')
-    hdurvmax.header['HIERARCH rvmaxerrZ03_sum'] = (rvmaxerrZ03_sum, '[km/s]')
-    hdurvmax.header['HIERARCH rvmaxerr_lZ03_sum'] = (rvmaxerr_lZ03_sum, '[km/s]')
-    hdurvmax.header['HIERARCH rvmaxerr_rZ03_sum'] = (rvmaxerr_rZ03_sum, '[km/s]')
-    hdurvmax.header['HIERARCH rvmaxBL19_sum'] = (rvmaxBL19_sum, '[km/s]')
-    hdurvmax.header['HIERARCH rvmaxerrBL19_sum'] = (rvmaxerrBL19_sum, '[km/s]')
-    hdurvmax.header['HIERARCH rvmaxerr_lBL19_sum'] = (rvmaxerr_lBL19_sum, '[km/s]')
-    hdurvmax.header['HIERARCH rvmaxerr_rBL19_sum'] = (rvmaxerr_rBL19_sum, '[km/s]')
+    hdurvmax.header['HIERARCH rvmaxZ03sum'] = (rvmaxZ03sum, '[km/s]')
+    hdurvmax.header['HIERARCH rvmaxerrZ03sum'] = (rvmaxerrZ03sum, '[km/s]')
+    hdurvmax.header['HIERARCH rvmaxerrlZ03sum'] = (rvmaxerrlZ03sum, '[km/s]')
+    hdurvmax.header['HIERARCH rvmaxerrrZ03sum'] = (rvmaxerrrZ03sum, '[km/s]')
+    hdurvmax.header['HIERARCH rvmaxBL19sum'] = (rvmaxBL19sum, '[km/s]')
+    hdurvmax.header['HIERARCH rvmaxerrBL19sum'] = (rvmaxerrBL19sum, '[km/s]')
+    hdurvmax.header['HIERARCH rvmaxerrlBL19sum'] = (rvmaxerrlBL19sum, '[km/s]')
+    hdurvmax.header['HIERARCH rvmaxerrrBL19sum'] = (rvmaxerrrBL19sum, '[km/s]')
 
     # -----------------------
 
     # Order-coadded data: 1D arrays (nrvpix)
     # Each 1D array in an extension of the FITS
-    hducc_sum = fits.ImageHDU(cc_sum, name='cc_sum')
-    hdulogLZ03_sum = fits.ImageHDU(logLZ03_sum, name='logLZ03_sum')
-    hdusigZ03_sum = fits.ImageHDU(sigZ03_sum, name='sigZ03_sum')
-    hdulogLBL19_sum = fits.ImageHDU(logLBL19_sum, name='logLBL19_sum')
-    hdusigBL19_sum = fits.ImageHDU(sigBL19_sum, name='sigBL19_sum')
+    hduccsum = fits.ImageHDU(ccsum, name='ccsum')
+    hdulogLZ03sum = fits.ImageHDU(logLZ03sum, name='logLZ03sum')
+    hdusigZ03sum = fits.ImageHDU(sigZ03sum, name='sigZ03sum')
+    hdulogLBL19sum = fits.ImageHDU(logLBL19sum, name='logLBL19sum')
+    hdusigBL19sum = fits.ImageHDU(sigBL19sum, name='sigBL19sum')
 
-    for hdux in [hducc_sum, hdulogLZ03_sum, hdusigZ03_sum, hdulogLBL19_sum, hdusigBL19_sum]:
+    for hdux in [hduccsum, hdulogLZ03sum, hdusigZ03sum, hdulogLBL19sum, hdusigBL19sum]:
         _ = rvgrid2header(rv, hdux)
 
     # -----------------------
 
     # Save
-    hdulist = fits.HDUList([hdu0, hducc, hdulogLZ03, hdusigZ03, hdulogLBL19, hdusigBL19, hdurvmax, hducc_sum, hdulogLZ03_sum, hdusigZ03_sum, hdulogLBL19_sum, hdusigBL19_sum])
+    hdulist = fits.HDUList([hdu0, hducc, hdulogLZ03, hdusigZ03, hdulogLBL19, hdusigBL19, hdurvmax, hduccsum, hdulogLZ03sum, hdusigZ03sum, hdulogLBL19sum, hdusigBL19sum])
     # If problems with original header -> Remove it
     try:
         hdulist.writeto(filout, overwrite=True, output_verify='silentfix+warn')
     except ValueError:
         hdu0 = fits.PrimaryHDU()  # replace original header
-        hdulist = fits.HDUList([hdu0, hducc, hdulogLZ03, hdusigZ03, hdulogLBL19, hdusigBL19, hdurvmax, hducc_sum, hdulogLZ03_sum, hdusigZ03_sum, hdulogLBL19_sum, hdusigBL19_sum])
+        hdulist = fits.HDUList([hdu0, hducc, hdulogLZ03, hdusigZ03, hdulogLBL19, hdusigBL19, hdurvmax, hduccsum, hdulogLZ03sum, hdusigZ03sum, hdulogLBL19sum, hdusigBL19sum])
         hdulist.writeto(filout, overwrite=True, output_verify='silentfix+warn')
     return
 
@@ -1386,11 +1386,11 @@ def infits_cclogLall(filin):
       4  LOGLBL19      1 ImageHDU        12   (202, 61)   float64   
       5  LOGLBL19      1 ImageHDU        12   (202, 61)   float64   
       6  RVMAX         1 TableHDU        44   61R x 9C   [I21, D25.17, D25.17, D25.17, D25.17, D25.17, D25.17, D25.17, D25.17]   
-      7  CC_SUM        1 ImageHDU        11   (202,)   float64   
-      8  LOGLZ03_SUM    1 ImageHDU        11   (202,)   float64   
-      9  SIGZ03_SUM    1 ImageHDU        11   (202,)   float64   
-     10  LOGLBL19_SUM    1 ImageHDU        11   (202,)   float64   
-     11  SIGBL19_SUM    1 ImageHDU        11   (202,)   float64   
+      7  CCSUM        1 ImageHDU        11   (202,)   float64   
+      8  LOGLZ03SUM    1 ImageHDU        11   (202,)   float64   
+      9  SIGZ03SUM    1 ImageHDU        11   (202,)   float64   
+     10  LOGLBL19SUM    1 ImageHDU        11   (202,)   float64   
+     11  SIGBL19SUM    1 ImageHDU        11   (202,)   float64   
     """
 
     with fits.open(filin) as hdulist:
@@ -1435,37 +1435,37 @@ def infits_cclogLall(filin):
         rvmaxrec = hdulist['rvmax'].data
         rvmaxZ03 = rvmaxrec['rvmaxZ03']
         rvmaxerrZ03 = rvmaxrec['rvmaxerrZ03']
-        rvmaxerr_lZ03 = rvmaxrec['rvmaxerr_lZ03']
-        rvmaxerr_rZ03 = rvmaxrec['rvmaxerr_rZ03']
+        rvmaxerrlZ03 = rvmaxrec['rvmaxerrlZ03']
+        rvmaxerrrZ03 = rvmaxrec['rvmaxerrrZ03']
         rvmaxBL19 = rvmaxrec['rvmaxBL19']
         rvmaxerrBL19 = rvmaxrec['rvmaxerrBL19']
-        rvmaxerr_lBL19 = rvmaxrec['rvmaxerr_lBL19']
-        rvmaxerr_rBL19 = rvmaxrec['rvmaxerr_rBL19']
+        rvmaxerrlBL19 = rvmaxrec['rvmaxerrlBL19']
+        rvmaxerrrBL19 = rvmaxrec['rvmaxerrrBL19']
 
         # -----------------------
 
         # Order-coadded data: RVmax floats (final values)
-        rvmaxZ03_sum = hdulist['rvmax'].header['HIERARCH rvmaxZ03_sum']
-        rvmaxerrZ03_sum = hdulist['rvmax'].header['HIERARCH rvmaxerrZ03_sum']
-        rvmaxerr_lZ03_sum = hdulist['rvmax'].header['HIERARCH rvmaxerr_lZ03_sum']
-        rvmaxerr_rZ03_sum = hdulist['rvmax'].header['HIERARCH rvmaxerr_rZ03_sum']
-        rvmaxBL19_sum = hdulist['rvmax'].header['HIERARCH rvmaxBL19_sum']
-        rvmaxerrBL19_sum = hdulist['rvmax'].header['HIERARCH rvmaxerrBL19_sum']
-        rvmaxerr_lBL19_sum = hdulist['rvmax'].header['HIERARCH rvmaxerr_lBL19_sum']
-        rvmaxerr_rBL19_sum = hdulist['rvmax'].header['HIERARCH rvmaxerr_rBL19_sum']
+        rvmaxZ03sum = hdulist['rvmax'].header['HIERARCH rvmaxZ03sum']
+        rvmaxerrZ03sum = hdulist['rvmax'].header['HIERARCH rvmaxerrZ03sum']
+        rvmaxerrlZ03sum = hdulist['rvmax'].header['HIERARCH rvmaxerrlZ03sum']
+        rvmaxerrrZ03sum = hdulist['rvmax'].header['HIERARCH rvmaxerrrZ03sum']
+        rvmaxBL19sum = hdulist['rvmax'].header['HIERARCH rvmaxBL19sum']
+        rvmaxerrBL19sum = hdulist['rvmax'].header['HIERARCH rvmaxerrBL19sum']
+        rvmaxerrlBL19sum = hdulist['rvmax'].header['HIERARCH rvmaxerrlBL19sum']
+        rvmaxerrrBL19sum = hdulist['rvmax'].header['HIERARCH rvmaxerrrBL19sum']
 
         # -----------------------
 
         # Order-coadded data: 1D arrays (nrvpix)
-        cc_sum = hdulist['cc_sum'].data
-        logLZ03_sum = hdulist['logLZ03_sum'].data
-        sigZ03_sum = hdulist['sigZ03_sum'].data
-        logLBL19_sum = hdulist['logLBL19_sum'].data
-        sigBL19_sum = hdulist['sigBL19_sum'].data
+        ccsum = hdulist['ccsum'].data
+        logLZ03sum = hdulist['logLZ03sum'].data
+        sigZ03sum = hdulist['sigZ03sum'].data
+        logLBL19sum = hdulist['logLBL19sum'].data
+        sigBL19sum = hdulist['sigBL19sum'].data
 
         # -----------------------
 
-    return rv, cc, logLZ03, sigZ03, logLBL19, sigBL19, rvmaxZ03, rvmaxerrZ03, rvmaxerr_lZ03, rvmaxerr_rZ03,  rvmaxBL19, rvmaxerrBL19, rvmaxerr_lBL19, rvmaxerr_rBL19, cc_sum, logLZ03_sum, sigZ03_sum, rvmaxZ03_sum, rvmaxerrZ03_sum, rvmaxerr_lZ03_sum, rvmaxerr_rZ03_sum, logLBL19_sum, sigBL19_sum, rvmaxBL19_sum, rvmaxerrBL19_sum, rvmaxerr_lBL19_sum, rvmaxerr_rBL19_sum, header, rvmaxrec
+    return rv, cc, logLZ03, sigZ03, logLBL19, sigBL19, rvmaxZ03, rvmaxerrZ03, rvmaxerrlZ03, rvmaxerrrZ03,  rvmaxBL19, rvmaxerrBL19, rvmaxerrlBL19, rvmaxerrrBL19, ccsum, logLZ03sum, sigZ03sum, rvmaxZ03sum, rvmaxerrZ03sum, rvmaxerrlZ03sum, rvmaxerrrZ03sum, logLBL19sum, sigBL19sum, rvmaxBL19sum, rvmaxerrBL19sum, rvmaxerrlBL19sum, rvmaxerrrBL19sum, header, rvmaxrec
 
 
 ###############################################################################
