@@ -77,6 +77,9 @@ def parse_args():
 
     parser.add_argument('--tplrv', help='RV shift of the template [km/s] (default is 0)', default=0.0, type=float)
 
+    # MCMC
+    parser.add_argument('--mcmc', help='Compute MCMC in logL to get RV. Only if tpltype is not `mask`.')
+
     # Target info
     parser.add_argument('--obj', help='CARMENES ID.', type=str)
     parser.add_argument('--targ', help='Target name (SIMBAD).', type=str)
@@ -1106,6 +1109,8 @@ def main():
     # ccf, ccferr, ccfreal, ccferrreal = {}, {}, {}, {}
     # ccfpar = {}
     dataccfsumTS = {}
+    # dataccfoTS = {}
+    dataccfoTS = []
     first, firsto = True, True
     for i, obs in enumerate(tqdm(lisfilobs)):
         filobs = lisfilobs[i]
@@ -1694,9 +1699,9 @@ def main():
             # Variables to store data
             cc = np.empty((nord, len(rv)))*np.nan
             logLZ03, sigZ03 = np.empty((nord, len(rv)))*np.nan, np.empty((nord, len(rv)))*np.nan
-            rvmaxZ03, rvmaxerrZ03, rvmaxerr_lZ03, rvmaxerr_rZ03 = np.empty(nord)*np.nan, np.empty(nord)*np.nan, np.empty(nord)*np.nan, np.empty(nord)*np.nan
+            rvmaxZ03, rvmaxerrZ03, rvmaxerrlZ03, rvmaxerrrZ03 = np.empty(nord)*np.nan, np.empty(nord)*np.nan, np.empty(nord)*np.nan, np.empty(nord)*np.nan
             logLBL19, sigBL19 = np.empty((nord, len(rv)))*np.nan, np.empty((nord, len(rv)))*np.nan
-            rvmaxBL19, rvmaxerrBL19, rvmaxerr_lBL19, rvmaxerr_rBL19 = np.empty(nord)*np.nan, np.empty(nord)*np.nan, np.empty(nord)*np.nan, np.empty(nord)*np.nan
+            rvmaxBL19, rvmaxerrBL19, rvmaxerrlBL19, rvmaxerrrBL19 = np.empty(nord)*np.nan, np.empty(nord)*np.nan, np.empty(nord)*np.nan, np.empty(nord)*np.nan
             
             # --- Start orders loop ---
             for o in ords_use_lines:
@@ -1761,7 +1766,7 @@ def main():
                     gVec -= (gVec[mtell_obs] @ Id[mtell_obs]) / N  # subtract mean  ----------> CAREFUL WITH TELLURICS
                     sg2 = (gVec[mtell_obs] @ gVec[mtell_obs]) / N  # stdev model
 
-
+                    """
                     if irvshift == 0 and (o == 25 or o == 35 or o == 43):
                         fig, ax = plt.subplots(2,1, figsize=(16,8), sharex=True)
                         # ax[0].plot(wcorr[o], f[o])
@@ -1772,6 +1777,7 @@ def main():
                         for a in ax: a.legend()
                         plt.tight_layout()
                         plt.show(), plt.close()
+                    """
 
 
                     # Cross-covariance function
@@ -1822,33 +1828,33 @@ def main():
                 # # ------ Left
                 # RVfunc_l = interp1d(sigZ03[o][mask_sigZ03][:imin+1], rv[mask_sigZ03][:imin+1], kind='cubic')
                 # rvsig1_l = RVfunc_l(1)
-                # rvmaxerr_lZ03 = np.abs(rvsig1_l - rvsig0)
+                # rvmaxerrlZ03 = np.abs(rvsig1_l - rvsig0)
                 # # ------ Right
                 # RVfunc_r = interp1d(sigZ03[o][mask_sigZ03][imin:], rv[mask_sigZ03][imin:], kind='cubic')
                 # rvsig1_r = RVfunc_r(1)
-                # rvmaxerr_rZ03 = np.abs(rvsig1_r - rvsig0)
+                # rvmaxerrrZ03 = np.abs(rvsig1_r - rvsig0)
                 # # ------ Average
-                # rvmaxerrZ03 = np.nanmean([rvmaxerr_lZ03, rvmaxerr_rZ03])
-                rvmaxerrZ03[o], rvmaxerr_lZ03[o], rvmaxerr_rZ03[o] = ccflib.rverr_from_sig(rv, sigZ03[o])
-                rvmaxerrBL19[o], rvmaxerr_lBL19[o], rvmaxerr_rBL19[o] = ccflib.rverr_from_sig(rv, sigBL19[o])
+                # rvmaxerrZ03 = np.nanmean([rvmaxerrlZ03, rvmaxerrrZ03])
+                rvmaxerrZ03[o], rvmaxerrlZ03[o], rvmaxerrrZ03[o] = ccflib.rverr_from_sig(rv, sigZ03[o])
+                rvmaxerrBL19[o], rvmaxerrlBL19[o], rvmaxerrrBL19[o] = ccflib.rverr_from_sig(rv, sigBL19[o])
 
 
                 # ipdb.set_trace()
             # --- End orders loop ---
 
-            if True:
+            if False:
                 fig, ax = plt.subplots(3,1, sharex=True, figsize=(8,12))
-                ax[0].errorbar(ords, rvmaxZ03, yerr=[rvmaxerr_lZ03, rvmaxerr_rZ03], fmt='o', label='Z03')
-                ax[0].errorbar(ords, rvmaxBL19, yerr=[rvmaxerr_lBL19, rvmaxerr_rBL19], fmt='o', label='BL19')
+                ax[0].errorbar(ords, rvmaxZ03, yerr=[rvmaxerrlZ03, rvmaxerrrZ03], fmt='o', label='Z03')
+                ax[0].errorbar(ords, rvmaxBL19, yerr=[rvmaxerrlBL19, rvmaxerrrBL19], fmt='o', label='BL19')
                 ax[0].set_ylabel('RV [km/s]')
                 ax[1].errorbar(ords, rvmaxZ03 - rvmaxBL19, fmt='o', label='Z03 - BL19, std {:.3f}'.format(np.nanstd(rvmaxZ03 - rvmaxBL19)))
                 ax[1].set_ylabel('RV diff [km/s]')
                 ax[2].plot(ords, rvmaxerrZ03, '.', label='Z03 average')
-                ax[2].plot(ords, rvmaxerr_lZ03, '+', label='Z03 left')
-                ax[2].plot(ords, rvmaxerr_rZ03, 'x', label='Z03 right')
+                ax[2].plot(ords, rvmaxerrlZ03, '+', label='Z03 left')
+                ax[2].plot(ords, rvmaxerrrZ03, 'x', label='Z03 right')
                 ax[2].plot(ords, rvmaxerrBL19, '.', label='BL19 average')
-                ax[2].plot(ords, rvmaxerr_lBL19, '+', label='BL19 left')
-                ax[2].plot(ords, rvmaxerr_rBL19, 'x', label='BL19 right')
+                ax[2].plot(ords, rvmaxerrlBL19, '+', label='BL19 left')
+                ax[2].plot(ords, rvmaxerrrBL19, 'x', label='BL19 right')
                 ax[2].set_ylabel('RV uncertainty [km/s]')
                 ax[-1].set_xlabel('Order')
                 ax[0].set_title(os.path.basename(os.path.splitext(filobs)[0]))
@@ -1863,50 +1869,50 @@ def main():
             
             # Coadd
 
-            cc_sum = np.nansum(cc, axis=0)
-            logLZ03_sum = np.nansum(logLZ03, axis=0)
-            logLBL19_sum = np.nansum(logLBL19, axis=0)
+            ccsum = np.nansum(cc, axis=0)
+            logLZ03sum = np.nansum(logLZ03, axis=0)
+            logLBL19sum = np.nansum(logLBL19, axis=0)
 
-            ccferrsum = np.ones_like(cc_sum)*np.nan
+            ccferrsum = np.ones_like(ccsum)*np.nan
 
             # Compute sigma
-            sigZ03_sum, pZ03_sum, dlogLZ03_sum = ccflib.logL2sigma(logLZ03_sum, dof=1)
-            sigBL19_sum, pBL19_sum, dlogLBL19_sum = ccflib.logL2sigma(logLBL19_sum, dof=1)
+            sigZ03sum, pZ03sum, dlogLZ03sum = ccflib.logL2sigma(logLZ03sum, dof=1)
+            sigBL19sum, pBL19sum, dlogLBL19sum = ccflib.logL2sigma(logLBL19sum, dof=1)
 
             # RV from maximum logL
-            rvmaxZ03_sum = rv[np.argmax(logLZ03_sum)]
-            rvmaxBL19_sum = rv[np.argmax(logLBL19_sum)]
+            rvmaxZ03sum = rv[np.argmax(logLZ03sum)]
+            rvmaxBL19sum = rv[np.argmax(logLBL19sum)]
 
             # Compute RV err
-            rvmaxerrZ03_sum, rvmaxerr_lZ03_sum, rvmaxerr_rZ03_sum = ccflib.rverr_from_sig(rv, sigZ03_sum)
-            rvmaxerrBL19_sum, rvmaxerr_lBL19_sum, rvmaxerr_rBL19_sum = ccflib.rverr_from_sig(rv, sigBL19_sum)
+            rvmaxerrZ03sum, rvmaxerrlZ03sum, rvmaxerrrZ03sum = ccflib.rverr_from_sig(rv, sigZ03sum)
+            rvmaxerrBL19sum, rvmaxerrlBL19sum, rvmaxerrrBL19sum = ccflib.rverr_from_sig(rv, sigBL19sum)
 
             # -----------------------
 
             # Plots
-            if True:
+            if False:
                 # CC
-                fig, axsum, axo, axmap = ccflib.plot_ccfo_lines_map(rv, cc, cc_sum, ccferrsum, lisord=None, title='{}'.format(obsid))
+                fig, axsum, axo, axmap = ccflib.plot_ccfo_lines_map(rv, cc, ccsum, ccferrsum, lisord=None, title='{}'.format(obsid))
                 plotutils.figout_simple(fig, sv=args.plot_sv, filout=os.path.join(args.dirout, '{}_cc'.format(obsid)), svext=args.plot_ext, sh=args.plot_sh)
                 # plt.show(), plt.close()
 
                 # logLZ03
-                fig, axsum, axo, axmap = ccflib.plot_ccfo_lines_map(rv, logLZ03, logLZ03_sum, ccferrsum, lisord=None, title='{} $\logL$ Z03'.format(obsid), ylabelsum = 'Coadd. $\logL$', ylabelline='Order $\logL$', cblabelmap='$\logL$')
+                fig, axsum, axo, axmap = ccflib.plot_ccfo_lines_map(rv, logLZ03, logLZ03sum, ccferrsum, lisord=None, title='{} $\logL$ Z03'.format(obsid), ylabelsum = 'Coadd. $\logL$', ylabelline='Order $\logL$', cblabelmap='$\logL$')
                 plotutils.figout_simple(fig, sv=args.plot_sv, filout=os.path.join(args.dirout, '{}_logLZ03'.format(obsid)), svext=args.plot_ext, sh=args.plot_sh)
                 # plt.show(), plt.close()
 
                 # logLBL19
-                fig, axsum, axo, axmap = ccflib.plot_ccfo_lines_map(rv, logLBL19, logLBL19_sum, ccferrsum, lisord=None, title='{} $\logL$ BL19'.format(obsid), ylabelsum = 'Coadd. $\logL$', ylabelline='Order $\logL$', cblabelmap='$\logL$')
+                fig, axsum, axo, axmap = ccflib.plot_ccfo_lines_map(rv, logLBL19, logLBL19sum, ccferrsum, lisord=None, title='{} $\logL$ BL19'.format(obsid), ylabelsum = 'Coadd. $\logL$', ylabelline='Order $\logL$', cblabelmap='$\logL$')
                 plotutils.figout_simple(fig, sv=args.plot_sv, filout=os.path.join(args.dirout, '{}_logLBL19'.format(obsid)), svext=args.plot_ext, sh=args.plot_sh)
                 # plt.show(), plt.close()
 
                 # sigZ03
-                fig, axsum, axo, axmap = ccflib.plot_ccfo_lines_map(rv, sigZ03, sigZ03_sum, ccferrsum, lisord=None, title='{} $\sigma$ Z03'.format(obsid), ylabelsum = 'Coadd. $\sigma$', ylabelline='Order $\sigma$', cblabelmap='$\sigma$')
+                fig, axsum, axo, axmap = ccflib.plot_ccfo_lines_map(rv, sigZ03, sigZ03sum, ccferrsum, lisord=None, title='{} $\sigma$ Z03'.format(obsid), ylabelsum = 'Coadd. $\sigma$', ylabelline='Order $\sigma$', cblabelmap='$\sigma$')
                 plotutils.figout_simple(fig, sv=args.plot_sv, filout=os.path.join(args.dirout, '{}_sigZ03'.format(obsid)), svext=args.plot_ext, sh=args.plot_sh)
                 # plt.show(), plt.close()
 
                 # sigBL19
-                fig, axsum, axo, axmap = ccflib.plot_ccfo_lines_map(rv, sigBL19, sigBL19_sum, ccferrsum, lisord=None, title='{} $\sigma$ BL19'.format(obsid), ylabelsum = 'Coadd. $\sigma$', ylabelline='Order $\sigma$', cblabelmap='$\sigma$')
+                fig, axsum, axo, axmap = ccflib.plot_ccfo_lines_map(rv, sigBL19, sigBL19sum, ccferrsum, lisord=None, title='{} $\sigma$ BL19'.format(obsid), ylabelsum = 'Coadd. $\sigma$', ylabelline='Order $\sigma$', cblabelmap='$\sigma$')
                 plotutils.figout_simple(fig, sv=args.plot_sv, filout=os.path.join(args.dirout, '{}_sigBL19'.format(obsid)), svext=args.plot_ext, sh=args.plot_sh)
                 # plt.show(), plt.close()
 
@@ -1916,180 +1922,228 @@ def main():
             filout = os.path.join(args.dirout, os.path.basename(os.path.splitext(filobs)[0]) + '_cclogL.fits')
             ccflib.outfits_cclogLall(
                 rv, cc, logLZ03, sigZ03, logLBL19, sigBL19, rvmaxZ03,
-                rvmaxerrZ03, rvmaxerr_lZ03, rvmaxerr_rZ03, 
-                rvmaxBL19, rvmaxerrBL19, rvmaxerr_lBL19, rvmaxerr_rBL19,
-                cc_sum,
-                logLZ03_sum, sigZ03_sum, rvmaxZ03_sum, rvmaxerrZ03_sum, rvmaxerr_lZ03_sum, rvmaxerr_rZ03_sum, 
-                logLBL19_sum, sigBL19_sum, rvmaxBL19_sum, rvmaxerrBL19_sum, rvmaxerr_lBL19_sum, rvmaxerr_rBL19_sum, 
+                rvmaxerrZ03, rvmaxerrlZ03, rvmaxerrrZ03, 
+                rvmaxBL19, rvmaxerrBL19, rvmaxerrlBL19, rvmaxerrrBL19,
+                ccsum,
+                logLZ03sum, sigZ03sum, rvmaxZ03sum, rvmaxerrZ03sum, rvmaxerrlZ03sum, rvmaxerrrZ03sum, 
+                logLBL19sum, sigBL19sum, rvmaxBL19sum, rvmaxerrBL19sum, rvmaxerrlBL19sum, rvmaxerrrBL19sum, 
                 header, filout)
             # # Read output example:
-            # rv, cc, logLZ03, sigZ03, logLBL19, sigBL19, rvmaxZ03, rvmaxerrZ03, rvmaxerr_lZ03, rvmaxerr_rZ03,  rvmaxBL19, rvmaxerrBL19, rvmaxerr_lBL19, rvmaxerr_rBL19, cc_sum, logLZ03_sum, sigZ03_sum, rvmaxZ03_sum, rvmaxerrZ03_sum, rvmaxerr_lZ03_sum, rvmaxerr_rZ03_sum, logLBL19_sum, sigBL19_sum, rvmaxBL19_sum, rvmaxerrBL19_sum, rvmaxerr_lBL19_sum, rvmaxerr_rBL19_sum, header, rvmaxrec = ccflib.infits_cclogLall(filout)
+            # rv, cc, logLZ03, sigZ03, logLBL19, sigBL19, rvmaxZ03, rvmaxerrZ03, rvmaxerrlZ03, rvmaxerrrZ03,  rvmaxBL19, rvmaxerrBL19, rvmaxerrlBL19, rvmaxerrrBL19, ccsum, logLZ03sum, sigZ03sum, rvmaxZ03sum, rvmaxerrZ03sum, rvmaxerrlZ03sum, rvmaxerrrZ03sum, logLBL19sum, sigBL19sum, rvmaxBL19sum, rvmaxerrBL19sum, rvmaxerrlBL19sum, rvmaxerrrBL19sum, header, rvmaxrec = ccflib.infits_cclogLall(filout)
 
 
             # Organize data
             # ------- TODO: Save only final ord-coadded data
             # -------       Add per-order data later
             ccfparsum = {}
-            ccfparsum['rvmaxZ03_sum'] = rvmaxZ03_sum
-            ccfparsum['rvmaxerrZ03_sum'] = rvmaxerrZ03_sum
-            ccfparsum['rvmaxerr_lZ03_sum'] = rvmaxerr_lZ03_sum
-            ccfparsum['rvmaxerr_rZ03_sum'] = rvmaxerr_rZ03_sum
-            ccfparsum['rvmaxBL19_sum'] = rvmaxBL19_sum
-            ccfparsum['rvmaxerrBL19_sum'] = rvmaxerrBL19_sum
-            ccfparsum['rvmaxerr_lBL19_sum'] = rvmaxerr_lBL19_sum
-            ccfparsum['rvmaxerr_rBL19_sum'] = rvmaxerr_rBL19_sum
+            ccfparsum['rvmaxZ03sum'] = rvmaxZ03sum
+            ccfparsum['rvmaxerrZ03sum'] = rvmaxerrZ03sum
+            ccfparsum['rvmaxerrlZ03sum'] = rvmaxerrlZ03sum
+            ccfparsum['rvmaxerrrZ03sum'] = rvmaxerrrZ03sum
+            ccfparsum['rvmaxBL19sum'] = rvmaxBL19sum
+            ccfparsum['rvmaxerrBL19sum'] = rvmaxerrBL19sum
+            ccfparsum['rvmaxerrlBL19sum'] = rvmaxerrlBL19sum
+            ccfparsum['rvmaxerrrBL19sum'] = rvmaxerrrBL19sum
             dataccfsumTS[filobs] = ccfparsum
 
-       # --- End observations loop ---
+            ccfparo = {}
+            ccfparo['rvmaxZ03'] = rvmaxZ03
+            ccfparo['rvmaxerrZ03'] = rvmaxerrZ03
+            ccfparo['rvmaxerrlZ03'] = rvmaxerrlZ03
+            ccfparo['rvmaxerrrZ03'] = rvmaxerrrZ03
+            ccfparo['rvmaxBL19'] = rvmaxBL19
+            ccfparo['rvmaxerrBL19'] = rvmaxerrBL19
+            ccfparo['rvmaxerrlBL19'] = rvmaxerrlBL19
+            ccfparo['rvmaxerrrBL19'] = rvmaxerrrBL19
+            for p in ['rvmaxZ03', 'rvmaxerrZ03', 'rvmaxerrlZ03', 'rvmaxerrrZ03', 'rvmaxBL19', 'rvmaxerrBL19', 'rvmaxerrlBL19', 'rvmaxerrrBL19']:
+                # ccfparo[p] = pd.DataFrame(ccfparo[p]).transpose()
+                # rename_cols = {o: '{}o{}'.format(p, o) for o in ccfparo[p].columns}
+                # ccfparo[p].rename(rename_cols, axis=1, inplace=True)
+                index_p = ['{}o{}'.format(p, o) for o in range(len(ccfparo[p]))]
+                ccfparo[p] = pd.DataFrame(ccfparo[p], index=index_p, columns=[filobs])
+
+            # Merge order data from dict of dataframes into single dataframe
+            # ccfparo = pd.concat(ccfparo.values(), axis=1)
+            ccfparo = pd.concat(ccfparo.values()).transpose()
+            # dataccfoTS[filobs] = ccfparo
+            dataccfoTS.append(ccfparo)
+
+        # --- End observations loop ---
 
     ###########################################################################
 
 
-    # Save sum TS data
+    # Outputs
 
-    # Convert to pandas dataframe
-    dataccfsumTS = pd.DataFrame.from_dict(dataccfsumTS, orient='index')
-
-    # Join observations input data and CCF data
-    # dataall = pd.concat([dataccfsumTS, dataobs], axis=1, sort=False)
-    dataall = dataccfsumTS
-
-    # ----------- TODO: Add BJD!!!!!!!!!!!!!!!!!!!!!!
-
-    # Change index from path/obs to obs
-    dataall['filobs'] = dataall.index
-    dataall['obs'] = [os.path.basename(filobs) for filobs in dataall['filobs']]
-    dataall.set_index('obs', inplace=True, drop=False)
-
-    # # Save in file: CCF data, some input data ---> NEW Moved below
-    # cols = dataall.columns
-    # filout = os.path.join(args.dirout, '{}.par.dat'.format(args.obj))
-    # dataall.to_csv(filout, sep=' ', na_rep=np.nan, columns=cols, header=True, index=True, float_format='%0.8f')
-    # verboseprint('\nCCF TS data saved in {}'.format(filout))
-
-
-    # Save TS output: file with all
     if args.tpltype == 'mask':
-        # --------- TODO
-        pass
+
+        # Save sum TS data
+
+        # Convert to pandas dataframe
+        dataccfsumTS = pd.DataFrame.from_dict(dataccfsumTS, orient='index')
+
+        # Join observations input data and CCF data
+        # dataall = pd.concat([dataccfsumTS, dataobs], axis=1, sort=False)
+        dataall = dataccfsumTS  # dataobs added manually above
+
+        # Change index from path/obs to obs
+        dataall['filobs'] = dataall.index
+        dataall['obs'] = [os.path.basename(filobs) for filobs in dataall['filobs']]
+        dataall.set_index('obs', inplace=True, drop=False)
+
+        # # Save in file: CCF data, some input data ---> NEW Moved below
+        # cols = dataall.columns
+        # filout = os.path.join(args.dirout, '{}.par.dat'.format(args.obj))
+        # dataall.to_csv(filout, sep=' ', na_rep=np.nan, columns=cols, header=True, index=True, float_format='%0.8f')
+        # verboseprint('\nCCF TS data saved in {}'.format(filout))
+
+        # Save in file main output: BJD, RV, FWHM, Contrast, BIS and their errors
+        cols = ['bjd', 'rv', 'fwhm', 'contrast', 'bis', 'rverrabs', 'fwhmerr', 'contrasterr', 'biserr']
+        if args.output is None:
+            filout = os.path.join(args.dirout, '{}.ccfpar.dat'.format(args.obj))
+        elif args.output == 'gto':
+            filout = os.path.join(args.dirout, '{}.ccf.ccfpar.dat'.format(args.obj))
+        dataall.to_csv(filout, sep=' ', na_rep=np.nan, columns=cols, header=False, index=False, float_format='%0.8f')
+        # verboseprint('CCF TS data saved in {}'.format(filout))
+
+        # Save file info.csv
+        cols = ['bjd', 'obs', 'berv', 'drift', 'sa', 'rverr', 'drifterr', 'exptime', 'airmass', 'snroref', 'objmask', 'sptmask', 'vsinimask', 'nlinoriginal', 'nlint']
+        if args.output is None:
+            filout = os.path.join(args.dirout, '{}.info.csv'.format(args.obj))
+        elif args.output == 'gto':
+            filout = os.path.join(args.dirout, '{}.ccf.info.csv'.format(args.obj))
+        dataall.to_csv(filout, sep=';', na_rep=np.nan, columns=cols, header=False, index=False, float_format='%0.8f')
+        # verboseprint('CCF extra data saved in {}'.format(filout))
+
+        ###########################################################################
+
+        # Save individual order data (read FITS files)
+
+        # lisccforv, lisccfofwhm, lisccfocontrast, lisccfobis = {}, {}, {}, {}
+        # lisccforverr, lisccfofwhmerr, lisccfocontrasterr, lisccfobiserr = {}, {}, {}, {}
+        # Main params
+        lisparam = ['rv', 'fwhm', 'contrast', 'bis', 'rverr', 'fwhmerr', 'contrasterr', 'biserr']
+        dataorder = {'rv': {}, 'fwhm': {}, 'contrast': {}, 'bis': {}, 'rverr': {}, 'fwhmerr': {}, 'contrasterr': {}, 'biserr': {}}
+        # All params
+        lisparam_all = ['rv', 'rverr', 'fwhm', 'fwhmerr', 'contrast', 'contrasterr', 'bis', 'biserr', 'fitamp', 'fitamperr', 'fitcen', 'fitcenerr', 'fitwid', 'fitwiderr', 'fitshift', 'fitshifterr', 'fitredchi2']
+        dataorder_all = {'rv': {}, 'rverr': {}, 'fwhm': {}, 'fwhmerr': {}, 'contrast': {}, 'contrasterr': {}, 'bis': {}, 'biserr': {}, 'fitamp': {}, 'fitamperr': {}, 'fitcen': {}, 'fitcenerr': {}, 'fitwid': {}, 'fitwiderr': {}, 'fitshift': {}, 'fitshifterr': {}, 'fitredchi2': {}}
+        # CCF
+        lisccfs = []
+        for i, obs in enumerate(lisfilobs):
+            # Read CCF order data
+            filobs = lisfilobs[i]
+            filccf = os.path.join(args.dirout, os.path.basename(os.path.splitext(filobs)[0]) + '_ccf.fits')
+            if not os.path.exists(filccf):
+                print('No FITS file', filobs)
+                continue
+            rv, ccfsum, ccfparsum, ccf, ccfpar, bxsum, bysum, bx, by, headerobs = ccflib.infits_ccfall(filccf)
+            
+            # Organise data main CCF params
+            for p in lisparam:
+                dataorder[p][ccfparsum['bjd']] = ccfpar[p]
+            
+            #  Organise data all CCF params
+            for p in lisparam_all:
+                # dataorder_all[p][ccfparsum['bjd']] = ccfpar[p]
+                dataorder_all[p][os.path.basename(obs)] = ccfpar[p]
+            
+            # Organise CCFs
+            lisccfs.append(np.vstack([rv, ccfsum, ccf]))
+
+        # Join and save data (main params)
+        for p in lisparam:
+            # Main params
+            dataorder[p] = pd.DataFrame.from_dict(dataorder[p], orient='index')
+            if args.output is None:
+                filout = os.path.join(args.dirout, '{}.{}o.dat'.format(args.obj, p))
+            elif args.output == 'gto':
+                pname = 'e_{}'.format(p.replace('err', '')) if p.endswith('err') else p
+                filout = os.path.join(args.dirout, '{}.ccf.{}o.dat'.format(args.obj, pname))
+            dataorder[p].to_csv(filout, sep=' ', na_rep=np.nan, header=False)
+
+        ###########################################################################
+
+        # Save all data (TS and order) in a single file
+
+        # Join data (all params), as above with main params
+        for p in lisparam_all:
+            dataorder_all[p] = pd.DataFrame.from_dict(dataorder_all[p], orient='index')
+            rename_cols = {o: '{}o{}'.format(p, o) for o in dataorder_all[p].columns}
+            dataorder_all[p].rename(rename_cols, axis=1, inplace=True)
+
+        # Merge order data from dict of dataframes into single dataframe
+        dataorder_all = pd.concat(dataorder_all.values(), axis=1)
+
+        # Merge order data `dataorder_all` and TS data `dataall`
+        datafinal = pd.concat([dataall, dataorder_all], axis=1)
+
+        # Save in file: CCF data (TS and order), and some input data
+        if args.output is None:
+            cols = datafinal.columns
+            filout = os.path.join(args.dirout, '{}.par.dat'.format(args.obj))
+            datafinal.to_csv(filout, sep=' ', na_rep=np.nan, columns=cols, header=True, index=True, float_format='%0.8f')
+            # verboseprint('\nCCF TS data saved in {}'.format(filout))
+        elif args.output == 'gto':
+            pass
+
+        ###########################################################################
+
+        # Save CCFs: RVgrid, TS CCF, and each order CCF, one file per observation
+        header = 'rv ccfsum '
+        headero = ['ccfo{}'.format(o) for o in ords]
+        header += ' '.join(headero)
+        for i, obs in enumerate(lisfilobs):
+            if args.output is None:
+                filout = os.path.join(args.dirout, os.path.basename(os.path.splitext(obs)[0]) + '_ccfall.dat')
+            elif args.output == 'gto':
+                # filout = os.path.join(args.dirout, os.path.basename(os.path.splitext(obs)[0]) + '_ccf.dat')
+                filout = os.path.join(args.dirout, args.obj + '.' + os.path.basename(os.path.splitext(obs)[0]) + '.ccf.dat')
+            np.savetxt(filout, lisccfs[i].T, fmt='%0.8f', delimiter=' ', newline='\n', header=header, comments='')
+
     else:
+
+        # Save all data (TS and order) in a single file
+
+        # Convert to pandas dataframe
+        dataccfsumTS = pd.DataFrame.from_dict(dataccfsumTS, orient='index')
+        dataccfoTS = pd.concat(dataccfoTS)
+
+        # Join observations input data and CCF data
+        # dataall = pd.concat([dataccfsumTS, dataobs], axis=1, sort=False)
+        dataall = pd.concat([dataccfsumTS, dataccfoTS, dataobs], axis=1, sort=False)
+
+        # Change index from path/obs to obs
+        dataall['filobs'] = dataall.index
+        dataall['obs'] = [os.path.basename(filobs) for filobs in dataall['filobs']]
+        dataall.set_index('obs', inplace=True, drop=False)
+
+        # Save
         cols = dataall.columns
         filout = os.path.join(args.dirout, '{}.cclogLpar.dat'.format(args.obj))
         dataall.to_csv(filout, sep=' ', na_rep=np.nan, columns=cols, header=True, index=True, float_format='%0.8f')
 
-    ipdb.set_trace()
+        # Quick plot
+    # if True:
+        fig, ax = plt.subplots()
+        ax.errorbar(dataall['bjd'], dataall['rvmaxZ03sum'], yerr=dataall['rvmaxerrZ03sum'], linestyle='None', marker='o', label='Z03')
+        ax.errorbar(dataall['bjd'], dataall['rvmaxBL19sum'], yerr=dataall['rvmaxerrBL19sum'], linestyle='None', marker='o', label='BL19')
+        ax.legend(fontsize='small')
+        ax.minorticks_on()
+        ax.set_xlabel('BJD [d]')
+        ax.set_ylabel('RV [km/s]')
+        plt.tight_layout()
+        plotutils.figout_simple(fig, sv=args.plot_sv, filout=os.path.join(args.dirout, 'ts_rv_quickcompare'.format(obsid)), svext=args.plot_ext, sh=args.plot_sh)
+        ipdb.set_trace()
 
 
 
 
+    # ipdb.set_trace()
 
+
+    ###########################################################################
 
     # ------- TODO: Indent with an if, only for mask CCFs
-
-    # Save in file main output: BJD, RV, FWHM, Contrast, BIS and their errors
-    cols = ['bjd', 'rv', 'fwhm', 'contrast', 'bis', 'rverrabs', 'fwhmerr', 'contrasterr', 'biserr']
-    if args.output is None:
-        filout = os.path.join(args.dirout, '{}.ccfpar.dat'.format(args.obj))
-    elif args.output == 'gto':
-        filout = os.path.join(args.dirout, '{}.ccf.ccfpar.dat'.format(args.obj))
-    dataall.to_csv(filout, sep=' ', na_rep=np.nan, columns=cols, header=False, index=False, float_format='%0.8f')
-    # verboseprint('CCF TS data saved in {}'.format(filout))
-
-    # Save file info.csv
-    cols = ['bjd', 'obs', 'berv', 'drift', 'sa', 'rverr', 'drifterr', 'exptime', 'airmass', 'snroref', 'objmask', 'sptmask', 'vsinimask', 'nlinoriginal', 'nlint']
-    if args.output is None:
-        filout = os.path.join(args.dirout, '{}.info.csv'.format(args.obj))
-    elif args.output == 'gto':
-        filout = os.path.join(args.dirout, '{}.ccf.info.csv'.format(args.obj))
-    dataall.to_csv(filout, sep=';', na_rep=np.nan, columns=cols, header=False, index=False, float_format='%0.8f')
-    # verboseprint('CCF extra data saved in {}'.format(filout))
-
-    ###########################################################################
-
-    # Save individual order data (read FITS files)
-
-    # lisccforv, lisccfofwhm, lisccfocontrast, lisccfobis = {}, {}, {}, {}
-    # lisccforverr, lisccfofwhmerr, lisccfocontrasterr, lisccfobiserr = {}, {}, {}, {}
-    # Main params
-    lisparam = ['rv', 'fwhm', 'contrast', 'bis', 'rverr', 'fwhmerr', 'contrasterr', 'biserr']
-    dataorder = {'rv': {}, 'fwhm': {}, 'contrast': {}, 'bis': {}, 'rverr': {}, 'fwhmerr': {}, 'contrasterr': {}, 'biserr': {}}
-    # All params
-    lisparam_all = ['rv', 'rverr', 'fwhm', 'fwhmerr', 'contrast', 'contrasterr', 'bis', 'biserr', 'fitamp', 'fitamperr', 'fitcen', 'fitcenerr', 'fitwid', 'fitwiderr', 'fitshift', 'fitshifterr', 'fitredchi2']
-    dataorder_all = {'rv': {}, 'rverr': {}, 'fwhm': {}, 'fwhmerr': {}, 'contrast': {}, 'contrasterr': {}, 'bis': {}, 'biserr': {}, 'fitamp': {}, 'fitamperr': {}, 'fitcen': {}, 'fitcenerr': {}, 'fitwid': {}, 'fitwiderr': {}, 'fitshift': {}, 'fitshifterr': {}, 'fitredchi2': {}}
-    # CCF
-    lisccfs = []
-    for i, obs in enumerate(lisfilobs):
-        # Read CCF order data
-        filobs = lisfilobs[i]
-        filccf = os.path.join(args.dirout, os.path.basename(os.path.splitext(filobs)[0]) + '_ccf.fits')
-        if not os.path.exists(filccf):
-            print('No FITS file', filobs)
-            continue
-        rv, ccfsum, ccfparsum, ccf, ccfpar, bxsum, bysum, bx, by, headerobs = ccflib.infits_ccfall(filccf)
-        
-        # Organise data main CCF params
-        for p in lisparam:
-            dataorder[p][ccfparsum['bjd']] = ccfpar[p]
-        
-        #  Organise data all CCF params
-        for p in lisparam_all:
-            # dataorder_all[p][ccfparsum['bjd']] = ccfpar[p]
-            dataorder_all[p][os.path.basename(obs)] = ccfpar[p]
-        
-        # Organise CCFs
-        lisccfs.append(np.vstack([rv, ccfsum, ccf]))
-
-    # Join and save data (main params)
-    for p in lisparam:
-        # Main params
-        dataorder[p] = pd.DataFrame.from_dict(dataorder[p], orient='index')
-        if args.output is None:
-            filout = os.path.join(args.dirout, '{}.{}o.dat'.format(args.obj, p))
-        elif args.output == 'gto':
-            pname = 'e_{}'.format(p.replace('err', '')) if p.endswith('err') else p
-            filout = os.path.join(args.dirout, '{}.ccf.{}o.dat'.format(args.obj, pname))
-        dataorder[p].to_csv(filout, sep=' ', na_rep=np.nan, header=False)
-
-    ###########################################################################
-
-    # Save all data (TS and order) in a single file
-
-    # Join data (all params), as above with main params
-    for p in lisparam_all:
-        dataorder_all[p] = pd.DataFrame.from_dict(dataorder_all[p], orient='index')
-        rename_cols = {o: '{}o{}'.format(p, o) for o in dataorder_all[p].columns}
-        dataorder_all[p].rename(rename_cols, axis=1, inplace=True)
-
-    # Merge order data from dict of dataframes into single dataframe
-    dataorder_all = pd.concat(dataorder_all.values(), axis=1)
-
-    # Merge order data `dataorder_all` and TS data `dataall`
-    datafinal = pd.concat([dataall, dataorder_all], axis=1)
-
-    # Save in file: CCF data (TS and order), and some input data
-    if args.output is None:
-        cols = datafinal.columns
-        filout = os.path.join(args.dirout, '{}.par.dat'.format(args.obj))
-        datafinal.to_csv(filout, sep=' ', na_rep=np.nan, columns=cols, header=True, index=True, float_format='%0.8f')
-        # verboseprint('\nCCF TS data saved in {}'.format(filout))
-    elif args.output == 'gto':
-        pass
-
-    ###########################################################################
-
-    # Save CCFs: RVgrid, TS CCF, and each order CCF, one file per observation
-    header = 'rv ccfsum '
-    headero = ['ccfo{}'.format(o) for o in ords]
-    header += ' '.join(headero)
-    for i, obs in enumerate(lisfilobs):
-        if args.output is None:
-            filout = os.path.join(args.dirout, os.path.basename(os.path.splitext(obs)[0]) + '_ccfall.dat')
-        elif args.output == 'gto':
-            # filout = os.path.join(args.dirout, os.path.basename(os.path.splitext(obs)[0]) + '_ccf.dat')
-            filout = os.path.join(args.dirout, args.obj + '.' + os.path.basename(os.path.splitext(obs)[0]) + '.ccf.dat')
-        np.savetxt(filout, lisccfs[i].T, fmt='%0.8f', delimiter=' ', newline='\n', header=header, comments='')
-
-    ###########################################################################
 
     # Plots
 
@@ -2114,23 +2168,25 @@ def main():
 
     # Plot CCF parameters TS (and SERVAL rvc if available)
 
-    if dataserval is not None:
-        fig, ax = ccflib.plot_ccfparbasic_servalrvc(dataall, title='{} CCF parameters  {} obs'.format(args.obj, len(dataall.index)))
-        plotutils.figout(fig, filout=os.path.join(args.dirout, '{}.ccfpar_servalrvc'.format(args.obj)), sv=args.plot_sv, svext=args.plot_ext, sh=args.plot_sh)
+    if args.tpltype == 'mask':
 
-        fig, ax = ccflib.plot_ccfparbasic_servalrvc_separated(dataall, dataserval=dataserval, title='{} CCF parameters'.format(args.obj))
-        plotutils.figout(fig, filout=os.path.join(args.dirout, '{}.ccfpar_servalrvc_separated'.format(args.obj)), sv=args.plot_sv, svext=args.plot_ext, sh=args.plot_sh)
+        if dataserval is not None:
+            fig, ax = ccflib.plot_ccfparbasic_servalrvc(dataall, title='{} CCF parameters  {} obs'.format(args.obj, len(dataall.index)))
+            plotutils.figout(fig, filout=os.path.join(args.dirout, '{}.ccfpar_servalrvc'.format(args.obj)), sv=args.plot_sv, svext=args.plot_ext, sh=args.plot_sh)
 
-    else:
-        fig, ax = ccflib.plot_ccfparbasic_servalrvc(dataall, plotserval=False, title='{} CCF parameters  {} obs'.format(args.obj, len(dataall.index)))
-        plotutils.figout(fig, filout=os.path.join(args.dirout, '{}.ccfpar'.format(args.obj)), sv=args.plot_sv, svext=args.plot_ext, sh=True)
+            fig, ax = ccflib.plot_ccfparbasic_servalrvc_separated(dataall, dataserval=dataserval, title='{} CCF parameters'.format(args.obj))
+            plotutils.figout(fig, filout=os.path.join(args.dirout, '{}.ccfpar_servalrvc_separated'.format(args.obj)), sv=args.plot_sv, svext=args.plot_ext, sh=args.plot_sh)
 
-    # ---------------------------
+        else:
+            fig, ax = ccflib.plot_ccfparbasic_servalrvc(dataall, plotserval=False, title='{} CCF parameters  {} obs'.format(args.obj, len(dataall.index)))
+            plotutils.figout(fig, filout=os.path.join(args.dirout, '{}.ccfpar'.format(args.obj)), sv=args.plot_sv, svext=args.plot_ext, sh=True)
 
-    # Plot RV CCF and SERVAL, and difference
-    if dataserval is not None:
-        fig, ax = ccflib.plot_ccfrv_servalrvc_diff(dataall, shiftserval=True, title='{}  {} obs'.format(args.obj, len(dataall.index)))
-        plotutils.figout(fig, filout=os.path.join(args.dirout, '{}.ccfrv_servalrvc_diff'.format(args.obj)), sv=args.plot_sv, svext=args.plot_ext, sh=args.plot_sh)
+        # ---------------------------
+
+        # Plot RV CCF and SERVAL, and difference
+        if dataserval is not None:
+            fig, ax = ccflib.plot_ccfrv_servalrvc_diff(dataall, shiftserval=True, title='{}  {} obs'.format(args.obj, len(dataall.index)))
+            plotutils.figout(fig, filout=os.path.join(args.dirout, '{}.ccfrv_servalrvc_diff'.format(args.obj)), sv=args.plot_sv, svext=args.plot_ext, sh=args.plot_sh)
 
 
 
