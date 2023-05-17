@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+"""
+PHOENIX wavelengths are in vacuum.
+"""
 from __future__ import division
 from __future__ import print_function
 

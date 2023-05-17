@@ -45,8 +45,9 @@ setup(
     # scripts=['scripts/ccf_compute.py', 'scripts/mask_compute.py'],
     entry_points={
         'console_scripts': [
-            'raccoonccf=raccoon.scripts.ccfcompute:main',
             'raccoonmask=raccoon.scripts.maskcompute:main',
+            'raccoonccf=raccoon.scripts.ccfcompute:main',
+            'raccoonlogL=raccoon.scripts.logLcompute:main',
         ],
     },
 

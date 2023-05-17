@@ -55,7 +55,7 @@ def parse_args():
 
     # Spectra
     parser.add_argument('fil_or_list_spec', help='File with the names of the reduced FITS spectra or directly the file names (names must include the absolute path to the files). The file with the list cannot end in `.fits`.', nargs='+', type=str)
-    parser.add_argument('inst', choices=['HARPS', 'HARPN', 'CARM_VIS', 'CARM_NIR', 'EXPRES', 'ESPRESSO', 'ESPRESSO4x2', 'HARPNSOLAR'], help='Instrument.')
+    parser.add_argument('inst', choices=['HARPS', 'HARPN', 'CARM_VIS', 'CARM_NIR', 'EXPRES', 'ESPRESSO', 'ESPRESSO4x2', 'ESPRESSO8x4', 'HARPNSOLAR'], help='Instrument.')
 
     parser.add_argument('--filobs2blaze', help='List of blaze file corresponding to each observation. Format: Column 1) filspec (e2ds), Column 2) filblaze. Full paths. For HARPS/N data. Needed if do not want to use the default from the header. If None, get file names from each observation header.', type=str, default=None)
     # parser.add_argument('--dirblaze', help='Directory containing blaze files. For HARPS/N data.', type=str, default=None)
@@ -208,6 +208,8 @@ def main():
     elif args.inst == 'ESPRESSO':
         npix = 9111
     elif args.inst == 'ESPRESSO4x2':
+        npix = 4545
+    elif args.inst == 'ESPRESSO8x4':
         npix = 4545
     pix = np.arange(0, npix, 1)
 
@@ -368,7 +370,6 @@ def main():
 
     # Reference order
     oref = spectrographutils.inst_oref(args.inst)
-
     # Reference observation: observation with highest SNR in the reference order
     filobsref = dataobs['snro{:d}'.format(oref)].idxmax()
 
@@ -1026,7 +1027,7 @@ def main():
 
         # Apply ESPRESSO quality mask (basically seems to remove pixels with0 flux values at the extremes)
         w_new, f_new, sf_new, c_new = [], [], [], []
-        if args.inst == 'ESPRESSO' or args.inst == 'ESPRESSO4x2':
+        if args.inst == 'ESPRESSO' or args.inst == 'ESPRESSO4x2' or args.inst == 'ESPRESSO8x4':
             for o in range(len(w)):
                 mq = dataextra['mq'][o]
                 w_new = w[o][mq]
@@ -1108,7 +1109,7 @@ def main():
 
 
         # CARMENES (CARACAL) FOX: Reweight flux so that <counts> = SNR^2
-        if args.inst == 'CARM_VIS' or args.inst == 'CARM_NIR' or args.inst == 'EXPRES' or args.inst == 'ESPRESSO' or args.inst == 'ESPRESSO4x2':
+        if args.inst == 'CARM_VIS' or args.inst == 'CARM_NIR' or args.inst == 'EXPRES' or args.inst == 'ESPRESSO' or args.inst == 'ESPRESSO4x2' or args.inst == 'ESPRESSO8x4':
             f = [f[o] * dataobs.loc[filobs]['snro{:d}'.format(o)]**2 / np.nanmean(f[o]) for o in ords]
             # f2 = [f[o] * dataobs.loc[filobs]['snro{:d}'.format(o)]**2 / np.median(f[o]) for o in ords]
 

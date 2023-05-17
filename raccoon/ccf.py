@@ -765,6 +765,7 @@ def listmask_default():
         'EXPRES': {},
         'ESPRESSO': {},
         'ESPRESSO4x2': {},
+        'ESPRESSO8x4': {},
     }
     return dictmask
 
@@ -1705,7 +1706,7 @@ def plot_ccfo_map(rv, ccfo, lisord=None, cb=True, cmap=cmocean.cm.deep_r, extent
 
 
 def plot_ccfo_lines_map(rv, ccfo, ccfsum, ccferrsum, lisord=None, 
-    ylabelsum = 'Coadd. CCF',
+    ylabelsum = 'Coadded\nCCF',
     multiline=True, cbline=True, cmapline=cc.cm.rainbow4, lw=2, alpha=0.9, ylabelline='Order CCF', cblabelline='Order',
     cbmap=True, cmapmap=cmocean.cm.deep_r, extent='data', vmin=None, vmax=None, extend='neither', ylabelmap='Order', cblabelmap='CCF',
     xlabel='RV [km/s]', title=''
@@ -1720,9 +1721,9 @@ def plot_ccfo_lines_map(rv, ccfo, ccfsum, ccferrsum, lisord=None,
     axsum.errorbar(rv, ccfsum, yerr=ccferrsum, fmt='k.')
     axsum.set_ylabel(ylabelsum)
     # CCFo
-    axo = plot_ccfo_lines(rv, ccfo, cmap=cmapline, lw=lw, alpha=alpha, xlabel=None, ylabel=ylabelline, cblabel=cblabelline, ax=axo)
+    axo = plot_ccfo_lines(rv, ccfo, lisord=lisord, cmap=cmapline, lw=lw, alpha=alpha, xlabel=None, ylabel=ylabelline, cblabel=cblabelline, ax=axo)
     # CCFo map
-    axmap = plot_ccfo_map(rv, ccfo, cmap=cmapmap, extent=extent, vmin=vmin, vmax=vmax, extend=extend, xlabel=xlabel, ylabel=ylabelmap, cblabel=cblabelmap, ax=axmap)
+    axmap = plot_ccfo_map(rv, ccfo, lisord=lisord, cmap=cmapmap, extent=extent, vmin=vmin, vmax=vmax, extend=extend, xlabel=xlabel, ylabel=ylabelmap, cblabel=cblabelmap, ax=axmap)
     # 
     ax[0].set_title(title)
     for a in ax.flatten():
@@ -1746,7 +1747,12 @@ def plot_lisccf_lines_map(rv, lisccf, lisccferr, time, maskgray=None, maskmap=No
     cmapline=cc.cm.rainbow4, lw=2, alpha=0.9, cbline=True, labeltime='Time',
     interpolation='none', origin='lower', extent='data', vmin=None, vmax=None, extend='neither', cbmap=True, cmapmap=cmocean.cm.deep_r,
     title='',):
-    """2-panel plot with list of CCF (coadded CCFs from different observations) lines color-coded as a function of time, and CCF map with time on y-axis and color-ocoded on CCF value, one below each other.
+    """2-panel plot with list of CCF (coadded CCFs from different observations) lines color-coded as a function of time, and CCF map with time on y-axis and color-coded on CCF value, one below each other.
+
+    Issues
+    ------
+    Assumes data (list of CCFs) is sorted by `time`, if not the map will be wrong.
+    Works well for data equally spaced. Workaround if gaps, but issues if overlapping data.
 
     TODO: add errorbars `lisccferr`
 
@@ -1783,6 +1789,13 @@ def plot_lisccf_lines_map(rv, lisccf, lisccferr, time, maskgray=None, maskmap=No
     #       smallpanel_height = 1.2
     #       aspect_cb_smallpanel = aspect_cb_bigpanel * smallpanel_height / bigpanel_height = 6
     # 
+    # Check if overlapping observations
+    #   Overlapping if time between obs is less than 10 s # HARDCODED, depends on exptime
+    overlappingobs = False
+    time_min = np.diff(time[maskmap]).min()
+    if time_min * 24 * 3600 < 10:
+        overlappingobs = True
+    # 
     # Check if observations are non-consecutive
     consecutiveobs = True
     time_min = np.diff(time[maskmap]).min()
@@ -1794,7 +1807,7 @@ def plot_lisccf_lines_map(rv, lisccf, lisccferr, time, maskgray=None, maskmap=No
     # If obs are non-consecutive, imshow will show the wrong "grid" because it assumes the values are equally spaced. Need to add "fake" nan-filled CCFs in between non-consecutive obs.
     # Add a nan-filled CCF at the beginning and end because if not the actual ones might be hidden by the borders
     # For non-uniform grid spacing, use plt.pcolor(rv, time, lisccf) or pcolormesh. But have everything coded with imshow, so it's easier to tweak the data.
-    if consecutiveobs is False:
+    if (consecutiveobs is False) and (overlappingobs is False):
         # Add nan-filled CCF between non-consecutive observations
         # Define consecutive by twice the minimum difference in time
         time_min = np.diff(time[maskmap]).min() * 2
@@ -1832,8 +1845,58 @@ def plot_lisccf_lines_map(rv, lisccf, lisccferr, time, maskgray=None, maskmap=No
         lisccf = np.array(lisccf_new)
         maskmap = np.array(maskmap_new)
     # 
+    # 
+    if (consecutiveobs is False) and (overlappingobs is True):
+        # Add nan-filled CCF between non-consecutive observations
+        ##### Define consecutive by twice the minimum difference in time
+        ## Define consecutive by the mean difference in time
+        # DOESN'T REALLY WORK
+        time_min = np.diff(time[maskmap]).mean()
+        time_new = []
+        lisccf_new = []
+        maskmap_new = []
+        nanccf = np.ones_like(lisccf[0])*np.nan
+        # Fake obs beginning
+        time_new.append(time[maskmap][0]-time_min)
+        lisccf_new.append(nanccf)
+        maskmap_new.append(True)
+        for obs_i in range(len(time[maskmap])):
+            time_new.append(time[maskmap][obs_i])
+            lisccf_new.append(lisccf[obs_i])
+            maskmap_new.append(maskmap[obs_i])
+            # Last obs
+            if obs_i == len(time[maskmap])-1:
+                continue
+            # Time diff with following observation
+            dt = time[maskmap][obs_i+1] - time[maskmap][obs_i]
+            # If difference larger than minimum time, assume non-consecutive obs, and fill with nan
+            if dt > time_min:
+                # How many new nan-filled obs are needed
+                nobs_new = int(dt/time_min)
+                for newobs in range(nobs_new):
+                    time_new.append(time[maskmap][obs_i]*(newobs+2))
+                    lisccf_new.append(nanccf)
+                    maskmap_new.append(True)
+        # Fake obs end
+        time_new.append(time[maskmap][-1]+time_min)
+        lisccf_new.append(nanccf)
+        maskmap_new.append(True)
+        # Arrays
+        time = np.array(time_new)
+        lisccf = np.array(lisccf_new)
+        maskmap = np.array(maskmap_new)
+    # 
+    # ipdb.set_trace()
     if extent == 'data': extent = [rv[0], rv[-1], time[maskmap][0], time[maskmap][-1]]
     axmap = plotutils.plot_map(lisccf[maskmap], labelccf, interpolation=interpolation, origin=origin, extent=extent, vmin=vmin, vmax=vmax, extend=extend, cmap=cmapmap, axcb=None, nocb=nocb, aspect=6, pad=0.02, fraction=0.15, ax=axmap)
+
+    # # Contour plot of irregularly spaced data
+    # xcontour = [rv for i in lisccf[maskmap]]
+    # ycontour = [phase for i in rv]
+    # zcontour = lisccf[maskmap].flatten()
+    # axmap.tricontour(xcotour, ycotour, zcotour, levels=14, linewidths=0.5, colors='k')
+    # cntr2 = axmap.tricontourf(xcontour, ycontour, zcontour, levels=14, cmap="RdBu_r")
+    # fig.colorbar(cntr2, ax=axmap)
 
     axmap.set_ylabel(labeltime)
     ax[-1].set_xlabel(labelrv)

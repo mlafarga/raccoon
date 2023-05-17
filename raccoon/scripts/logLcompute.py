@@ -1250,31 +1250,27 @@ def main():
         # -----------------------
 
         # Plots
-        if False:
+        if doplot:
             # CC
-            fig, axsum, axo, axmap = ccflib.plot_ccfo_lines_map(rv, cc, ccsum, ccferrsum, lisord=None, title='{}'.format(obsid))
+            fig, axsum, axo, axmap = ccflib.plot_ccfo_lines_map(rv, cc, ccsum, ccferrsum, alpha=0.7, title='{} CC'.format(obsid))
             plotutils.figout_simple(fig, sv=args.plot_sv, filout=os.path.join(args.dirout, '{}_cc'.format(obsid)), svext=args.plot_ext, sh=args.plot_sh)
             # plt.show(), plt.close()
 
             # logLZ03
-            fig, axsum, axo, axmap = ccflib.plot_ccfo_lines_map(rv, logLZ03, logLZ03sum, ccferrsum, lisord=None, title='{} $\logL$ Z03'.format(obsid), ylabelsum = 'Coadd. $\logL$', ylabelline='Order $\logL$', cblabelmap='$\logL$')
+            fig, axsum, axo, axmap = ccflib.plot_ccfo_lines_map(rv, logLZ03, logLZ03sum, ccferrsum, alpha=0.7, title='{} $\logL$ Z03'.format(obsid), ylabelsum = 'Coadded\n$\logL$', ylabelline='Order $\logL$', cblabelmap='$\logL$')
             plotutils.figout_simple(fig, sv=args.plot_sv, filout=os.path.join(args.dirout, '{}_logLZ03'.format(obsid)), svext=args.plot_ext, sh=args.plot_sh)
-            # plt.show(), plt.close()
 
             # logLBL19
-            fig, axsum, axo, axmap = ccflib.plot_ccfo_lines_map(rv, logLBL19, logLBL19sum, ccferrsum, lisord=None, title='{} $\logL$ BL19'.format(obsid), ylabelsum = 'Coadd. $\logL$', ylabelline='Order $\logL$', cblabelmap='$\logL$')
+            fig, axsum, axo, axmap = ccflib.plot_ccfo_lines_map(rv, logLBL19, logLBL19sum, ccferrsum, alpha=0.7, title='{} $\logL$ BL19'.format(obsid), ylabelsum = 'Coadded\n$\logL$', ylabelline='Order $\logL$', cblabelmap='$\logL$')
             plotutils.figout_simple(fig, sv=args.plot_sv, filout=os.path.join(args.dirout, '{}_logLBL19'.format(obsid)), svext=args.plot_ext, sh=args.plot_sh)
-            # plt.show(), plt.close()
 
             # sigZ03
-            fig, axsum, axo, axmap = ccflib.plot_ccfo_lines_map(rv, sigZ03, sigZ03sum, ccferrsum, lisord=None, title='{} $\sigma$ Z03'.format(obsid), ylabelsum = 'Coadd. $\sigma$', ylabelline='Order $\sigma$', cblabelmap='$\sigma$')
+            fig, axsum, axo, axmap = ccflib.plot_ccfo_lines_map(rv, sigZ03, sigZ03sum, ccferrsum, alpha=0.7, title='{} $\sigma$ Z03'.format(obsid), ylabelsum = 'Coadded\n$\sigma$', ylabelline='Order $\sigma$', cblabelmap='$\sigma$')
             plotutils.figout_simple(fig, sv=args.plot_sv, filout=os.path.join(args.dirout, '{}_sigZ03'.format(obsid)), svext=args.plot_ext, sh=args.plot_sh)
-            # plt.show(), plt.close()
 
             # sigBL19
-            fig, axsum, axo, axmap = ccflib.plot_ccfo_lines_map(rv, sigBL19, sigBL19sum, ccferrsum, lisord=None, title='{} $\sigma$ BL19'.format(obsid), ylabelsum = 'Coadd. $\sigma$', ylabelline='Order $\sigma$', cblabelmap='$\sigma$')
+            fig, axsum, axo, axmap = ccflib.plot_ccfo_lines_map(rv, sigBL19, sigBL19sum, ccferrsum, alpha=0.7, title='{} $\sigma$ BL19'.format(obsid), ylabelsum = 'Coadded\n$\sigma$', ylabelline='Order $\sigma$', cblabelmap='$\sigma$')
             plotutils.figout_simple(fig, sv=args.plot_sv, filout=os.path.join(args.dirout, '{}_sigBL19'.format(obsid)), svext=args.plot_ext, sh=args.plot_sh)
-            # plt.show(), plt.close()
 
         # -----------------------
 
