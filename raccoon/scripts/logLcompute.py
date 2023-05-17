@@ -115,6 +115,8 @@ def parse_args():
     parser.add_argument('--rmvspike_maxiters', help='Remove flux spikes: number of iterations', type=int, default=2)
     parser.add_argument('--fcorrorders', help='Correct order flux so that all observations have the same SED', choices=['obshighsnr'], default=None)
 
+    parser.add_argument('--noblazecorr', help='', action='store_true')
+
     # Telluric mask
     parser.add_argument('--filtell', help='File containing a telluric mask, or `default` to use the default file. If None, no tellurics are removed', type=str, default=None)
     parser.add_argument('--tellbroadendv', help='Velocity by which to broaden the telluric lines to be removed. Options: A) `obsall` (default): get maximum absolute BERV of all observations available, B) float [m/s].', type=str, default='obsall')  # nargs='+',
@@ -166,6 +168,7 @@ def parse_args():
     parser.add_argument('--plot_ext', nargs='+', help='Extensions of the plots to be saved (e.g. `--plot_ext pdf png`)', default=['pdf'])
 
     parser.add_argument('--verbose', help='', action='store_true')
+    parser.add_argument('--pause', help='', action='store_true')
 
     parser.add_argument('--testnobs', help='Testing. Number of observations (>0).', type=int, default=0)
 
@@ -676,9 +679,9 @@ def main():
             verboseprint('Remove mask lines affected by tellurics')
             verboseprint('  {} lines in mask after removing tellurics'.format(nlin))
 
-        # Full templates: Cannot really remove tellurics (make them nan or 0) because the template is interpolated and there's issues with that. Plus we also need the mean to having tellurics set as 0 causes issues.
+        # Full templates: Cannot really remove tellurics (make them nan or 0) because the template is interpolated and there's issues with that. Plus we also need the mean so having tellurics set as 0 causes issues.
         # Instead of making them 0, keep model as is, and keep track of the bad wavelength with the function Maskbad_inv above. Remove them for each RV shift when actually computing the CCF
-        else:
+        # else:
             """
             for o in ordsm_use:
                 mask = [[]] * len(rvnew)
@@ -728,7 +731,7 @@ def main():
     # Select mask lines per order usable at any epoch
     # -----------------------------------------------
 
-    verboseprint('\nRemove mask lines at order edges, taking into account BERV and mask shift')
+    verboseprint('\nRemove mask lines at order edges, taking into account BERV and mask shift, so that all observations use the same wavelength range (regardless of BERV)')
 
 
     # Order wavelength limits
@@ -786,7 +789,8 @@ def main():
 
     # ----
 
-    # Lines per order usable at any epoch
+    ### Lines per order usable at any epoch
+    # Template wavelength range usable at any epoch
 
     wmords, fmords = [[]]*nord, [[]]*nord
     if nordm > 1:
@@ -800,7 +804,11 @@ def main():
             wmords[o] = wm[mask]
             fmords[o] = fm[mask]
 
+    # NOTE: wmords and fmords are the vectors used in the model interpolation
+
     # ----
+
+    # TODO update minimum number of lines for minimum number of pixels. This code doesn't change anything now so it's ok for now
 
     # Remove orders with not enough lines
     ords_use_new = []
@@ -812,39 +820,39 @@ def main():
 
     # ----
 
-    # Mask lines all orders (count overlaps too)
-    wmall = np.hstack(wmords)
-    fmall = np.hstack(fmords)
+    # # Mask lines all orders (count overlaps too)
+    # wmall = np.hstack(wmords)
+    # fmall = np.hstack(fmords)
 
-    # Mask lines that will be used (count overlaps too) i.e. lines in ords_use
-    wmall_use = np.hstack([wmords[o] for o in args.ords_use])
-    fmall_use = np.hstack([fmords[o] for o in args.ords_use])
+    # # Mask lines that will be used (count overlaps too) i.e. lines in ords_use
+    # wmall_use = np.hstack([wmords[o] for o in args.ords_use])
+    # fmall_use = np.hstack([fmords[o] for o in args.ords_use])
 
-    # Number of lines per order
-    nlinords = [len(o) for o in wmords]
+    # # Number of lines per order
+    # nlinords = [len(o) for o in wmords]
 
-    # fig, ax = plt.subplots()
-    # for o in args.ords_use:
-    #     ax.plot(w[o], f[o])
-    #     ax.vlines(wmords[o], 0, fmords[o])
-    # plt.tight_layout()
-    # plt.show()
-    # plt.close()
-    # sys.exit()
+    # # fig, ax = plt.subplots()
+    # # for o in args.ords_use:
+    # #     ax.plot(w[o], f[o])
+    # #     ax.vlines(wmords[o], 0, fmords[o])
+    # # plt.tight_layout()
+    # # plt.show()
+    # # plt.close()
+    # # sys.exit()
 
-    # Total number of lines (including duplicates due to order overlap)
-    nlin = len(wmall)
-    nlin_use = len(wmall_use)
+    # # Total number of lines (including duplicates due to order overlap)
+    # nlin = len(wmall)
+    # nlin_use = len(wmall_use)
 
-    verboseprint('  {} lines in mask after removing tellurics and order edges'.format(nlin))
-    verboseprint('  {} lines in mask that will be used'.format(nlin_use))
-    verboseprint('  -> Some lines may be duplicated because of order overlap!')
-    verboseprint('  Lines per order:')
-    verboseprint('     Ord    Nlin')
-    for o in ords:
-        verboseprint('    {:4d}   {:5d}'.format(o, nlinords[o]))
-    verboseprint('  Orders with less than {} lines will not be used'.format(args.nlinmin))
-    verboseprint('  Orders use update: {}'.format(args.ords_use))
+    # verboseprint('  {} lines in mask after removing tellurics and order edges'.format(nlin))
+    # verboseprint('  {} lines in mask that will be used'.format(nlin_use))
+    # verboseprint('  -> Some lines may be duplicated because of order overlap!')
+    # verboseprint('  Lines per order:')
+    # verboseprint('     Ord    Nlin')
+    # for o in ords:
+    #     verboseprint('    {:4d}   {:5d}'.format(o, nlinords[o]))
+    # verboseprint('  Orders with less than {} lines will not be used'.format(args.nlinmin))
+    # verboseprint('  Orders use update: {}'.format(args.ords_use))
 
     ###########################################################################
 
@@ -933,29 +941,36 @@ def main():
         #     plt.close()
 
         # Correct flux
-        f = [f[o]/c[o] for o in ords]
-        sf = [sf[o]/c[o] for o in ords]
+        f = [f[o] / c[o] for o in ords]
+        sf = [sf[o] / c[o] for o in ords]
+        # if True:
+        #     fig, ax = plt.subplots(figsize=(16, 8))
+        #     ax.plot(w[o], f[o])
+        #     ax.plot(w[o], f[o] / c[o], '--')
+        #     plt.tight_layout()
+        #     plt.show(), plt.close()
 
         # CARMENES: c = 1
         if args.inst == 'CARM_VIS' or args.inst == 'CARM_NIR' or args.inst == 'EXPRES':
             c = [np.ones(len(w[o])) for o in ords]
 
         # HARPS correct order slope with a line
-        if args.inst == 'HARPS' or args.inst == 'HARPN':
-            # TODO: fit only line max
-            for o in ords:
-                SpecFitPar = np.polyfit(w[o], f[o], 1)
-                f[o] = np.array(f[o] / np.poly1d(SpecFitPar)(w[o]) * np.mean(f[o]))
-            # fig, ax = plt.subplots(4, 1, figsize=(8, 12))
-            # for o in [25, 26, 27]:
-            #     ax[0].plot(wraw[o], fraw[o]/craw[o])
-            #     ax[1].plot(w[o], c[o])
-            #     ax[2].plot(w[o], fraw[o]*c[o])
-            #     ax[3].plot(w[o], f[o])
-            # plt.tight_layout()
-            # plt.show()
-            # plt.close()
-            # sys.exit()
+        if args.noblazecorr is False:
+            if args.inst == 'HARPS' or args.inst == 'HARPN':
+                # TODO: fit only line max
+                for o in ords:
+                    SpecFitPar = np.polyfit(w[o], f[o], 1)
+                    f[o] = np.array(f[o] / np.poly1d(SpecFitPar)(w[o]) * np.mean(f[o]))
+                # fig, ax = plt.subplots(4, 1, figsize=(8, 12))
+                # for o in [25, 26, 27]:
+                #     ax[0].plot(wraw[o], fraw[o]/craw[o])
+                #     ax[1].plot(w[o], c[o])
+                #     ax[2].plot(w[o], fraw[o]*c[o])
+                #     ax[3].plot(w[o], f[o])
+                # plt.tight_layout()
+                # plt.show()
+                # plt.close()
+                # sys.exit()
 
         # Clip flux spikes
         if args.rmvspike:
@@ -1026,6 +1041,17 @@ def main():
         ron = dataobs.loc[filobs]['ron']
 
 
+        # ----------------
+        # TEMPORAL
+        if args.noblazecorr:
+            # Un-apply blaze correction
+            f = [f[o] * c[o] for o in ords]
+            sf = [sf[o] * c[o] for o in ords]
+            # Make blaze 1
+            c = [np.ones(len(w[o])) for o in ords]
+        # ----------------
+
+
         #######################################################################
 
         # Compute CCF with full model and logL (CC-to-logL)
@@ -1051,9 +1077,12 @@ def main():
 
         # # No yerr
         # liscs = [splrep(wmords[om], fmords[om], s=0) if om in ords_use_lines else np.nan for om in ordsm ]
-        liscs = [splrep(wmords[om], fmords[om], k=1) if om in ords_use_lines else np.nan for om in ordsm ]
+        liscs = [splrep(wmords[om], fmords[om], k=1) if om in ords_use_lines else np.nan for om in ordsm]
         # liscs = [splrep(wmords[om], fmords[om], w=1./sfm[o], s=0) if om in ords_use_lines else np.nan for om in ordsm ]  # using weight w results in all nan when interpolating
         # TODO: This can be done outside the observation loop
+
+
+
 
 
         # Variables to store data
@@ -1064,12 +1093,41 @@ def main():
         rvmaxBL19, rvmaxerrBL19, rvmaxerrlBL19, rvmaxerrrBL19 = np.empty(nord)*np.nan, np.empty(nord)*np.nan, np.empty(nord)*np.nan, np.empty(nord)*np.nan
         
         # --- Start orders loop ---
+        # ipdb.set_trace()
         for o in ords_use_lines:
         # for o in [35]:
+
+            # If template is shorter than observation -> cut observation
+            # Actually if template is shorter than observartion shifted to min/max rv
+            # Actually shift to minus min/ax rv because we are using the fast CCF approach in which we interpolate the template to -rv of the obs, so we don't need to interpolate the observation
+            # if wmords[o][0] > wcorr[o][0]:
+            # if wmords[o][0] > spectrumutils.dopplershift(wcorr[o][0], rv[0] * 1.e3, rel=True):
+            if wmords[o][0] > spectrumutils.dopplershift(wcorr[o][0], -rv[-1] * 1.e3, rel=True):
+                # Want 1st observation pixel (here this is wcorr[o]) shifted to -rv[-1] to be equal to the 1st pixel of the model
+                maskblue = spectrumutils.dopplershift(wcorr[o], -rv[-1] * 1.e3, rel=True) >= wmords[o][0]
+            else:
+                maskblue = np.ones_like(wcorr[o], dtype=bool)
+            # if wmords[o][-1] < wcorr[o][-1]:
+            # if wmords[o][-1] < spectrumutils.dopplershift(wcorr[o][-1], rv[-1] * 1.e3, rel=True):
+            if wmords[o][-1] < spectrumutils.dopplershift(wcorr[o][-1], -rv[0] * 1.e3, rel=True):
+                # Want last observation pixel shifted to  -rv[0] to be equal to the last pixel of the model
+                maskred = spectrumutils.dopplershift(wcorr[o], -rv[0] * 1.e3, rel=True) <= wmords[o][-1]
+            else:
+                maskred = np.ones_like(wcorr[o], dtype=bool)
+            maskextremes = maskblue & maskred
+
+            wcorr[o] = wcorr[o][maskextremes]
+            f[o] = f[o][maskextremes]
+            sf[o] = sf[o][maskextremes]
+            c[o] = c[o][maskextremes]
+            
+            # ---
 
             # Function to make tellurics 0
             mtell_obs = np.array(Maskbad_inv(wcorr[o]), dtype=bool)
             # TODO: this should also include order extremes
+
+            # ---
 
             # Number of datapoints
             # TODO: Should be without tellurics
@@ -1094,7 +1152,6 @@ def main():
 
                 # Fast CCF: shift observation w minus the RV shift of the CCF
                 # --------
-
                 # Doppler shift obs w minus rvshift
                 wobs_shift = spectrumutils.dopplershift(wcorr[o], -rvshift * 1.e3, rel=True)
                 
@@ -1108,7 +1165,7 @@ def main():
 
                 # Interpolate model to shifted obs w
                 if nordm > 1: cs = liscs[o]
-                fm_obsgrid = splev(wobs_shift, cs, der=0, ext=3)  # ext=0 means return extrapolated value, if ext=3, return the boundary value
+                fm_obsgrid = splev(wobs_shift, cs, der=0, ext=2)  # ext=0 means return extrapolated value, if ext=3, return the boundary value, ext=2 raises an error
                 # ISSUE TODO: Different lines (pixels) for different shifts. Extremes (+- CCF RV shift (and BERV)) should be set to 0.
 
                 # Make tellurics nan
@@ -1128,19 +1185,39 @@ def main():
 
                 """
                 if irvshift == 0 and (o == 25 or o == 35 or o == 43):
-                    fig, ax = plt.subplots(2,1, figsize=(16,8), sharex=True)
-                    # ax[0].plot(wcorr[o], f[o])
-                    ax[0].plot(wcorr[o], fVec, label='sf2 {:.3f}'.format(sf2))
-                    ax[1].plot(wmords[o], fmords[o]) 
-                    ax[1].plot(wobs_shift, fm_obsgrid) 
-                    ax[1].plot(wobs_shift, gVec, label='sg2 {:.3f}'.format(sg2))
-                    for a in ax: a.legend()
+                # if o == 25 or o == 35 or o == 43:
+                    # fig, ax = plt.subplots(3, 1, figsize=(16, 10), sharex=True)
+                    # # ax[0].plot(wcorr[o], f[o])
+                    # ax[0].plot(wcorr[o], fVec, label='Obs sf2 {:.3f}'.format(sf2))
+                    # # ax[0].plot(wobs_shift, fVec, '--', label='Obs shift sf2 {:.3f}'.format(sf2))
+                    # ax[1].plot(wmords[o], fmords[o], label='Tpl')
+                    # ax[1].plot(wobs_shift, fm_obsgrid, '--', label='Tpl shift')
+                    # ax[1].plot(wobs_shift, gVec, label='Tpl shift interp. sg2 {:.3f}'.format(sg2))
+                    # ax[2].plot(wcorr[o], fVec / np.std(fVec), '.', label='Obs')
+                    # ax[2].plot(wobs_shift, fVec / np.std(fVec), '.', label='Obs -shift')
+                    # ax[2].plot(wobs_shift, gVec / np.std(gVec), '.', label='Tpl')
+                    # for a in ax: a.legend()
+                    # plt.tight_layout()
+                    # plt.show(), plt.close()
+                    # 
+                if True:
+                    fig, ax = plt.subplots(2, 1, figsize=(16, 8), sharex=True)
+                    ax[0].plot(wcorr[o], fVec, label='Obs, sf2={:e}'.format(sf2))
+                    # ax[0].plot(wobs_shift, gVec, label='Tpl shift interp, sg2={:e}'.format(sg2))
+                    ax[0].plot(wcorr[o], gVec, label='Tpl shift interp, sg2={:e}'.format(sg2))
+                    ax[1].plot(wcorr[o], fVec / np.std(fVec), label='Obs / sf2')
+                    # ax[1].plot(wobs_shift, gVec / np.std(gVec), label='Tpl / sg2')
+                    ax[1].plot(wcorr[o], gVec / np.std(gVec), label='Tpl / sg2')
+                    ax[-1].set_xlabel(r'Wavelength [$\mathrm{A}$]')
+                    for a in ax:
+                        a.legend()
+                        a.set_ylabel('Flux')
                     plt.tight_layout()
                     plt.show(), plt.close()
                 """
 
-
                 # Cross-covariance function
+                ipdb.set_trace()
                 R = (fVec[mtell_obs] @ gVec[mtell_obs]) / N
                 # Compute the CCF between the obs f and the interpolated model f
                 cc_rv = R / np.sqrt(sf2*sg2)
@@ -1150,6 +1227,7 @@ def main():
 
                 # Compute logL BL19
                 logLBL19_rv = - N/2. * np.log(sf2 + sg2 - 2.*R)
+                # print(' ', sf2, sg2, R, cc_rv, '---', np.exp(- N/2. * np.log(sf2 + sg2 - 2.*R)))
 
                 # Save
                 cc_i.append(cc_rv)
@@ -1362,12 +1440,12 @@ def main():
         ax.set_ylabel('RV [km/s]')
         plt.tight_layout()
         plotutils.figout_simple(fig, sv=args.plot_sv, filout=os.path.join(args.dirout, 'ts_rv_quickcompare'), svext=args.plot_ext, sh=args.plot_sh)
+        # ipdb.set_trace()
+
+
+
+    if args.pause:
         ipdb.set_trace()
-
-
-
-
-    # ipdb.set_trace()
 
 
     ###########################################################################
