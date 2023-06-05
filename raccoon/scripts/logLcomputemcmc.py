@@ -18,6 +18,10 @@ import pandas as pd
 from scipy.interpolate import splrep, splev
 from tqdm import tqdm
 
+from multiprocessing import Pool
+import corner
+import emcee
+
 from raccoon import ccf as ccflib
 from raccoon import carmenesutils
 from raccoon import expresutils
@@ -38,6 +42,124 @@ C_MS = 2.99792458*1.e8  # Light speed [m/s]
 C_KMS = 2.99792458*1.e5  # Light speed [km/s]
 
 ###############################################################################
+
+
+# Likelihood function
+def rvshift2logL_fast(theta, wcorr, fVec, sf2, cs, N, mtell_obs, Id, rel=True, logLmapping='Z03'):
+    """
+    Compute logL from an rvshift (for MCMC).
+    rvshift -> cc -> logL
+
+    Parameters
+    ----------
+
+    cs : splrep output
+        Inteprolation parameters for the template
+    N : int
+        Number of datapoints in spectrum or template
+    rel : bool, default True
+        Use relativistic approximation in Doppler shift
+    """
+
+    rvshift = theta[0]  # [m/s]
+    # print('------------ rvshift', rvshift)
+
+    # Doppler shift obs w minus rvshift
+    wobs_shift = spectrumutils.dopplershift(wcorr, -rvshift, rel=rel)
+
+    # Interpolate model to shifted obs w
+    fm_obsgrid = splev(wobs_shift, cs, der=0, ext=2)  # ext=0 means return extrapolated value, if ext=3, return the boundary value, ext=2 raises an error
+
+    # Stdev of the model
+    gVec = fm_obsgrid.copy()
+    gVec[~mtell_obs] = 0.0
+    gVec -= (gVec[mtell_obs] @ Id[mtell_obs]) / N  # subtract mean
+    sg2 = (gVec[mtell_obs] @ gVec[mtell_obs]) / N  # stdev model
+
+    # Cross-covariance function
+    R = (fVec[mtell_obs] @ gVec[mtell_obs]) / N
+    # Compute the CCF between the obs f and the interpolated model f
+    cc = R / np.sqrt(sf2*sg2)
+
+    # Compute logL
+    if logLmapping == 'Z03':
+        # Compute logL Z03
+        # logLZ03 = - N/2. * np.log(1 - cc**2)
+        logL = - N/2. * np.log(1 - cc**2)
+    elif logLmapping == 'BL19':
+        # Compute logL BL19
+        # logLBL19 = - N/2. * np.log(sf2 + sg2 - 2.*R)
+        logL = - N/2. * np.log(sf2 + sg2 - 2.*R)
+    return logL  # returns a float
+
+
+# Priors
+def log_prior(theta):
+    rv = theta[0]
+    if (-1.e6 <= rv <= 1.e6):
+        return 0.0
+    else:
+        return -np.inf
+
+
+# Full log-probability function
+def log_probability(theta, wcorr, fVec, sf2, cs, N, mtell, Id, rel=True):
+    lp = log_prior(theta)
+    if not np.isfinite(lp):
+        return -np.inf
+    else:  # lp is 0
+        # return lp + log_likelihood(theta, obsx, obsy, cs, N)
+        return lp + rvshift2logL_fast(theta, wcorr, fVec, sf2, cs, N, mtell, Id, rel=True)
+
+
+def hline0(ax, y=0, color='0.8', linestyle='dashed'):
+    xlim = ax.get_xlim()
+    ax.hlines(y, xlim[0], xlim[1], color=color, linestyle=linestyle)
+    ax.set_xlim(xlim)
+    return ax
+
+
+def vline0(ax, x=0, color='0.8', linestyle='dashed'):
+    ylim = ax.get_ylim()
+    ax.vlines(x, ylim[0], ylim[1], color=color, linestyle=linestyle)
+    ax.set_ylim(ylim)
+    return ax
+
+
+def figout_simple(fig, sv=True, filout='', svext=['png', 'pdf'], sh=False, cl=True):
+    """
+    """
+    if sv:
+        for ext in svext: fig.savefig(filout+'.'+ext)
+    if sh: plt.show()
+    if cl: plt.close(fig)
+    return
+
+
+def plot_chains(samples, ndim, niterburnin=None, niterzoom=None, listhetanames=None, filout='chains', sv=True, sh=False, cl=True, svext=['png', 'pdf'], rasterized=True, verbose=True):
+    """
+    Positions of each walker as a function of the number of steps in the chain
+    """
+    # samples = sampler.get_chain()
+    fig, ax = plt.subplots(ndim, figsize=(8, 3*ndim), sharex=True)
+    ax = ax if ndim > 1 else [ax]  # make sure ax is a lis
+    for i in range(ndim):
+        axi = ax[i]
+        # Chains
+        axi.plot(samples[:, :, i], "k", lw=1, alpha=0.3, rasterized=rasterized)
+        # Burn-in limit
+        if niterburnin is not None: axi = vline0(axi, x=niterburnin, color='r', linestyle='dashed')
+        axi.set_xlim(0, len(samples))
+        if listhetanames is not None:
+            axi.set_ylabel(listhetanames[i])
+        # axi.yaxis.set_label_coords(-0.1, 0.5)
+        axi.minorticks_on()
+    # Zoom on the first `niterzoom` iterations only
+    if niterzoom is not None: ax[-1].set_xlim(0, niterzoom)
+    ax[-1].set_xlabel("Iteration")
+    plt.tight_layout()
+    plotutils.figout_simple(fig, sv=sv, filout=filout, svext=svext, sh=sh, cl=cl)
+    if verbose: print('Saved figure chains:', filout)
 
 
 def parse_args():
@@ -155,7 +277,17 @@ def parse_args():
     # logL
     # parser.add_argument('--cc2logL', help='Compute logLikelihood (logL) with the CC-to-logL mapping (false if not present).', action='store_true')
     # parser.add_argument('--logLmapping', help='Type of CC-to-logL mapping', choices=['zucker2003', 'brogiline2019'])
-    parser.add_argument('--mcmc', help='Use an MCMC to sample the peak of the logL, instead of computing it for a fixed RV range.', action='store_true')
+
+    # MCMC
+    # parser.add_argument('--mcmc', help='Use an MCMC to sample the peak of the logL, instead of computing it for a fixed RV range.', action='store_true')
+    parser.add_argument('--nwalkers', help='MCMC number of walkers.', type=int, default=20)
+    parser.add_argument('--niter', help='MCMC total number of iterations.', type=int, default=1000)
+    parser.add_argument('--niterburnin', help='Number of initial iterations to discard out of niter.', type=int, default=150)
+
+    parser.add_argument('--pool_nthreads', help='', type=int, default=6)
+
+    parser.add_argument('--p0type', help='Starting point for walkers', choices=['gball', 'uniform'], default='uniform')
+    parser.add_argument('--p0range', help='+- from rvabs to start the walkers [m/s]', type=float, default=50)
 
     # Output
     parser.add_argument('--dirout', help='Output directory.', default='./ccf_output/', type=str)
@@ -888,7 +1020,8 @@ def main():
     # dataccfoTS = {}
     dataccfoTS = []
     first, firsto = True, True
-    for i, obs in enumerate(tqdm(lisfilobs)):
+    # for i, obs in enumerate(tqdm(lisfilobs)):
+    for i, obs in enumerate(lisfilobs):
         filobs = lisfilobs[i]
         obsid = os.path.basename(os.path.splitext(filobs)[0])
         # verboseprint('{}/{} {}'.format(i+1, nobs, filobs))
@@ -1119,6 +1252,7 @@ def main():
         # ipdb.set_trace()
         for o in ords_use_lines:
         # for o in [35]:
+            verboseprint('===o', o)
 
             # If template is shorter than observation -> cut observation
             # Actually if template is shorter than observartion shifted to min/max rv
@@ -1189,9 +1323,10 @@ def main():
             fVec -= (fVec[mtell_obs] @ Id[mtell_obs]) / N  # subtract mean
             sf2 = (fVec[mtell_obs] @ fVec[mtell_obs]) / N  # stdev spectrum
 
-            # Temporal variables to append Doppler-shift values
-            cc_i, logLZ03_i, logLBL19_i = [], [], []
+            # # Temporal variables to append Doppler-shift values
+            # cc_i, logLZ03_i, logLBL19_i = [], [], []
 
+            """
             # For each RV shift in the CCF grid
             for irvshift, rvshift in enumerate(rv):
 
@@ -1228,39 +1363,6 @@ def main():
                 gVec -= (gVec[mtell_obs] @ Id[mtell_obs]) / N  # subtract mean  ----------> CAREFUL WITH TELLURICS
                 sg2 = (gVec[mtell_obs] @ gVec[mtell_obs]) / N  # stdev model
 
-                """
-                if irvshift == 0 and (o == 25 or o == 35 or o == 43):
-                # if o == 25 or o == 35 or o == 43:
-                    # fig, ax = plt.subplots(3, 1, figsize=(16, 10), sharex=True)
-                    # # ax[0].plot(wcorr[o], f[o])
-                    # ax[0].plot(wcorr[o], fVec, label='Obs sf2 {:.3f}'.format(sf2))
-                    # # ax[0].plot(wobs_shift, fVec, '--', label='Obs shift sf2 {:.3f}'.format(sf2))
-                    # ax[1].plot(wmords[o], fmords[o], label='Tpl')
-                    # ax[1].plot(wobs_shift, fm_obsgrid, '--', label='Tpl shift')
-                    # ax[1].plot(wobs_shift, gVec, label='Tpl shift interp. sg2 {:.3f}'.format(sg2))
-                    # ax[2].plot(wcorr[o], fVec / np.std(fVec), '.', label='Obs')
-                    # ax[2].plot(wobs_shift, fVec / np.std(fVec), '.', label='Obs -shift')
-                    # ax[2].plot(wobs_shift, gVec / np.std(gVec), '.', label='Tpl')
-                    # for a in ax: a.legend()
-                    # plt.tight_layout()
-                    # plt.show(), plt.close()
-                    # 
-                if True:
-                    fig, ax = plt.subplots(2, 1, figsize=(16, 8), sharex=True)
-                    ax[0].plot(wcorr[o], fVec, label='Obs, sf2={:e}'.format(sf2))
-                    # ax[0].plot(wobs_shift, gVec, label='Tpl shift interp, sg2={:e}'.format(sg2))
-                    ax[0].plot(wcorr[o], gVec, label='Tpl shift interp, sg2={:e}'.format(sg2))
-                    ax[1].plot(wcorr[o], fVec / np.std(fVec), label='Obs / sf2')
-                    # ax[1].plot(wobs_shift, gVec / np.std(gVec), label='Tpl / sg2')
-                    ax[1].plot(wcorr[o], gVec / np.std(gVec), label='Tpl / sg2')
-                    ax[-1].set_xlabel(r'Wavelength [$\mathrm{A}$]')
-                    for a in ax:
-                        a.legend()
-                        a.set_ylabel('Flux')
-                    plt.tight_layout()
-                    plt.show(), plt.close()
-                """
-
                 # Cross-covariance function
                 # ipdb.set_trace()
                 R = (fVec[mtell_obs] @ gVec[mtell_obs]) / N
@@ -1279,6 +1381,170 @@ def main():
                 logLZ03_i.append(logLZ03_rv)
                 logLBL19_i.append(logLBL19_rv)
             # --- End RV shift loop ---
+            """
+
+            # MCMC to sample logL peak
+            # ------------------------
+
+            # Parameter strings for plots
+            listhetanames = ['rv']
+            dictthetastr = {'rv': 'RV'}
+            dictthetastrunit = {'rv': 'RV [m/s]'}
+            listthetastr = [v for v in dictthetastr.values()]
+            listhetastrunit = [v for v in dictthetastrunit.values()]
+
+            # MCMC params
+            ndim = len(listhetanames)
+
+
+            # Initial guess
+            theta_initial = [args.rvabs * 1.e3]  # [m/s]
+
+            # Initialise the walkers
+            # shape: (args.nwalkers, ndim)
+            #   Tiny Gaussian ball (i.e. multivariate Gaussian centered on each theta, with a small sigma)
+            #   Initial one can be centered around the maximum likelihood result
+            if args.p0type == 'gball':
+                p0 = [np.array(theta_initial) + np.random.randn(ndim) for i in range(args.nwalkers)]
+            #   Uniform distribution +- args.p0range m/s
+            elif args.p0type == 'uniform':
+                p0 = [np.array([np.random.uniform(theta_initial[l] - args.p0range, theta_initial[l] + args.p0range) for l in range(ndim)]) for i in range(args.nwalkers)]
+
+            # True (injected) RVs
+            theta_true = [np.nan]
+
+            # Backend file
+            diroutmcmc = os.path.join(args.dirout, 'walk{}_iter{}_iterburn{}/'.format(args.nwalkers, args.niter, args.niterburnin))
+            if not os.path.exists(diroutmcmc): os.makedirs(diroutmcmc)
+            labelout = ''
+            filbackend = os.path.join(diroutmcmc, '{}_o{}_mcmcbackend'.format(obsid, o) + labelout + '.h5')
+
+            # Set up the backend
+            # Don't forget to clear it in case the file already exists
+            backend = emcee.backends.HDFBackend(filbackend)
+            backend.reset(args.nwalkers, ndim)
+
+            # Run MCMC
+            verboseprint('Run MCMC')
+            with Pool(args.pool_nthreads) as pool:
+                sampler = emcee.EnsembleSampler(args.nwalkers, ndim, log_probability, args=(wcorr[o], fVec, sf2, liscs[o], N, mtell_obs, Id), kwargs={'rel': True}, pool=pool, backend=backend)
+                pos, prob, state = sampler.run_mcmc(p0, args.niter, progress=True)
+
+            # # Read MCMC backend saved in previous run
+            # reader = emcee.backends.HDFBackend(filbackend)
+            # # Change name for consistency below
+            # sampler = reader
+
+            # MCMC output values and plots
+
+            # Load the samples
+            samplesall = sampler.get_chain()  # including burn-in
+            samples = sampler.get_chain(discard=args.niterburnin)  # , thin=thin
+            # Load the samples and flat
+            flat_samples = sampler.get_chain(discard=args.niterburnin, flat=True)
+            # Load the likelihood
+            log_prob_samples = sampler.get_log_prob(discard=args.niterburnin, flat=True)
+            # Load the prior
+            log_prior_samples = sampler.get_blobs(discard=args.niterburnin, flat=True)
+            # print(flat_samples.shape)
+
+            # -----------------------------------
+
+            # Plot chains
+            if doplot:
+                verboseprint('Plot chains')
+
+                # Without burn-in
+                filout = os.path.join(diroutmcmc, '{}_o{}_chains'.format(obsid, o) + labelout)
+                plot_chains(samples, ndim, listhetanames=listhetastrunit, filout=filout, sv=args.plot_sv, sh=args.plot_sh, svext=args.plot_ext, verbose=False)
+
+                # With burn-in
+                filout = os.path.join(diroutmcmc, '{}_o{}_chainsall'.format(obsid, o) + labelout)
+                plot_chains(samplesall, ndim, niterburnin=args.niterburnin, listhetanames=listhetastrunit, filout=filout, sv=args.plot_sv, sh=args.plot_sh, svext=args.plot_ext, verbose=False)
+
+                # Zoom on first 200 iterations only (with) burn-in if seen)
+                niterzoom = 200
+                filout = os.path.join(diroutmcmc, '{}_o{}_chainszoom{}iters'.format(obsid, o, niterzoom) + labelout)
+                plot_chains(samplesall, ndim, niterburnin=args.niterburnin, niterzoom=niterzoom, listhetanames=listhetastrunit, filout=filout, sv=args.plot_sv, sh=args.plot_sh, svext=args.plot_ext, verbose=False)
+
+            # -----------------------------------
+            
+            # Final values
+            #   Uncertainties based on the 16th, 50th, and 84th percentiles of the samples in the marginalized distributions
+            filout = os.path.join(diroutmcmc, '{}_o{}_mcmc_paramsfinal'.format(obsid, o) + '.txt')
+            with open(filout, 'w') as fout:
+                verboseprint('Final values')
+                fout.write('Final values\n')
+                for i in range(ndim):
+                    mcmc = np.percentile(flat_samples[:, i], [16, 50, 84])
+                    q = np.diff(mcmc)  # uncertainties
+                    verboseprint('  {} = {:.3f} +- {:.3f} {:.3f}'.format(listhetanames[i], mcmc[1], q[0], q[1]))
+                    fout.write('  {} = {:.3f} +- {:.3f} {:.3f}\n'.format(listhetanames[i], mcmc[1], q[0], q[1]))
+                    strinit = '    init: {:.3f}'.format(theta_initial[i])
+                    # strtrue = '    true: {:.3f}'.format(theta_true[i]) if theta_true[i] is not None else ''
+                    strtrue = ''
+                    verboseprint(strinit, strtrue)
+                    fout.write(strinit + strtrue + '\n')
+                    # #
+                    # from IPython.display import display, Math
+                    # txt = "\mathrm{{{3}}} = {0:.3f}_{{-{1:.3f}}}^{{{2:.3f}}}"
+                    # txt = txt.format(mcmc[1], q[0], q[1], listhetanames[i])
+                    # display(Math(txt))
+                    # # print(txt)
+
+            # -----------------------------------
+
+            # Put likelihood in same array so can pop into corner plot easily
+            flat_samples_logl = np.concatenate((flat_samples, log_prob_samples[:, None]), axis=1)
+            # Add labels for plot
+            theta_true_logl = theta_true + [np.nan]
+            listhetastrunit_logl = listhetastrunit + [r'$\log L$']
+            listthetastr_logl = listthetastr + [r'$\log L$']
+            
+            # -----------------------------------
+
+            # Plot corner
+            if doplot:
+                verboseprint('Plot corner')
+                # fig = corner.corner(flat_samples, labels=listhetanames, truths=[m_true, b_true])
+                fig = corner.corner(flat_samples, quantiles=[0.16, 0.5, 0.84], truths=theta_true, truth_color='C1', labels=listhetastrunit, titles=listthetastr, show_titles=True, title_kwargs={"fontsize": 'medium'}, label_kwargs={"fontsize": 'medium'}, verbose=args.verbose)
+                # fig = corner.corner(flat_samples, quantiles=[0.16, 0.5, 0.84], labels=listhetastrunit, titles=listthetastr, show_titles=True, title_kwargs={"fontsize": 'medium'}, label_kwargs={"fontsize": 'medium'}, verbose=args.verbose)
+                filout = os.path.join(diroutmcmc, '{}_o{}_corner'.format(obsid, o) + labelout)
+                plotutils.figout_simple(fig, sv=args.plot_sv, filout=filout, svext=args.plot_ext, sh=args.plot_sh)
+                verboseprint('  Saved:', filout)
+                # plt.show()
+                # plt.close()
+
+            if True:
+                verboseprint('Plot corner with logL')
+                fig = corner.corner(flat_samples_logl, quantiles=[0.16, 0.5, 0.84], truths=theta_true_logl, truth_color='C1', labels=listhetastrunit_logl, titles=listthetastr_logl, show_titles=True, title_kwargs={"fontsize": 'medium'}, label_kwargs={"fontsize": 'medium'}, verbose=args.verbose)
+                filout = os.path.join(diroutmcmc, '{}_o{}_corner_logL'.format(obsid, o) + labelout)
+                plotutils.figout_simple(fig, sv=args.plot_sv, filout=filout, svext=args.plot_ext, sh=args.plot_sh)
+                verboseprint('  Saved:', filout)
+
+            # -----------------------------------
+
+
+
+
+            ipdb.set_trace()
+
+            # TODO: save MCMC outputs into arrays, fits files, and time series
+            # Careful with all stuff below, it is old
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
             # Save
             cc[o] = cc_i

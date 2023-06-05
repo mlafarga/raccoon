@@ -34,7 +34,7 @@ setup(
     packages=setuptools.find_packages(),  # better for scripts
     # python_requires='>=3.6',
     setup_requires=['numpy', 'scipy'],  # need for fortran
-    install_requires=['numpy', 'scipy', 'astropy', 'pandas', 'lmfit', 'progress', 'matplotlib', 'tqdm', 'colorcet', 'cmocean'],
+    install_requires=['numpy', 'scipy', 'astropy', 'pandas', 'lmfit', 'progress', 'matplotlib', 'tqdm', 'colorcet', 'cmocean', 'corner', 'emcee', 'h5py'],
 
     # package_data={
     #     # 'raccoon': ["data/*.dat", "data/*.mas", "data/*.fits", ],
@@ -48,6 +48,7 @@ setup(
             'raccoonmask=raccoon.scripts.maskcompute:main',
             'raccoonccf=raccoon.scripts.ccfcompute:main',
             'raccoonlogL=raccoon.scripts.logLcompute:main',
+            'raccoonlogLmcmc=raccoon.scripts.logLcomputemcmc:main',
         ],
     },
 
