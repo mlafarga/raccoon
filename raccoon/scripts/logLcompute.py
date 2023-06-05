@@ -115,7 +115,9 @@ def parse_args():
     parser.add_argument('--rmvspike_maxiters', help='Remove flux spikes: number of iterations', type=int, default=2)
     parser.add_argument('--fcorrorders', help='Correct order flux so that all observations have the same SED', choices=['obshighsnr'], default=None)
 
+    # TESTS
     parser.add_argument('--noblazecorr', help='', action='store_true')
+    parser.add_argument('--test_norm', help='', action='store_true')
 
     # Telluric mask
     parser.add_argument('--filtell', help='File containing a telluric mask, or `default` to use the default file. If None, no tellurics are removed', type=str, default=None)
@@ -808,6 +810,26 @@ def main():
 
     # ----
 
+    # TEST
+    # Normalise model
+    if args.test_norm:
+        fmords_norm = [[]]*nord
+        for o in ords:
+            if len(fmords[o] > 0):
+                fmords_norm[o] = fmords[o] / np.nanmax(fmords[o])
+            else:
+                fmords_norm[o] = fmords[o]
+            # if True and o > 20:
+            #     fig, ax = plt.subplots(2, 1)
+            #     ax[0].plot(wmords[o], fmords[o])
+            #     ax[1].plot(wmords[o], fmords_norm[o])
+            #     plt.tight_layout()
+            #     plt.show(), plt.close()
+            #     ipdb.set_trace()
+        fmords = fmords_norm
+        
+    # ----
+
     # TODO update minimum number of lines for minimum number of pixels. This code doesn't change anything now so it's ok for now
 
     # Remove orders with not enough lines
@@ -1140,6 +1162,28 @@ def main():
             # Make tellurics zero
             fVec[~mtell_obs] = 0.0
 
+            # ---
+            
+            # TEST
+            if args.test_norm:
+                # fVec_norm = []
+                if len(fVec > 0):
+                    fVec_norm = fVec / np.nanmax(fVec)
+                else:
+                    fVec_norm = fVec
+                # if True and o > 10:
+                #     fig, ax = plt.subplots(2, 1)
+                #     ax[0].plot(wcorr[o], fVec, label='obs')
+                #     ax[1].plot(wcorr[o], fVec_norm, label='obs')
+                #     ax[1].plot(wmords[o], fmords[o], label='tpl')
+                #     for a in ax: a.legend()
+                #     plt.tight_layout()
+                #     plt.show(), plt.close()
+                #     ipdb.set_trace()
+                fVec = fVec_norm
+
+            # ---
+
             # Stdev of the spectrum
             fVec -= (fVec[mtell_obs] @ Id[mtell_obs]) / N  # subtract mean
             sf2 = (fVec[mtell_obs] @ fVec[mtell_obs]) / N  # stdev spectrum
@@ -1431,13 +1475,17 @@ def main():
 
     # Quick plot
     if True:
-        fig, ax = plt.subplots()
-        ax.errorbar(dataall['bjd'], dataall['rvmaxZ03sum'], yerr=dataall['rvmaxerrZ03sum'], linestyle='None', marker='o', label='Z03')
-        ax.errorbar(dataall['bjd'], dataall['rvmaxBL19sum'], yerr=dataall['rvmaxerrBL19sum'], linestyle='None', marker='o', label='BL19')
-        ax.legend(fontsize='small')
-        ax.minorticks_on()
-        ax.set_xlabel('BJD [d]')
-        ax.set_ylabel('RV [km/s]')
+        fig, ax = plt.subplots(2, 1, figsize=(8, 8), sharex=True)
+        ax[0].errorbar(dataall['bjd'], dataall['rvmaxZ03sum'], yerr=dataall['rvmaxerrZ03sum'], linestyle='None', marker='o', color='C0', ecolor=mpl.colors.colorConverter.to_rgba('C0', alpha=0.5), elinewidth=2, capsize=5, capthick=2, label='Z03')
+        ax[0].errorbar(dataall['bjd'], dataall['rvmaxBL19sum'], yerr=dataall['rvmaxerrBL19sum'], linestyle='None', marker='^', color='C1', ecolor=mpl.colors.colorConverter.to_rgba('C1', alpha=0.5), elinewidth=2, capsize=5, capthick=2, label='BL19')
+        # Diff
+        ax[1].plot(dataall['bjd'], (dataall['rvmaxZ03sum'] - dataall['rvmaxBL19sum']) * 1.e3, 'ko', label='Z03 - BL19')
+        for a in ax:
+            a.legend(fontsize='small')
+            a.minorticks_on()
+        ax[-1].set_xlabel('BJD [d]')
+        ax[0].set_ylabel('RV [km/s]')
+        ax[1].set_ylabel('RV diff [m/s]')
         plt.tight_layout()
         plotutils.figout_simple(fig, sv=args.plot_sv, filout=os.path.join(args.dirout, 'ts_rv_quickcompare'), svext=args.plot_ext, sh=args.plot_sh)
         # ipdb.set_trace()
