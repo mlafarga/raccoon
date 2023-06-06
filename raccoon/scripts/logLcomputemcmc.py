@@ -280,14 +280,16 @@ def parse_args():
 
     # MCMC
     # parser.add_argument('--mcmc', help='Use an MCMC to sample the peak of the logL, instead of computing it for a fixed RV range.', action='store_true')
-    parser.add_argument('--nwalkers', help='MCMC number of walkers.', type=int, default=20)
-    parser.add_argument('--niter', help='MCMC total number of iterations.', type=int, default=1000)
-    parser.add_argument('--niterburnin', help='Number of initial iterations to discard out of niter.', type=int, default=150)
+    parser.add_argument('--nwalkers', help='MCMC number of walkers.', type=int, default=10)
+    parser.add_argument('--niter', help='MCMC total number of iterations.', type=int, default=500)
+    parser.add_argument('--niterburnin', help='Number of initial iterations to discard out of niter.', type=int, default=100)
 
     parser.add_argument('--pool_nthreads', help='', type=int, default=6)
 
     parser.add_argument('--p0type', help='Starting point for walkers', choices=['gball', 'uniform'], default='uniform')
     parser.add_argument('--p0range', help='+- from rvabs to start the walkers [m/s]', type=float, default=50)
+
+    parser.add_argument('--nobackend', help='Do not save individual backend per ord/obs', action='store_true')
 
     # Output
     parser.add_argument('--dirout', help='Output directory.', default='./ccf_output/', type=str)
@@ -1019,6 +1021,10 @@ def main():
     dataccfsumTS = {}
     # dataccfoTS = {}
     dataccfoTS = []
+
+    # MCMC save data
+    rvmean_ts, rvmedian_ts, rvmeanw_ts, rvmeanwerr_ts, rverrmean0_ts, rverrmean1_ts, rverrmean_ts = [], [], [], [], [], [], []
+
     first, firsto = True, True
     # for i, obs in enumerate(tqdm(lisfilobs)):
     for i, obs in enumerate(lisfilobs):
@@ -1242,10 +1248,10 @@ def main():
 
 
         # Variables to store data
-        cc = np.empty((nord, len(rv)))*np.nan
-        logLZ03, sigZ03 = np.empty((nord, len(rv)))*np.nan, np.empty((nord, len(rv)))*np.nan
+        cc = np.empty((nord, len(rv)))*np.nan  # not needed with MCMC
+        logLZ03, sigZ03 = np.empty((nord, len(rv)))*np.nan, np.empty((nord, len(rv)))*np.nan  # not needed with MCMC
         rvmaxZ03, rvmaxerrZ03, rvmaxerrlZ03, rvmaxerrrZ03 = np.empty(nord)*np.nan, np.empty(nord)*np.nan, np.empty(nord)*np.nan, np.empty(nord)*np.nan
-        logLBL19, sigBL19 = np.empty((nord, len(rv)))*np.nan, np.empty((nord, len(rv)))*np.nan
+        logLBL19, sigBL19 = np.empty((nord, len(rv)))*np.nan, np.empty((nord, len(rv)))*np.nan  # not needed with MCMC
         rvmaxBL19, rvmaxerrBL19, rvmaxerrlBL19, rvmaxerrrBL19 = np.empty(nord)*np.nan, np.empty(nord)*np.nan, np.empty(nord)*np.nan, np.empty(nord)*np.nan
         
         # --- Start orders loop ---
@@ -1415,14 +1421,20 @@ def main():
 
             # Backend file
             diroutmcmc = os.path.join(args.dirout, 'walk{}_iter{}_iterburn{}/'.format(args.nwalkers, args.niter, args.niterburnin))
+            diroutmcmcords = os.path.join(diroutmcmc, 'ords')
             if not os.path.exists(diroutmcmc): os.makedirs(diroutmcmc)
+            if not os.path.exists(diroutmcmcords): os.makedirs(diroutmcmcords)
             labelout = ''
-            filbackend = os.path.join(diroutmcmc, '{}_o{}_mcmcbackend'.format(obsid, o) + labelout + '.h5')
+            filbackend = os.path.join(diroutmcmcords, '{}_o{}_mcmcbackend'.format(obsid, o) + labelout + '.h5')
 
-            # Set up the backend
-            # Don't forget to clear it in case the file already exists
-            backend = emcee.backends.HDFBackend(filbackend)
-            backend.reset(args.nwalkers, ndim)
+            if args.nobackend:
+                backend = None
+            else:
+                # Set up the backend
+                # Don't forget to clear it in case the file already exists
+                backend = emcee.backends.HDFBackend(filbackend)
+                backend.reset(args.nwalkers, ndim)
+
 
             # Run MCMC
             verboseprint('Run MCMC')
@@ -1454,32 +1466,32 @@ def main():
             if doplot:
                 verboseprint('Plot chains')
 
-                # Without burn-in
-                filout = os.path.join(diroutmcmc, '{}_o{}_chains'.format(obsid, o) + labelout)
-                plot_chains(samples, ndim, listhetanames=listhetastrunit, filout=filout, sv=args.plot_sv, sh=args.plot_sh, svext=args.plot_ext, verbose=False)
+                # # Without burn-in
+                # filout = os.path.join(diroutmcmcords, '{}_o{}_chains'.format(obsid, o) + labelout)
+                # plot_chains(samples, ndim, listhetanames=listhetastrunit, filout=filout, sv=args.plot_sv, sh=args.plot_sh, svext=args.plot_ext, verbose=False)
 
                 # With burn-in
-                filout = os.path.join(diroutmcmc, '{}_o{}_chainsall'.format(obsid, o) + labelout)
+                filout = os.path.join(diroutmcmcords, '{}_o{}_chainsall'.format(obsid, o) + labelout)
                 plot_chains(samplesall, ndim, niterburnin=args.niterburnin, listhetanames=listhetastrunit, filout=filout, sv=args.plot_sv, sh=args.plot_sh, svext=args.plot_ext, verbose=False)
 
-                # Zoom on first 200 iterations only (with) burn-in if seen)
-                niterzoom = 200
-                filout = os.path.join(diroutmcmc, '{}_o{}_chainszoom{}iters'.format(obsid, o, niterzoom) + labelout)
-                plot_chains(samplesall, ndim, niterburnin=args.niterburnin, niterzoom=niterzoom, listhetanames=listhetastrunit, filout=filout, sv=args.plot_sv, sh=args.plot_sh, svext=args.plot_ext, verbose=False)
+                # # Zoom on first 200 iterations only (with) burn-in if seen)
+                # niterzoom = 200
+                # filout = os.path.join(diroutmcmcords, '{}_o{}_chainszoom{}iters'.format(obsid, o, niterzoom) + labelout)
+                # plot_chains(samplesall, ndim, niterburnin=args.niterburnin, niterzoom=niterzoom, listhetanames=listhetastrunit, filout=filout, sv=args.plot_sv, sh=args.plot_sh, svext=args.plot_ext, verbose=False)
 
             # -----------------------------------
             
             # Final values
             #   Uncertainties based on the 16th, 50th, and 84th percentiles of the samples in the marginalized distributions
-            filout = os.path.join(diroutmcmc, '{}_o{}_mcmc_paramsfinal'.format(obsid, o) + '.txt')
+            filout = os.path.join(diroutmcmcords, '{}_o{}_mcmc_paramsfinal'.format(obsid, o) + '.txt')
             with open(filout, 'w') as fout:
                 verboseprint('Final values')
                 fout.write('Final values\n')
                 for i in range(ndim):
                     mcmc = np.percentile(flat_samples[:, i], [16, 50, 84])
                     q = np.diff(mcmc)  # uncertainties
-                    verboseprint('  {} = {:.3f} +- {:.3f} {:.3f}'.format(listhetanames[i], mcmc[1], q[0], q[1]))
-                    fout.write('  {} = {:.3f} +- {:.3f} {:.3f}\n'.format(listhetanames[i], mcmc[1], q[0], q[1]))
+                    verboseprint('  {} = {:.3f} +- {:.3f} {:.3f}'.format(listhetanames[i], mcmc[1], q[1], q[0]))
+                    fout.write('  {} = {:.3f} +- {:.3f} {:.3f}\n'.format(listhetanames[i], mcmc[1], q[1], q[0]))
                     strinit = '    init: {:.3f}'.format(theta_initial[i])
                     # strtrue = '    true: {:.3f}'.format(theta_true[i]) if theta_true[i] is not None else ''
                     strtrue = ''
@@ -1491,6 +1503,11 @@ def main():
                     # txt = txt.format(mcmc[1], q[0], q[1], listhetanames[i])
                     # display(Math(txt))
                     # # print(txt)
+
+            # Save in arrays
+            rvmaxZ03[o] = mcmc[1]  # rv
+            rvmaxerrlZ03[o] = q[0]  # rverr0 (negative)
+            rvmaxerrrZ03[o] = q[1]  # rverr1 (positive)
 
             # -----------------------------------
 
@@ -1504,33 +1521,60 @@ def main():
             # -----------------------------------
 
             # Plot corner
-            if doplot:
-                verboseprint('Plot corner')
-                # fig = corner.corner(flat_samples, labels=listhetanames, truths=[m_true, b_true])
-                fig = corner.corner(flat_samples, quantiles=[0.16, 0.5, 0.84], truths=theta_true, truth_color='C1', labels=listhetastrunit, titles=listthetastr, show_titles=True, title_kwargs={"fontsize": 'medium'}, label_kwargs={"fontsize": 'medium'}, verbose=args.verbose)
-                # fig = corner.corner(flat_samples, quantiles=[0.16, 0.5, 0.84], labels=listhetastrunit, titles=listthetastr, show_titles=True, title_kwargs={"fontsize": 'medium'}, label_kwargs={"fontsize": 'medium'}, verbose=args.verbose)
-                filout = os.path.join(diroutmcmc, '{}_o{}_corner'.format(obsid, o) + labelout)
-                plotutils.figout_simple(fig, sv=args.plot_sv, filout=filout, svext=args.plot_ext, sh=args.plot_sh)
-                verboseprint('  Saved:', filout)
-                # plt.show()
-                # plt.close()
+            # if doplot:
+            #     verboseprint('Plot corner')
+            #     # fig = corner.corner(flat_samples, labels=listhetanames, truths=[m_true, b_true])
+            #     fig = corner.corner(flat_samples, quantiles=[0.16, 0.5, 0.84], truths=theta_true, truth_color='C1', labels=listhetastrunit, titles=listthetastr, show_titles=True, title_kwargs={"fontsize": 'medium'}, label_kwargs={"fontsize": 'medium'}, verbose=args.verbose)
+            #     # fig = corner.corner(flat_samples, quantiles=[0.16, 0.5, 0.84], labels=listhetastrunit, titles=listthetastr, show_titles=True, title_kwargs={"fontsize": 'medium'}, label_kwargs={"fontsize": 'medium'}, verbose=args.verbose)
+            #     filout = os.path.join(diroutmcmcords, '{}_o{}_corner'.format(obsid, o) + labelout)
+            #     plotutils.figout_simple(fig, sv=args.plot_sv, filout=filout, svext=args.plot_ext, sh=args.plot_sh)
+            #     verboseprint('  Saved:', filout)
+            #     # plt.show()
+            #     # plt.close()
 
-            if True:
+            if doplot:
                 verboseprint('Plot corner with logL')
                 fig = corner.corner(flat_samples_logl, quantiles=[0.16, 0.5, 0.84], truths=theta_true_logl, truth_color='C1', labels=listhetastrunit_logl, titles=listthetastr_logl, show_titles=True, title_kwargs={"fontsize": 'medium'}, label_kwargs={"fontsize": 'medium'}, verbose=args.verbose)
-                filout = os.path.join(diroutmcmc, '{}_o{}_corner_logL'.format(obsid, o) + labelout)
+                filout = os.path.join(diroutmcmcords, '{}_o{}_corner_logL'.format(obsid, o) + labelout)
                 plotutils.figout_simple(fig, sv=args.plot_sv, filout=filout, svext=args.plot_ext, sh=args.plot_sh)
                 verboseprint('  Saved:', filout)
 
             # -----------------------------------
 
+            # End orders loop
+            # ---------------
 
+        # Save order RVs (per obs)
+        filout = os.path.join(diroutmcmc, os.path.basename(os.path.splitext(filobs)[0]) + '_rvmcmc.csv')
+        dfout = pd.DataFrame({'rv': rvmaxZ03, 'rverr0': rvmaxerrlZ03, 'rverr1': rvmaxerrrZ03}, index=ords)
+        dfout.index.rename('ord', inplace=True)
+        dfout.to_csv(filout, na_rep=np.nan, header=True, index=True, float_format='%0.8f')
 
+        # Average order RVs
+        rvmean_ts.append(np.nanmean(rvmaxZ03))
+        rvmedian_ts.append(np.nanmedian(rvmaxZ03))
+        rverrmean0_ts.append(np.nanmean(rvmaxerrlZ03))  # mean left uncertainty over all orders
+        rverrmean1_ts.append(np.nanmean(rvmaxerrrZ03))  # mean right uncertainty over all orders
+        rverrmean_ts.append(np.nanmean([rvmaxerrlZ03, rvmaxerrrZ03]))  # mean uncertianty over all orders
+        errmean = np.nanmean([rvmaxerrlZ03, rvmaxerrrZ03], axis=0)  # mean uncertianty per order
+        weight_errmean = 1 / errmean**2  # weight per order
+        mnan = np.isfinite(rvmaxZ03) & np.isfinite(weight_errmean)
+        rvmeanw_ts.append(np.average(rvmaxZ03[mnan], weights=weight_errmean[mnan]))
+        rvmeanwerr_ts.append(np.nan)  # compute weigthed mean uncertainty
 
-            ipdb.set_trace()
+        # End obs loop
+        # ------------
 
-            # TODO: save MCMC outputs into arrays, fits files, and time series
-            # Careful with all stuff below, it is old
+    # Save obs RVs (single file for all obs)
+    filout = os.path.join(diroutmcmc, '{}.cclogLmcmcpar.csv'.format(args.obj))
+    dfout_ts = pd.DataFrame({'rvmean_ts': rvmean_ts, 'rvmedian_ts': rvmedian_ts, 'rverrmean0_ts': rverrmean0_ts, 'rverrmean1_ts': rverrmean1_ts, 'rverrmean_ts': rverrmean_ts, 'rvmeanw_ts': rvmeanw_ts, 'rvmeanwerr_ts': rvmeanwerr_ts}, index=listimeid['timeid'])
+    dfout_ts.index.rename('obsid', inplace=True)
+    dfout_ts.to_csv(filout, na_rep=np.nan, header=True, index=True, float_format='%0.8f')
+    # ipdb.set_trace()
+
+    """
+        # TODO: save MCMC outputs into arrays, fits files, and time series
+        # Careful with all stuff below, it is old
 
 
 
@@ -1757,6 +1801,7 @@ def main():
         plotutils.figout_simple(fig, sv=args.plot_sv, filout=os.path.join(args.dirout, 'ts_rv_quickcompare'), svext=args.plot_ext, sh=args.plot_sh)
         # ipdb.set_trace()
 
+    """
 
 
     if args.pause:
