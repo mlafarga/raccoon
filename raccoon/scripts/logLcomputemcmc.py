@@ -129,7 +129,7 @@ def rvshift2logL_fast_obo(theta, wcorr, fVec, sf2, cs, N, mtell_obs, Id, rel=Tru
 # Priors
 def log_prior(theta):
     rv = theta[0]
-    if (-1.e6 <= rv <= 1.e6):
+    if (-1.e3 <= rv <= 1.e3):
         return 0.0
     else:
         return -np.inf
@@ -175,7 +175,10 @@ def rvshift2logL_fast_allords(theta, ords, liswcorr, lisfVec, lissf2, liscs, lis
 
         # Interpolate model to shifted obs w
         fm_obsgrid = splev(wobs_shift, liscs[o], der=0, ext=2)  # ext=0 means return extrapolated value, if ext=3, return the boundary value, ext=2 raises an error
-
+        # try:
+        #     fm_obsgrid = splev(wobs_shift, liscs[o], der=0, ext=2)  # ext=0 means return extrapolated value, if ext=3, return the boundary value, ext=2 raises an error
+        # except ValueError:
+        #     print('++++++++++++ o', o, 'rvshift', rvshift)
         # Stdev of the model
         gVec = fm_obsgrid.copy()
         gVec[~lismtell_obs[o]] = 0.0
