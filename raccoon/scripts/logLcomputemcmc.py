@@ -41,11 +41,44 @@ plotutils.mpl_size_same(font_size=18)
 C_MS = 2.99792458*1.e8  # Light speed [m/s]
 C_KMS = 2.99792458*1.e5  # Light speed [km/s]
 
+# Parameter strings for plots
+listhetanames = ['rv']
+dictthetastr = {'rv': 'RV'}
+dictthetastrunit = {'rv': 'RV [m/s]'}
+listthetastr = [v for v in dictthetastr.values()]
+listhetastrunit = [v for v in dictthetastrunit.values()]
+
+# MCMC params
+ndim = len(listhetanames)
+
+
 ###############################################################################
 
+def cutobs_if_tplshort(wobs, wtpl, rvmin, rvmax):
+    # If template is shorter than observation -> cut observation
+    # Actually if template is shorter than observartion shifted to min/max rv considered
+    # Actually shift to minus min/max rv because we are using the fast CCF approach in which we interpolate the template to -rv of the obs, so we don't need to interpolate the observation
+    # if wtpl[0] > wobs[0]:
+    # if wtpl[0] > spectrumutils.dopplershift(wobs[0], rvmin * 1.e3, rel=True):
+    if wtpl[0] > spectrumutils.dopplershift(wobs[0], -rvmax * 1.e3, rel=True):
+        # Want 1st observation pixel (here this is wobs) shifted to -rvmax to be equal to the 1st pixel of the model
+        maskblue = spectrumutils.dopplershift(wobs, -rvmax * 1.e3, rel=True) >= wtpl[0]
+    else:
+        maskblue = np.ones_like(wobs, dtype=bool)
+    # if wtpl[-1] < wobs[-1]:
+    # if wtpl[-1] < spectrumutils.dopplershift(wobs[-1], rv[-1] * 1.e3, rel=True):
+    if wtpl[-1] < spectrumutils.dopplershift(wobs[-1], -rvmin * 1.e3, rel=True):
+        # Want last observation pixel shifted to  -rvmin to be equal to the last pixel of the model
+        maskred = spectrumutils.dopplershift(wobs, -rvmin * 1.e3, rel=True) <= wtpl[-1]
+    else:
+        maskred = np.ones_like(wobs, dtype=bool)
+    maskextremes = maskblue & maskred
+    return maskextremes
 
-# Likelihood function
-def rvshift2logL_fast(theta, wcorr, fVec, sf2, cs, N, mtell_obs, Id, rel=True, logLmapping='Z03'):
+
+
+# Likelihood function order-by-order MCMC
+def rvshift2logL_fast_obo(theta, wcorr, fVec, sf2, cs, N, mtell_obs, Id, rel=True, logLmapping='Z03'):
     """
     Compute logL from an rvshift (for MCMC).
     rvshift -> cc -> logL
@@ -103,13 +136,85 @@ def log_prior(theta):
 
 
 # Full log-probability function
-def log_probability(theta, wcorr, fVec, sf2, cs, N, mtell, Id, rel=True):
+def log_probability_obo(theta, wcorr, fVec, sf2, cs, N, mtell, Id, rel=True):
     lp = log_prior(theta)
     if not np.isfinite(lp):
         return -np.inf
     else:  # lp is 0
         # return lp + log_likelihood(theta, obsx, obsy, cs, N)
-        return lp + rvshift2logL_fast(theta, wcorr, fVec, sf2, cs, N, mtell, Id, rel=True)
+        return lp + rvshift2logL_fast_obo(theta, wcorr, fVec, sf2, cs, N, mtell, Id, rel=True)
+
+
+def rvshift2logL_fast_allords(theta, ords, liswcorr, lisfVec, lissf2, liscs, lisN, lismtell_obs, lisId, rel=True, logLmapping='Z03'):
+    """
+    Compute logL from an rvshift (for MCMC).
+    rvshift -> cc -> logL
+
+    All orders together (sum logL)
+
+    Parameters
+    ----------
+
+    cs : splrep output
+        Inteprolation parameters for the template
+    N : int
+        Number of datapoints in spectrum or template
+    rel : bool, default True
+        Use relativistic approximation in Doppler shift
+    """
+
+    rvshift = theta[0]  # [m/s]
+    # print('------------ rvshift', rvshift)
+
+    # Compute logL per ord at rvshift
+    lislogL = []
+    for o in ords:
+
+        # Doppler shift obs w minus rvshift
+        wobs_shift = spectrumutils.dopplershift(liswcorr[o], -rvshift, rel=rel)
+
+        # Interpolate model to shifted obs w
+        fm_obsgrid = splev(wobs_shift, liscs[o], der=0, ext=2)  # ext=0 means return extrapolated value, if ext=3, return the boundary value, ext=2 raises an error
+
+        # Stdev of the model
+        gVec = fm_obsgrid.copy()
+        gVec[~lismtell_obs[o]] = 0.0
+        gVec -= (gVec[lismtell_obs[o]] @ lisId[o][lismtell_obs[o]]) / lisN[o]  # subtract mean
+        sg2 = (gVec[lismtell_obs[o]] @ gVec[lismtell_obs[o]]) / lisN[o]  # stdev model
+
+        # Cross-covariance function
+        R = (lisfVec[o][lismtell_obs[o]] @ gVec[lismtell_obs[o]]) / lisN[o]
+        # Compute the CCF between the obs f and the interpolated model f
+        cc = R / np.sqrt(lissf2[o]*sg2)
+
+        # Compute logL
+        if logLmapping == 'Z03':
+            # Compute logL Z03
+            # logLZ03 = - N/2. * np.log(1 - cc**2)
+            logL_o = - lisN[o]/2. * np.log(1 - cc**2)
+            lislogL.append(logL_o)
+        elif logLmapping == 'BL19':
+            # Compute logL BL19
+            # logLBL19 = - N/2. * np.log(sf2 + sg2 - 2.*R)
+            logL_o = - lisN[o]/2. * np.log(lissf2[o] + sg2 - 2.*R)
+            lislogL.append(logL_o)
+
+    # Coadd ord logL
+    logL = np.sum(lislogL)  # CHECK this actualy sums
+
+    return logL  # returns a float
+
+
+# Full log-probability function
+def log_probability_allords(theta, ords, liswcorr, lisfVec, lissf2, liscs, lisN, lismtell, lisId, rel=True):
+    lp = log_prior(theta)
+    if not np.isfinite(lp):
+        return -np.inf
+    else:  # lp is 0
+        # return lp + log_likelihood(theta, obsx, obsy, cs, N)
+        return lp + rvshift2logL_fast_allords(theta, ords, liswcorr, lisfVec, lissf2, liscs, lisN, lismtell, lisId, rel=True)
+
+# -------------
 
 
 def hline0(ax, y=0, color='0.8', linestyle='dashed'):
@@ -288,6 +393,8 @@ def parse_args():
 
     parser.add_argument('--p0type', help='Starting point for walkers', choices=['gball', 'uniform'], default='uniform')
     parser.add_argument('--p0range', help='+- from rvabs to start the walkers [m/s]', type=float, default=50)
+
+    parser.add_argument('--obo', help='Run MCMC order by order, to get an RV per order', action='store_true')
 
     parser.add_argument('--nobackend', help='Do not save individual backend per ord/obs', action='store_true')
 
@@ -1023,14 +1130,16 @@ def main():
     dataccfoTS = []
 
     # MCMC save data
-    rvmean_ts, rvmedian_ts, rvmeanw_ts, rvmeanwerr_ts, rverrmean0_ts, rverrmean1_ts, rverrmean_ts = [], [], [], [], [], [], []
+    rvmean_ts, rvmedian_ts, rvmeanw_ts, rvmeanwerr_ts, rverrmean0_ts, rverrmean1_ts, rverrmean_ts = [], [], [], [], [], [], []  # MCMC obo
+
+    rv_ts, rverrl_ts, rverrr_ts = np.empty(nobs)*np.nan, np.empty(nobs)*np.nan, np.empty(nobs)*np.nan  # MCMC all ords together
 
     first, firsto = True, True
     # for i, obs in enumerate(tqdm(lisfilobs)):
     for i, obs in enumerate(lisfilobs):
         filobs = lisfilobs[i]
         obsid = os.path.basename(os.path.splitext(filobs)[0])
-        # verboseprint('{}/{} {}'.format(i+1, nobs, filobs))
+        verboseprint('{}/{} {}'.format(i+1, nobs, obsid))
 
         # Get blaze file (if indicated)
         if args.filobs2blaze is not None:
@@ -1247,161 +1356,370 @@ def main():
 
 
 
-        # Variables to store data
-        cc = np.empty((nord, len(rv)))*np.nan  # not needed with MCMC
-        logLZ03, sigZ03 = np.empty((nord, len(rv)))*np.nan, np.empty((nord, len(rv)))*np.nan  # not needed with MCMC
-        rvmaxZ03, rvmaxerrZ03, rvmaxerrlZ03, rvmaxerrrZ03 = np.empty(nord)*np.nan, np.empty(nord)*np.nan, np.empty(nord)*np.nan, np.empty(nord)*np.nan
-        logLBL19, sigBL19 = np.empty((nord, len(rv)))*np.nan, np.empty((nord, len(rv)))*np.nan  # not needed with MCMC
-        rvmaxBL19, rvmaxerrBL19, rvmaxerrlBL19, rvmaxerrrBL19 = np.empty(nord)*np.nan, np.empty(nord)*np.nan, np.empty(nord)*np.nan, np.empty(nord)*np.nan
+        # # Variables to store data
+        # cc = np.empty((nord, len(rv)))*np.nan  # not needed with MCMC
+        # logLZ03, sigZ03 = np.empty((nord, len(rv)))*np.nan, np.empty((nord, len(rv)))*np.nan  # not needed with MCMC
+        # rvmaxZ03, rvmaxerrZ03, rvmaxerrlZ03, rvmaxerrrZ03 = np.empty(nord)*np.nan, np.empty(nord)*np.nan, np.empty(nord)*np.nan, np.empty(nord)*np.nan
+        # logLBL19, sigBL19 = np.empty((nord, len(rv)))*np.nan, np.empty((nord, len(rv)))*np.nan  # not needed with MCMC
+        # rvmaxBL19, rvmaxerrBL19, rvmaxerrlBL19, rvmaxerrrBL19 = np.empty(nord)*np.nan, np.empty(nord)*np.nan, np.empty(nord)*np.nan, np.empty(nord)*np.nan
         
-        # --- Start orders loop ---
-        # ipdb.set_trace()
-        for o in ords_use_lines:
-        # for o in [35]:
-            verboseprint('===o', o)
 
-            # If template is shorter than observation -> cut observation
-            # Actually if template is shorter than observartion shifted to min/max rv
-            # Actually shift to minus min/ax rv because we are using the fast CCF approach in which we interpolate the template to -rv of the obs, so we don't need to interpolate the observation
-            # if wmords[o][0] > wcorr[o][0]:
-            # if wmords[o][0] > spectrumutils.dopplershift(wcorr[o][0], rv[0] * 1.e3, rel=True):
-            if wmords[o][0] > spectrumutils.dopplershift(wcorr[o][0], -rv[-1] * 1.e3, rel=True):
-                # Want 1st observation pixel (here this is wcorr[o]) shifted to -rv[-1] to be equal to the 1st pixel of the model
-                maskblue = spectrumutils.dopplershift(wcorr[o], -rv[-1] * 1.e3, rel=True) >= wmords[o][0]
-            else:
-                maskblue = np.ones_like(wcorr[o], dtype=bool)
-            # if wmords[o][-1] < wcorr[o][-1]:
-            # if wmords[o][-1] < spectrumutils.dopplershift(wcorr[o][-1], rv[-1] * 1.e3, rel=True):
-            if wmords[o][-1] < spectrumutils.dopplershift(wcorr[o][-1], -rv[0] * 1.e3, rel=True):
-                # Want last observation pixel shifted to  -rv[0] to be equal to the last pixel of the model
-                maskred = spectrumutils.dopplershift(wcorr[o], -rv[0] * 1.e3, rel=True) <= wmords[o][-1]
-            else:
-                maskred = np.ones_like(wcorr[o], dtype=bool)
-            maskextremes = maskblue & maskred
 
-            wcorr[o] = wcorr[o][maskextremes]
-            f[o] = f[o][maskextremes]
-            sf[o] = sf[o][maskextremes]
-            c[o] = c[o][maskextremes]
-            
-            # ---
+        # MCMC order by order (get an RV per order, but slow)
+        if args.obo:
 
-            # Function to make tellurics 0
-            mtell_obs = np.array(Maskbad_inv(wcorr[o]), dtype=bool)
-            # TODO: this should also include order extremes
+            rvmaxZ03, rvmaxerrZ03, rvmaxerrlZ03, rvmaxerrrZ03 = np.empty(nord)*np.nan, np.empty(nord)*np.nan, np.empty(nord)*np.nan, np.empty(nord)*np.nan
 
-            # ---
+            # --- Start orders loop ---
+            # ipdb.set_trace()
+            for o in ords_use_lines:
+            # for o in [35]:
+                verboseprint('===o', o)
 
-            # Number of datapoints
-            # TODO: Should be without tellurics
-            N_full = len(f[o])
-            N = len(f[o][mtell_obs])  # accounting for tellurics
-            Id = np.ones(N_full)  # for matrix operations
-            
-            fVec = f[o].copy()
+                # # If template is shorter than observation -> cut observation
+                # # Actually if template is shorter than observartion shifted to min/max rv
+                # # Actually shift to minus min/ax rv because we are using the fast CCF approach in which we interpolate the template to -rv of the obs, so we don't need to interpolate the observation
+                # # if wmords[o][0] > wcorr[o][0]:
+                # # if wmords[o][0] > spectrumutils.dopplershift(wcorr[o][0], rv[0] * 1.e3, rel=True):
+                # if wmords[o][0] > spectrumutils.dopplershift(wcorr[o][0], -rv[-1] * 1.e3, rel=True):
+                #     # Want 1st observation pixel (here this is wcorr[o]) shifted to -rv[-1] to be equal to the 1st pixel of the model
+                #     maskblue = spectrumutils.dopplershift(wcorr[o], -rv[-1] * 1.e3, rel=True) >= wmords[o][0]
+                # else:
+                #     maskblue = np.ones_like(wcorr[o], dtype=bool)
+                # # if wmords[o][-1] < wcorr[o][-1]:
+                # # if wmords[o][-1] < spectrumutils.dopplershift(wcorr[o][-1], rv[-1] * 1.e3, rel=True):
+                # if wmords[o][-1] < spectrumutils.dopplershift(wcorr[o][-1], -rv[0] * 1.e3, rel=True):
+                #     # Want last observation pixel shifted to  -rv[0] to be equal to the last pixel of the model
+                #     maskred = spectrumutils.dopplershift(wcorr[o], -rv[0] * 1.e3, rel=True) <= wmords[o][-1]
+                # else:
+                #     maskred = np.ones_like(wcorr[o], dtype=bool)
+                # maskextremes = maskblue & maskred
+                maskextremes = cutobs_if_tplshort(wcorr[o], wmords[o], rv[0], rv[-1])
 
-            # Make tellurics zero
-            fVec[~mtell_obs] = 0.0
-
-            # ---
-            
-            # TEST
-            if args.test_norm:
-                # fVec_norm = []
-                if len(fVec > 0):
-                    fVec_norm = fVec / np.nanmax(fVec)
-                else:
-                    fVec_norm = fVec
-                # if True and o > 10:
-                #     fig, ax = plt.subplots(2, 1)
-                #     ax[0].plot(wcorr[o], fVec, label='obs')
-                #     ax[1].plot(wcorr[o], fVec_norm, label='obs')
-                #     ax[1].plot(wmords[o], fmords[o], label='tpl')
-                #     for a in ax: a.legend()
-                #     plt.tight_layout()
-                #     plt.show(), plt.close()
-                #     ipdb.set_trace()
-                fVec = fVec_norm
-
-            # ---
-
-            # Stdev of the spectrum
-            fVec -= (fVec[mtell_obs] @ Id[mtell_obs]) / N  # subtract mean
-            sf2 = (fVec[mtell_obs] @ fVec[mtell_obs]) / N  # stdev spectrum
-
-            # # Temporal variables to append Doppler-shift values
-            # cc_i, logLZ03_i, logLBL19_i = [], [], []
-
-            """
-            # For each RV shift in the CCF grid
-            for irvshift, rvshift in enumerate(rv):
-
-                # Fast CCF: shift observation w minus the RV shift of the CCF
-                # --------
-                # Doppler shift obs w minus rvshift
-                wobs_shift = spectrumutils.dopplershift(wcorr[o], -rvshift * 1.e3, rel=True)
+                wcorr[o] = wcorr[o][maskextremes]
+                f[o] = f[o][maskextremes]
+                sf[o] = sf[o][maskextremes]
+                c[o] = c[o][maskextremes]
                 
-                # # First and last orders, check if w observation out of model range, and cut accordingly. If not, will have issues with the logL
-                # if io == iords_use[0] or io == iords_use[1]:
-                #     pass
-                # if io == iords_use[-2] or io == iords_use[-1]:
-                #     if wobs_shift[-1] > wtpl[-1]:
-                #         mask = wobs_shift > wtpl[-1]
-                #         wobs_shift[mask] = np.nan
+                # ---
 
-                # Interpolate model to shifted obs w
-                if nordm > 1: cs = liscs[o]
-                fm_obsgrid = splev(wobs_shift, cs, der=0, ext=2)  # ext=0 means return extrapolated value, if ext=3, return the boundary value, ext=2 raises an error
-                # ISSUE TODO: Different lines (pixels) for different shifts. Extremes (+- CCF RV shift (and BERV)) should be set to 0.
+                # Function to make tellurics 0
+                mtell_obs = np.array(Maskbad_inv(wcorr[o]), dtype=bool)
+                # TODO: this should also include order extremes
 
-                # Make tellurics nan
-                # mtell_i = np.array(Maskbad_inv(wobs_shift), dtype=bool)
-                # fm_obsgrid[~mtell_i] = 0.0
-                # fm_obsgrid[~mtell_obs] = 0.0  # -> Should be mtell_obs because tellurics do not move
+                # ---
 
-                # if np.array_equiv(~mtell_obs, ~mtell_i) is False:
-                #     print('----', i, o, irvshift, np.array_equiv(mtell_obs, mtell_i))
+                # Number of datapoints
+                # TODO: Should be without tellurics
+                N_full = len(f[o])
+                N = len(f[o][mtell_obs])  # accounting for tellurics
+                Id = np.ones(N_full)  # for matrix operations
+                
+                fVec = f[o].copy()
+
+                # Make tellurics zero
+                fVec[~mtell_obs] = 0.0
+
+                # ---
+                
+                # TEST
+                if args.test_norm:
+                    # fVec_norm = []
+                    if len(fVec > 0):
+                        fVec_norm = fVec / np.nanmax(fVec)
+                    else:
+                        fVec_norm = fVec
+                    # if True and o > 10:
+                    #     fig, ax = plt.subplots(2, 1)
+                    #     ax[0].plot(wcorr[o], fVec, label='obs')
+                    #     ax[1].plot(wcorr[o], fVec_norm, label='obs')
+                    #     ax[1].plot(wmords[o], fmords[o], label='tpl')
+                    #     for a in ax: a.legend()
+                    #     plt.tight_layout()
+                    #     plt.show(), plt.close()
+                    #     ipdb.set_trace()
+                    fVec = fVec_norm
+
+                # ---
+
+                # Stdev of the spectrum
+                fVec -= (fVec[mtell_obs] @ Id[mtell_obs]) / N  # subtract mean
+                sf2 = (fVec[mtell_obs] @ fVec[mtell_obs]) / N  # stdev spectrum
+
+                # # Temporal variables to append Doppler-shift values
+                # cc_i, logLZ03_i, logLBL19_i = [], [], []
+
+                """
+                # For each RV shift in the CCF grid
+                for irvshift, rvshift in enumerate(rv):
+
+                    # Fast CCF: shift observation w minus the RV shift of the CCF
+                    # --------
+                    # Doppler shift obs w minus rvshift
+                    wobs_shift = spectrumutils.dopplershift(wcorr[o], -rvshift * 1.e3, rel=True)
+                    
+                    # # First and last orders, check if w observation out of model range, and cut accordingly. If not, will have issues with the logL
+                    # if io == iords_use[0] or io == iords_use[1]:
+                    #     pass
+                    # if io == iords_use[-2] or io == iords_use[-1]:
+                    #     if wobs_shift[-1] > wtpl[-1]:
+                    #         mask = wobs_shift > wtpl[-1]
+                    #         wobs_shift[mask] = np.nan
+
+                    # Interpolate model to shifted obs w
+                    if nordm > 1: cs = liscs[o]
+                    fm_obsgrid = splev(wobs_shift, cs, der=0, ext=2)  # ext=0 means return extrapolated value, if ext=3, return the boundary value, ext=2 raises an error
+                    # ISSUE TODO: Different lines (pixels) for different shifts. Extremes (+- CCF RV shift (and BERV)) should be set to 0.
+
+                    # Make tellurics nan
+                    # mtell_i = np.array(Maskbad_inv(wobs_shift), dtype=bool)
+                    # fm_obsgrid[~mtell_i] = 0.0
+                    # fm_obsgrid[~mtell_obs] = 0.0  # -> Should be mtell_obs because tellurics do not move
+
+                    # if np.array_equiv(~mtell_obs, ~mtell_i) is False:
+                    #     print('----', i, o, irvshift, np.array_equiv(mtell_obs, mtell_i))
+                    # ipdb.set_trace()
+
+                    # Stdev of the model
+                    gVec = fm_obsgrid.copy()
+                    gVec[~mtell_obs] = 0.0
+                    gVec -= (gVec[mtell_obs] @ Id[mtell_obs]) / N  # subtract mean  ----------> CAREFUL WITH TELLURICS
+                    sg2 = (gVec[mtell_obs] @ gVec[mtell_obs]) / N  # stdev model
+
+                    # Cross-covariance function
+                    # ipdb.set_trace()
+                    R = (fVec[mtell_obs] @ gVec[mtell_obs]) / N
+                    # Compute the CCF between the obs f and the interpolated model f
+                    cc_rv = R / np.sqrt(sf2*sg2)
+
+                    # Compute logL Z03
+                    logLZ03_rv = - N/2. * np.log(1 - cc_rv**2)
+
+                    # Compute logL BL19
+                    logLBL19_rv = - N/2. * np.log(sf2 + sg2 - 2.*R)
+                    # print(' ', sf2, sg2, R, cc_rv, '---', np.exp(- N/2. * np.log(sf2 + sg2 - 2.*R)))
+
+                    # Save
+                    cc_i.append(cc_rv)
+                    logLZ03_i.append(logLZ03_rv)
+                    logLBL19_i.append(logLBL19_rv)
+                # --- End RV shift loop ---
+                """
+
+                # MCMC to sample logL peak
+                # ------------------------
+
+                # Initial guess
+                theta_initial = [args.rvabs * 1.e3]  # [m/s]
+
+                # Initialise the walkers
+                # shape: (args.nwalkers, ndim)
+                #   Tiny Gaussian ball (i.e. multivariate Gaussian centered on each theta, with a small sigma)
+                #   Initial one can be centered around the maximum likelihood result
+                if args.p0type == 'gball':
+                    p0 = [np.array(theta_initial) + np.random.randn(ndim) for ii in range(args.nwalkers)]
+                #   Uniform distribution +- args.p0range m/s
+                elif args.p0type == 'uniform':
+                    p0 = [np.array([np.random.uniform(theta_initial[l] - args.p0range, theta_initial[l] + args.p0range) for l in range(ndim)]) for ii in range(args.nwalkers)]
+
+                # True (injected) RVs
+                theta_true = [np.nan]
+
+                # Backend file
+                diroutmcmc = os.path.join(args.dirout, 'walk{}_iter{}_iterburn{}/'.format(args.nwalkers, args.niter, args.niterburnin))
+                diroutmcmcords = os.path.join(diroutmcmc, 'ords')
+                if not os.path.exists(diroutmcmc): os.makedirs(diroutmcmc)
+                if not os.path.exists(diroutmcmcords): os.makedirs(diroutmcmcords)
+                labelout = ''
+                filbackend = os.path.join(diroutmcmcords, '{}_o{}_mcmcbackend'.format(obsid, o) + labelout + '.h5')
+
+                if args.nobackend:
+                    backend = None
+                else:
+                    # Set up the backend
+                    # Don't forget to clear it in case the file already exists
+                    backend = emcee.backends.HDFBackend(filbackend)
+                    backend.reset(args.nwalkers, ndim)
+
+
+                # Run MCMC
+                verboseprint('Run MCMC')
+                with Pool(args.pool_nthreads) as pool:
+                    sampler = emcee.EnsembleSampler(args.nwalkers, ndim, log_probability_obo, args=(wcorr[o], fVec, sf2, liscs[o], N, mtell_obs, Id), kwargs={'rel': True}, pool=pool, backend=backend)
+                    pos, prob, state = sampler.run_mcmc(p0, args.niter, progress=True)
+
+                # # Read MCMC backend saved in previous run
+                # reader = emcee.backends.HDFBackend(filbackend)
+                # # Change name for consistency below
+                # sampler = reader
+
+                # MCMC output values and plots
+
+                # Load the samples
+                samplesall = sampler.get_chain()  # including burn-in
+                samples = sampler.get_chain(discard=args.niterburnin)  # , thin=thin
+                # Load the samples and flat
+                flat_samples = sampler.get_chain(discard=args.niterburnin, flat=True)
+                # Load the likelihood
+                log_prob_samples = sampler.get_log_prob(discard=args.niterburnin, flat=True)
+                # Load the prior
+                log_prior_samples = sampler.get_blobs(discard=args.niterburnin, flat=True)
+                # print(flat_samples.shape)
+
+                # -----------------------------------
+
+                # Plot chains
+                if doplot:
+                    verboseprint('Plot chains')
+
+                    # # Without burn-in
+                    # filout = os.path.join(diroutmcmcords, '{}_o{}_chains'.format(obsid, o) + labelout)
+                    # plot_chains(samples, ndim, listhetanames=listhetastrunit, filout=filout, sv=args.plot_sv, sh=args.plot_sh, svext=args.plot_ext, verbose=False)
+
+                    # With burn-in
+                    filout = os.path.join(diroutmcmcords, '{}_o{}_chainsall'.format(obsid, o) + labelout)
+                    plot_chains(samplesall, ndim, niterburnin=args.niterburnin, listhetanames=listhetastrunit, filout=filout, sv=args.plot_sv, sh=args.plot_sh, svext=args.plot_ext, verbose=False)
+
+                    # # Zoom on first 200 iterations only (with) burn-in if seen)
+                    # niterzoom = 200
+                    # filout = os.path.join(diroutmcmcords, '{}_o{}_chainszoom{}iters'.format(obsid, o, niterzoom) + labelout)
+                    # plot_chains(samplesall, ndim, niterburnin=args.niterburnin, niterzoom=niterzoom, listhetanames=listhetastrunit, filout=filout, sv=args.plot_sv, sh=args.plot_sh, svext=args.plot_ext, verbose=False)
+
+                # -----------------------------------
+                
+                # Final values
+                # #   Uncertainties based on the 16th, 50th, and 84th percentiles of the samples in the marginalized distributions
+                # filout = os.path.join(diroutmcmcords, '{}_o{}_mcmc_paramsfinal'.format(obsid, o) + '.txt')
+                # with open(filout, 'w') as fout:
+                #     verboseprint('Final values')
+                #     fout.write('Final values\n')
+                #     for i in range(ndim):
+                #         mcmc = np.percentile(flat_samples[:, i], [16, 50, 84])
+                #         q = np.diff(mcmc)  # uncertainties
+                #         verboseprint('  {} = {:.3f} +- {:.3f} {:.3f}'.format(listhetanames[i], mcmc[1], q[1], q[0]))
+                #         fout.write('  {} = {:.3f} +- {:.3f} {:.3f}\n'.format(listhetanames[i], mcmc[1], q[1], q[0]))
+                #         strinit = '    init: {:.3f}'.format(theta_initial[i])
+                #         # strtrue = '    true: {:.3f}'.format(theta_true[i]) if theta_true[i] is not None else ''
+                #         strtrue = ''
+                #         verboseprint(strinit, strtrue)
+                #         fout.write(strinit + strtrue + '\n')
+                #         # #
+                #         # from IPython.display import display, Math
+                #         # txt = "\mathrm{{{3}}} = {0:.3f}_{{-{1:.3f}}}^{{{2:.3f}}}"
+                #         # txt = txt.format(mcmc[1], q[0], q[1], listhetanames[i])
+                #         # display(Math(txt))
+                #         # # print(txt)
+
+                for ii in range(ndim):
+                    mcmc = np.percentile(flat_samples[:, ii], [16, 50, 84])
+                    q = np.diff(mcmc)  # uncertainties
+
+                # Save in arrays
+                rvmaxZ03[o] = mcmc[1]  # rv
+                rvmaxerrlZ03[o] = q[0]  # rverr0 (negative)
+                rvmaxerrrZ03[o] = q[1]  # rverr1 (positive)
+
+                # -----------------------------------
+
+                # Put likelihood in same array so can pop into corner plot easily
+                flat_samples_logl = np.concatenate((flat_samples, log_prob_samples[:, None]), axis=1)
+                # Add labels for plot
+                theta_true_logl = theta_true + [np.nan]
+                listhetastrunit_logl = listhetastrunit + [r'$\log L$']
+                listthetastr_logl = listthetastr + [r'$\log L$']
+                
+                # -----------------------------------
+
+                # Plot corner
+                # if doplot:
+                #     verboseprint('Plot corner')
+                #     # fig = corner.corner(flat_samples, labels=listhetanames, truths=[m_true, b_true])
+                #     fig = corner.corner(flat_samples, quantiles=[0.16, 0.5, 0.84], truths=theta_true, truth_color='C1', labels=listhetastrunit, titles=listthetastr, show_titles=True, title_kwargs={"fontsize": 'medium'}, label_kwargs={"fontsize": 'medium'}, verbose=args.verbose)
+                #     # fig = corner.corner(flat_samples, quantiles=[0.16, 0.5, 0.84], labels=listhetastrunit, titles=listthetastr, show_titles=True, title_kwargs={"fontsize": 'medium'}, label_kwargs={"fontsize": 'medium'}, verbose=args.verbose)
+                #     filout = os.path.join(diroutmcmcords, '{}_o{}_corner'.format(obsid, o) + labelout)
+                #     plotutils.figout_simple(fig, sv=args.plot_sv, filout=filout, svext=args.plot_ext, sh=args.plot_sh)
+                #     verboseprint('  Saved:', filout)
+                #     # plt.show()
+                #     # plt.close()
+
+                if doplot:
+                    verboseprint('Plot corner with logL')
+                    fig = corner.corner(flat_samples_logl, quantiles=[0.16, 0.5, 0.84], truths=theta_true_logl, truth_color='C1', labels=listhetastrunit_logl, titles=listthetastr_logl, show_titles=True, title_kwargs={"fontsize": 'medium'}, label_kwargs={"fontsize": 'medium'}, verbose=args.verbose)
+                    filout = os.path.join(diroutmcmcords, '{}_o{}_corner_logL'.format(obsid, o) + labelout)
+                    plotutils.figout_simple(fig, sv=args.plot_sv, filout=filout, svext=args.plot_ext, sh=args.plot_sh)
+                    verboseprint('  Saved:', filout)
+
                 # ipdb.set_trace()
+                # -----------------------------------
 
-                # Stdev of the model
-                gVec = fm_obsgrid.copy()
-                gVec[~mtell_obs] = 0.0
-                gVec -= (gVec[mtell_obs] @ Id[mtell_obs]) / N  # subtract mean  ----------> CAREFUL WITH TELLURICS
-                sg2 = (gVec[mtell_obs] @ gVec[mtell_obs]) / N  # stdev model
+                # End orders loop
+                # ---------------
 
-                # Cross-covariance function
-                # ipdb.set_trace()
-                R = (fVec[mtell_obs] @ gVec[mtell_obs]) / N
-                # Compute the CCF between the obs f and the interpolated model f
-                cc_rv = R / np.sqrt(sf2*sg2)
+            # Save order RVs (per obs)
+            filout = os.path.join(diroutmcmc, os.path.basename(os.path.splitext(filobs)[0]) + '_rvmcmc.csv')
+            dfout = pd.DataFrame({'rv': rvmaxZ03, 'rverr0': rvmaxerrlZ03, 'rverr1': rvmaxerrrZ03}, index=ords)
+            dfout.index.rename('ord', inplace=True)
+            dfout.to_csv(filout, na_rep=np.nan, header=True, index=True, float_format='%0.8f')
 
-                # Compute logL Z03
-                logLZ03_rv = - N/2. * np.log(1 - cc_rv**2)
+            # Average order RVs
+            rvmean_ts.append(np.nanmean(rvmaxZ03))
+            rvmedian_ts.append(np.nanmedian(rvmaxZ03))
+            rverrmean0_ts.append(np.nanmean(rvmaxerrlZ03))  # mean left uncertainty over all orders
+            rverrmean1_ts.append(np.nanmean(rvmaxerrrZ03))  # mean right uncertainty over all orders
+            rverrmean_ts.append(np.nanmean([rvmaxerrlZ03, rvmaxerrrZ03]))  # mean uncertianty over all orders
+            errmean = np.nanmean([rvmaxerrlZ03, rvmaxerrrZ03], axis=0)  # mean uncertianty per order
+            weight_errmean = 1 / errmean**2  # weight per order
+            mnan = np.isfinite(rvmaxZ03) & np.isfinite(weight_errmean)
+            rvmeanw_ts.append(np.average(rvmaxZ03[mnan], weights=weight_errmean[mnan]))
+            rvmeanwerr_ts.append(np.nan)  # compute weigthed mean uncertainty
 
-                # Compute logL BL19
-                logLBL19_rv = - N/2. * np.log(sf2 + sg2 - 2.*R)
-                # print(' ', sf2, sg2, R, cc_rv, '---', np.exp(- N/2. * np.log(sf2 + sg2 - 2.*R)))
+        # MCMC all orders together
+        else:
 
-                # Save
-                cc_i.append(cc_rv)
-                logLZ03_i.append(logLZ03_rv)
-                logLBL19_i.append(logLBL19_rv)
-            # --- End RV shift loop ---
-            """
+            lisN, lisN_full = [[]]*nord, [[]]*nord
+            lisId = [[]]*nord
+            lismtell_obs = [[]]*nord
+            lisfVec = [[]]*nord
+            lissf2 = [[]]*nord
+            # This bit is copied from what's inside the orders loop in the order-by-order case
+            for o in ords:
+                if len(wmords[o]) > 0:
+                    maskextremes = cutobs_if_tplshort(wcorr[o], wmords[o], rv[0], rv[-1])
+
+                    wcorr[o] = wcorr[o][maskextremes]
+                    f[o] = f[o][maskextremes]
+                    sf[o] = sf[o][maskextremes]
+                    c[o] = c[o][maskextremes]
+
+                # ---
+
+                # Function to make tellurics 0
+                lismtell_obs[o] = np.array(Maskbad_inv(wcorr[o]), dtype=bool)
+                # TODO: this should also include order extremes
+
+                # ---
+
+                # Number of datapoints
+                # TODO: Should be without tellurics
+                lisN_full[o] = len(f[o])
+                lisN[o] = len(f[o][lismtell_obs[o]])  # accounting for tellurics
+                lisId[o] = np.ones(lisN_full[o])  # for matrix operations
+                
+                lisfVec[o] = f[o].copy()
+
+                # Make tellurics zero
+                lisfVec[o][~lismtell_obs[o]] = 0.0
+
+                # ---
+
+                # Stdev of the spectrum
+                lisfVec[o] -= (lisfVec[o][lismtell_obs[o]] @ lisId[o][lismtell_obs[o]]) / lisN[o]  # subtract mean
+                lissf2[o] = (lisfVec[o][lismtell_obs[o]] @ lisfVec[o][lismtell_obs[o]]) / lisN[o]  # stdev spectrum
+
+            # ------
 
             # MCMC to sample logL peak
             # ------------------------
-
-            # Parameter strings for plots
-            listhetanames = ['rv']
-            dictthetastr = {'rv': 'RV'}
-            dictthetastrunit = {'rv': 'RV [m/s]'}
-            listthetastr = [v for v in dictthetastr.values()]
-            listhetastrunit = [v for v in dictthetastrunit.values()]
-
-            # MCMC params
-            ndim = len(listhetanames)
-
 
             # Initial guess
             theta_initial = [args.rvabs * 1.e3]  # [m/s]
@@ -1411,21 +1729,19 @@ def main():
             #   Tiny Gaussian ball (i.e. multivariate Gaussian centered on each theta, with a small sigma)
             #   Initial one can be centered around the maximum likelihood result
             if args.p0type == 'gball':
-                p0 = [np.array(theta_initial) + np.random.randn(ndim) for i in range(args.nwalkers)]
+                p0 = [np.array(theta_initial) + np.random.randn(ndim) for ii in range(args.nwalkers)]
             #   Uniform distribution +- args.p0range m/s
             elif args.p0type == 'uniform':
-                p0 = [np.array([np.random.uniform(theta_initial[l] - args.p0range, theta_initial[l] + args.p0range) for l in range(ndim)]) for i in range(args.nwalkers)]
+                p0 = [np.array([np.random.uniform(theta_initial[l] - args.p0range, theta_initial[l] + args.p0range) for l in range(ndim)]) for ii in range(args.nwalkers)]
 
             # True (injected) RVs
             theta_true = [np.nan]
 
             # Backend file
             diroutmcmc = os.path.join(args.dirout, 'walk{}_iter{}_iterburn{}/'.format(args.nwalkers, args.niter, args.niterburnin))
-            diroutmcmcords = os.path.join(diroutmcmc, 'ords')
             if not os.path.exists(diroutmcmc): os.makedirs(diroutmcmc)
-            if not os.path.exists(diroutmcmcords): os.makedirs(diroutmcmcords)
             labelout = ''
-            filbackend = os.path.join(diroutmcmcords, '{}_o{}_mcmcbackend'.format(obsid, o) + labelout + '.h5')
+            filbackend = os.path.join(diroutmcmc, '{}_mcmcbackend'.format(obsid) + labelout + '.h5')
 
             if args.nobackend:
                 backend = None
@@ -1435,12 +1751,13 @@ def main():
                 backend = emcee.backends.HDFBackend(filbackend)
                 backend.reset(args.nwalkers, ndim)
 
-
             # Run MCMC
             verboseprint('Run MCMC')
             with Pool(args.pool_nthreads) as pool:
-                sampler = emcee.EnsembleSampler(args.nwalkers, ndim, log_probability, args=(wcorr[o], fVec, sf2, liscs[o], N, mtell_obs, Id), kwargs={'rel': True}, pool=pool, backend=backend)
+                # !!!!!!!!!!!!!!!!!!!!!! CHANGE CODE HERE
+                sampler = emcee.EnsembleSampler(args.nwalkers, ndim, log_probability_allords, args=(ords_use_lines, wcorr, lisfVec, lissf2, liscs, lisN, lismtell_obs, lisId), kwargs={'rel': True}, pool=pool, backend=backend)
                 pos, prob, state = sampler.run_mcmc(p0, args.niter, progress=True)
+
 
             # # Read MCMC backend saved in previous run
             # reader = emcee.backends.HDFBackend(filbackend)
@@ -1467,47 +1784,51 @@ def main():
                 verboseprint('Plot chains')
 
                 # # Without burn-in
-                # filout = os.path.join(diroutmcmcords, '{}_o{}_chains'.format(obsid, o) + labelout)
+                # filout = os.path.join(diroutmcmc, '{}_o{}_chains'.format(obsid, o) + labelout)
                 # plot_chains(samples, ndim, listhetanames=listhetastrunit, filout=filout, sv=args.plot_sv, sh=args.plot_sh, svext=args.plot_ext, verbose=False)
 
                 # With burn-in
-                filout = os.path.join(diroutmcmcords, '{}_o{}_chainsall'.format(obsid, o) + labelout)
+                filout = os.path.join(diroutmcmc, '{}_chainsall'.format(obsid) + labelout)
                 plot_chains(samplesall, ndim, niterburnin=args.niterburnin, listhetanames=listhetastrunit, filout=filout, sv=args.plot_sv, sh=args.plot_sh, svext=args.plot_ext, verbose=False)
 
                 # # Zoom on first 200 iterations only (with) burn-in if seen)
                 # niterzoom = 200
-                # filout = os.path.join(diroutmcmcords, '{}_o{}_chainszoom{}iters'.format(obsid, o, niterzoom) + labelout)
+                # filout = os.path.join(diroutmcmc, '{}_o{}_chainszoom{}iters'.format(obsid, o, niterzoom) + labelout)
                 # plot_chains(samplesall, ndim, niterburnin=args.niterburnin, niterzoom=niterzoom, listhetanames=listhetastrunit, filout=filout, sv=args.plot_sv, sh=args.plot_sh, svext=args.plot_ext, verbose=False)
 
             # -----------------------------------
             
             # Final values
-            #   Uncertainties based on the 16th, 50th, and 84th percentiles of the samples in the marginalized distributions
-            filout = os.path.join(diroutmcmcords, '{}_o{}_mcmc_paramsfinal'.format(obsid, o) + '.txt')
-            with open(filout, 'w') as fout:
-                verboseprint('Final values')
-                fout.write('Final values\n')
-                for i in range(ndim):
-                    mcmc = np.percentile(flat_samples[:, i], [16, 50, 84])
-                    q = np.diff(mcmc)  # uncertainties
-                    verboseprint('  {} = {:.3f} +- {:.3f} {:.3f}'.format(listhetanames[i], mcmc[1], q[1], q[0]))
-                    fout.write('  {} = {:.3f} +- {:.3f} {:.3f}\n'.format(listhetanames[i], mcmc[1], q[1], q[0]))
-                    strinit = '    init: {:.3f}'.format(theta_initial[i])
-                    # strtrue = '    true: {:.3f}'.format(theta_true[i]) if theta_true[i] is not None else ''
-                    strtrue = ''
-                    verboseprint(strinit, strtrue)
-                    fout.write(strinit + strtrue + '\n')
-                    # #
-                    # from IPython.display import display, Math
-                    # txt = "\mathrm{{{3}}} = {0:.3f}_{{-{1:.3f}}}^{{{2:.3f}}}"
-                    # txt = txt.format(mcmc[1], q[0], q[1], listhetanames[i])
-                    # display(Math(txt))
-                    # # print(txt)
+            # #   Uncertainties based on the 16th, 50th, and 84th percentiles of the samples in the marginalized distributions
+            # filout = os.path.join(diroutmcmc, '{}_o{}_mcmc_paramsfinal'.format(obsid, o) + '.txt')
+            # with open(filout, 'w') as fout:
+            #     verboseprint('Final values')
+            #     fout.write('Final values\n')
+            #     for i in range(ndim):
+            #         mcmc = np.percentile(flat_samples[:, i], [16, 50, 84])
+            #         q = np.diff(mcmc)  # uncertainties
+            #         verboseprint('  {} = {:.3f} +- {:.3f} {:.3f}'.format(listhetanames[i], mcmc[1], q[1], q[0]))
+            #         fout.write('  {} = {:.3f} +- {:.3f} {:.3f}\n'.format(listhetanames[i], mcmc[1], q[1], q[0]))
+            #         strinit = '    init: {:.3f}'.format(theta_initial[i])
+            #         # strtrue = '    true: {:.3f}'.format(theta_true[i]) if theta_true[i] is not None else ''
+            #         strtrue = ''
+            #         verboseprint(strinit, strtrue)
+            #         fout.write(strinit + strtrue + '\n')
+            #         # #
+            #         # from IPython.display import display, Math
+            #         # txt = "\mathrm{{{3}}} = {0:.3f}_{{-{1:.3f}}}^{{{2:.3f}}}"
+            #         # txt = txt.format(mcmc[1], q[0], q[1], listhetanames[i])
+            #         # display(Math(txt))
+            #         # # print(txt)
+
+            for ii in range(ndim):
+                mcmc = np.percentile(flat_samples[:, ii], [16, 50, 84])
+                q = np.diff(mcmc)  # uncertainties
 
             # Save in arrays
-            rvmaxZ03[o] = mcmc[1]  # rv
-            rvmaxerrlZ03[o] = q[0]  # rverr0 (negative)
-            rvmaxerrrZ03[o] = q[1]  # rverr1 (positive)
+            rv_ts[i] = mcmc[1]  # rv
+            rverrl_ts[i] = q[0]  # rverr0 (negative)
+            rverrr_ts[i] = q[1]  # rverr1 (positive)
 
             # -----------------------------------
 
@@ -1526,7 +1847,7 @@ def main():
             #     # fig = corner.corner(flat_samples, labels=listhetanames, truths=[m_true, b_true])
             #     fig = corner.corner(flat_samples, quantiles=[0.16, 0.5, 0.84], truths=theta_true, truth_color='C1', labels=listhetastrunit, titles=listthetastr, show_titles=True, title_kwargs={"fontsize": 'medium'}, label_kwargs={"fontsize": 'medium'}, verbose=args.verbose)
             #     # fig = corner.corner(flat_samples, quantiles=[0.16, 0.5, 0.84], labels=listhetastrunit, titles=listthetastr, show_titles=True, title_kwargs={"fontsize": 'medium'}, label_kwargs={"fontsize": 'medium'}, verbose=args.verbose)
-            #     filout = os.path.join(diroutmcmcords, '{}_o{}_corner'.format(obsid, o) + labelout)
+            #     filout = os.path.join(diroutmcmc, '{}_o{}_corner'.format(obsid, o) + labelout)
             #     plotutils.figout_simple(fig, sv=args.plot_sv, filout=filout, svext=args.plot_ext, sh=args.plot_sh)
             #     verboseprint('  Saved:', filout)
             #     # plt.show()
@@ -1535,42 +1856,33 @@ def main():
             if doplot:
                 verboseprint('Plot corner with logL')
                 fig = corner.corner(flat_samples_logl, quantiles=[0.16, 0.5, 0.84], truths=theta_true_logl, truth_color='C1', labels=listhetastrunit_logl, titles=listthetastr_logl, show_titles=True, title_kwargs={"fontsize": 'medium'}, label_kwargs={"fontsize": 'medium'}, verbose=args.verbose)
-                filout = os.path.join(diroutmcmcords, '{}_o{}_corner_logL'.format(obsid, o) + labelout)
+                filout = os.path.join(diroutmcmc, '{}_corner_logL'.format(obsid) + labelout)
                 plotutils.figout_simple(fig, sv=args.plot_sv, filout=filout, svext=args.plot_ext, sh=args.plot_sh)
                 verboseprint('  Saved:', filout)
-
-            # -----------------------------------
-
-            # End orders loop
-            # ---------------
-
-        # Save order RVs (per obs)
-        filout = os.path.join(diroutmcmc, os.path.basename(os.path.splitext(filobs)[0]) + '_rvmcmc.csv')
-        dfout = pd.DataFrame({'rv': rvmaxZ03, 'rverr0': rvmaxerrlZ03, 'rverr1': rvmaxerrrZ03}, index=ords)
-        dfout.index.rename('ord', inplace=True)
-        dfout.to_csv(filout, na_rep=np.nan, header=True, index=True, float_format='%0.8f')
-
-        # Average order RVs
-        rvmean_ts.append(np.nanmean(rvmaxZ03))
-        rvmedian_ts.append(np.nanmedian(rvmaxZ03))
-        rverrmean0_ts.append(np.nanmean(rvmaxerrlZ03))  # mean left uncertainty over all orders
-        rverrmean1_ts.append(np.nanmean(rvmaxerrrZ03))  # mean right uncertainty over all orders
-        rverrmean_ts.append(np.nanmean([rvmaxerrlZ03, rvmaxerrrZ03]))  # mean uncertianty over all orders
-        errmean = np.nanmean([rvmaxerrlZ03, rvmaxerrrZ03], axis=0)  # mean uncertianty per order
-        weight_errmean = 1 / errmean**2  # weight per order
-        mnan = np.isfinite(rvmaxZ03) & np.isfinite(weight_errmean)
-        rvmeanw_ts.append(np.average(rvmaxZ03[mnan], weights=weight_errmean[mnan]))
-        rvmeanwerr_ts.append(np.nan)  # compute weigthed mean uncertainty
 
         # End obs loop
         # ------------
 
-    # Save obs RVs (single file for all obs)
-    filout = os.path.join(diroutmcmc, '{}.cclogLmcmcpar.csv'.format(args.obj))
-    dfout_ts = pd.DataFrame({'rvmean_ts': rvmean_ts, 'rvmedian_ts': rvmedian_ts, 'rverrmean0_ts': rverrmean0_ts, 'rverrmean1_ts': rverrmean1_ts, 'rverrmean_ts': rverrmean_ts, 'rvmeanw_ts': rvmeanw_ts, 'rvmeanwerr_ts': rvmeanwerr_ts}, index=listimeid['timeid'])
-    dfout_ts.index.rename('obsid', inplace=True)
-    dfout_ts.to_csv(filout, na_rep=np.nan, header=True, index=True, float_format='%0.8f')
-    # ipdb.set_trace()
+
+    if args.obo:  # if MCMC order by order
+        # Save obs RVs (single file for all obs)
+        filout = os.path.join(diroutmcmc, '{}.cclogLmcmcobopar.csv'.format(args.obj))
+        lisobsid = [ii.replace('_e2ds.fits', '') for ii in listimeid['timeid']]
+        dfout_ts = pd.DataFrame({'bjd': dataobs['bjd'].values, 'rvmean_ts': rvmean_ts, 'rvmedian_ts': rvmedian_ts, 'rverrmean0_ts': rverrmean0_ts, 'rverrmean1_ts': rverrmean1_ts, 'rverrmean_ts': rverrmean_ts, 'rvmeanw_ts': rvmeanw_ts, 'rvmeanwerr_ts': rvmeanwerr_ts, 'filobs': dataobs.index}, index=lisobsid)
+        dfout_ts.index.rename('obsid', inplace=True)
+        dfout_ts.to_csv(filout, na_rep=np.nan, header=True, index=True, float_format='%0.8f')
+        # ipdb.set_trace()
+
+    else:  # if MCMC all orders together
+        # Save obs RVs (single file for all obs)
+        filout = os.path.join(diroutmcmc, '{}.cclogLmcmcpar.csv'.format(args.obj))
+        lisobsid = [ii.replace('_e2ds.fits', '') for ii in listimeid['timeid']]
+        rv_ts = pd.DataFrame({'bjd': dataobs['bjd'].values, 'rv_ts': rv_ts, 'rverrl_ts': rverrl_ts, 'rverrr_ts': rverrr_ts, 'filobs': dataobs.index}, index=lisobsid)
+        dfout_ts.index.rename('obsid', inplace=True)
+        dfout_ts.to_csv(filout, na_rep=np.nan, header=True, index=True, float_format='%0.8f')
+        # ipdb.set_trace()
+
+
 
     """
         # TODO: save MCMC outputs into arrays, fits files, and time series
