@@ -1754,6 +1754,18 @@ def main():
                 backend = emcee.backends.HDFBackend(filbackend)
                 backend.reset(args.nwalkers, ndim)
 
+            # ipdb.set_trace()
+            # if o == 70:
+            #     fig, ax = plt.subplots()
+            #     ax.plot(wcorr[o][lismtell_obs[o]], lisfVec[o][lismtell_obs[o]])
+            #     fplot = splev(wcorr[o][24:], liscs[o], der=0, ext=2)
+            #     ax.plot(wcorr[o][24:], fplot, '--')
+            #     # fplot = splev(wcorr[o], liscs[o], der=0, ext=2)
+            #     # ax.plot(wcorr[o][lismtell_obs[o]], fplot[lismtell_obs[o]], '--')
+            #     plt.show()
+            #     plt.close()
+            #     ipdb.set_trace()
+
             # Run MCMC
             verboseprint('Run MCMC')
             with Pool(args.pool_nthreads) as pool:
