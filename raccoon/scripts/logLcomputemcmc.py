@@ -1892,7 +1892,7 @@ def main():
         # Save obs RVs (single file for all obs)
         filout = os.path.join(diroutmcmc, '{}.cclogLmcmcpar.csv'.format(args.obj))
         lisobsid = [ii.replace('_e2ds.fits', '') for ii in listimeid['timeid']]
-        rv_ts = pd.DataFrame({'bjd': dataobs['bjd'].values, 'rv_ts': rv_ts, 'rverrl_ts': rverrl_ts, 'rverrr_ts': rverrr_ts, 'filobs': dataobs.index}, index=lisobsid)
+        dfout_ts = pd.DataFrame({'bjd': dataobs['bjd'].values, 'rv_ts': rv_ts, 'rverrl_ts': rverrl_ts, 'rverrr_ts': rverrr_ts, 'filobs': dataobs.index}, index=lisobsid)
         dfout_ts.index.rename('obsid', inplace=True)
         dfout_ts.to_csv(filout, na_rep=np.nan, header=True, index=True, float_format='%0.8f')
         # ipdb.set_trace()
