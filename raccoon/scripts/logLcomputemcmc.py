@@ -129,7 +129,7 @@ def rvshift2logL_fast_obo(theta, wcorr, fVec, sf2, cs, N, mtell_obs, Id, rel=Tru
 # Priors
 def log_prior(theta):
     rv = theta[0]
-    if (-1.e3 <= rv <= 1.e3):
+    if (-1.e6 <= rv <= 1.e6):
         return 0.0
     else:
         return -np.inf
