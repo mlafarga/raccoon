@@ -581,7 +581,7 @@ def main():
             fig, ax = plt.subplots(2, 1, figsize=(16, 10))
             # fig, ax = plt.subplots(1,2, figsize=(16, 5), gridspec_kw={'width_ratios': [2,1]})
             # Spec
-            args.ccftesto = 45
+            # args.ccftesto = 45
             fmax = np.nanmax(f[args.ccftesto])
             fn = (f[args.ccftesto]) / fmax
             fmaxn = np.nanmax(fn)  # 1.
@@ -1019,7 +1019,7 @@ def main():
                 if oo % 2 == 0: c = 'k'
                 else: c = '.5'
                 ax[0].plot(w[oo], f[oo], linewidth=0.5, marker='.', color=c, alpha=0.8)
-                ax[1].plot(w[oo], f[oo]/c[oo], linewidth=0.5, marker='.', color=c, alpha=0.8)
+                # ax[1].plot(w[oo], f[oo]/c[oo], linewidth=0.5, marker='.', color=c, alpha=0.8)
                 # ax[1].plot(w[o], f[o]/c[o], linewidth=0.5, marker='.', color=c)
             plt.tight_layout()
             plt.show()
@@ -1077,7 +1077,7 @@ def main():
             c = [np.ones(len(w[o])) for o in ords]
 
         # HARPS correct order slope with a line
-        if args.inst == 'HARPS' or args.inst == 'HARPN':
+        if args.inst == 'HARPS' or args.inst == 'HARPN' or args.inst == 'ESPRESSO' or args.inst == 'ESPRESSO4x2' or args.inst == 'ESPRESSO8x4':
             # TODO: fit only line max
             for o in ords:
                 SpecFitPar = np.polyfit(w[o], f[o], 1)
@@ -1157,6 +1157,9 @@ def main():
         if np.isfinite(shifterr): shifterr_use = shifterr
         else: shifterr_use = 0.
         wcorr = [w[o] * (1. - (shift_use) / C_MS) for o in ords]
+
+        # print('++++++++ shift', i, shift_use)
+        # continue
 
         # Readout noise
         ron = dataobs.loc[filobs]['ron']

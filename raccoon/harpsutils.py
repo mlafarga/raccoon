@@ -703,6 +703,11 @@ def drs_blazefile_lisobs(lisobs, inst, drop_duplicates=False, notfound=np.nan, e
     return data
 
 
+# Ca RHK
+
+# 'HIERARCH ESO DRS CAII RHK'
+
+
 # CCF
 
 def drs_ccfrvgrid_read(filin, ext=0):
@@ -715,6 +720,7 @@ def drs_ccfrvgrid_read(filin, ext=0):
     # Read header
     if isinstance(filin, str): header = fitsutils.read_header(filin, ext=ext)
     elif isinstance(filin, fits.header.Header): header = filin
+    # return np.arange(header['CRVAL1'], header['CRVAL1'] + header['NAXIS1'] * header['CDELT1'] - 1.e-12, header['CDELT1'])
     return np.arange(header['CRVAL1'], header['CRVAL1'] + header['NAXIS1'] * header['CDELT1'] , header['CDELT1'])
 
 
@@ -744,6 +750,14 @@ def drs_ccfparams_lisobs(lisobs, inst, notfound=np.nan, ext=0):
 
     HIERARCH ESO DRS BIS RV = -22.6998204866241 / Bisector mean velocity [km/s]     
     HIERARCH ESO DRS BIS SPAN = 0.0117052755450899 / Bisector velocity span [km/s] 
+
+    Question
+    --------
+    RV uncertainty? Quadratically coadd some of the keywords below?
+    HIERARCH ESO DRS CCF NOISE = 0.000195150630483059 / Photon noise on CCF RV (km/s
+    HIERARCH ESO DRS DRIFT NOISE = 0.33 / Th Drift photon noise [m/s]
+    HIERARCH ESO DRS DVRMS = 0.146008385646044 / Estimated RV uncertainty [m/s] 
+    
     """
     # Get instrument kw
     try: kwinst = headerkwinst(inst.lower(), outfail=np.nan)
