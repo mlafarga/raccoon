@@ -10,6 +10,7 @@ import os
 import sys
 import ipdb
 
+from astropy.io import fits
 import numpy as np
 import pandas as pd
 
@@ -91,6 +92,8 @@ dicoref = {
    'ESPRESSO': 102,  # ? Orders 102 and 103 (starting from 0) cover the 550 nm (orders 100 and 101 too, but 550 nnm falls on the extreme)
    'ESPRESSO4x2': 102,  # ? Orders 102 and 103 (starting from 0) cover the 550 nm (orders 100 and 101 too, but 550 nnm falls on the extreme)
    'ESPRESSO8x4': 74,  # ? Orders 102 and 103 (starting from 0) cover the 550 nm (orders 100 and 101 too, but 550 nnm falls on the extreme)
+   'MAROONXb': 21,
+   'MAROONXr': 10,
 }
 
 
@@ -124,6 +127,7 @@ dicrvpixmed = {
     'HARPS': 0.820,
     'HARPN': 0.820,
     'EXPRES': 0.500,
+    'ESPRESSO': 0.500,
 }
 
 
@@ -153,6 +157,7 @@ dictspix = {
     'HARPS': 3.2,
     'HARPN': 3.2,
     'EXPRES': 3.6,  # 4.0
+    'ESPRESSO': 4.5,
 }
 
 
@@ -266,6 +271,8 @@ def header_bjd_lisobs(lisobs, inst, name='bjd', notfound=np.nan, ext=0):
         lisbjd = espressoutils.drs_bjd_lisobs(lisobs, notfound=notfound, ext=ext, name=name)
     elif inst == 'EXPRES':
         lisbjd = expresutils.drs_bjd_lisobs(lisobs, notfound=notfound, ext=ext, name=name)
+    elif inst == 'MAROONXb' or inst == 'MAROONXr':
+        lisbjd = maroonxutils.drs_bjd_lisobs(lisobs, notfound=notfound, ext=ext, name=name)
     return lisbjd
 
 
@@ -552,6 +559,26 @@ def read_spec_model(filtpl, tpltype):
         nord = len(w)
         ords = np.arange(0, nord, 1)
 
+    elif tpltype == 'serval_mx':  # tpl stored with w not in ln
+        with fits.open(filtpl) as hdulist:
+            w = hdulist['WAVE'].data
+            f = hdulist['SPEC'].data
+            sf = hdulist['SIG'].data
+            header = hdulist[0].header
+        nord = len(w)
+        ords = np.arange(0, nord, 1)
+
+    elif tpltype == 'serval_espressonew':  # tpl stored with w not in ln
+        with fits.open(filtpl) as hdulist:
+            wln = hdulist['WAVE'].data
+            f = hdulist['SPEC'].data
+            qmap = hdulist['QMAP'].data
+            header = hdulist[0].header
+        w = np.asarray([np.exp(wln_i) for wln_i in wln])
+        sf = np.ones_like(w) * np.nan
+        nord = len(w)
+        ords = np.arange(0, nord, 1)
+
     elif tpltype == 'phoenix':
         sys.exit('Template type is phoenix. Not implemented yet!')
         # TO DO: in parser, specify option for phoenix files
@@ -582,6 +609,7 @@ def read_spec_model(filtpl, tpltype):
         #     plt.show(), plt.close()
 
     elif tpltype == '1dtxt':
+        # TODO no sf, function fails
         w, f = np.loadtxt(filtpl, unpack=True)
         w, f = [w], [f]
         nord = 1

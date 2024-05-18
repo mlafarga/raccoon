@@ -303,7 +303,7 @@ def parse_args():
     # parser.add_argument('--filmaskabserr')
 
     # Template
-    parser.add_argument('--tpltype', choices=['mask', 'serval', 'phoenix', '1dtxt', 'espressos1dcoadd'], help='', type=str, default='mask')  # 'custommatrix', 'customstepctn'
+    parser.add_argument('--tpltype', choices=['mask', 'serval', 'phoenix', '1dtxt', 'espressos1dcoadd', 'maskinterp'], help='', type=str, default='mask')  # 'custommatrix', 'customstepctn'
 
     parser.add_argument('--tplrv', help='RV shift of the template [km/s] (default is 0)', default=0.0, type=float)
 
@@ -385,6 +385,7 @@ def parse_args():
     # logL
     # parser.add_argument('--cc2logL', help='Compute logLikelihood (logL) with the CC-to-logL mapping (false if not present).', action='store_true')
     # parser.add_argument('--logLmapping', help='Type of CC-to-logL mapping', choices=['zucker2003', 'brogiline2019'])
+    parser.add_argument('--splk', help='Spline interpolation degree', type=int, default=1)
 
     # MCMC
     # parser.add_argument('--mcmc', help='Use an MCMC to sample the peak of the logL, instead of computing it for a fixed RV range.', action='store_true')
@@ -395,7 +396,7 @@ def parse_args():
     parser.add_argument('--pool_nthreads', help='', type=int, default=6)
 
     parser.add_argument('--p0type', help='Starting point for walkers', choices=['gball', 'uniform'], default='uniform')
-    parser.add_argument('--p0range', help='+- from rvabs to start the walkers [m/s]', type=float, default=50)
+    parser.add_argument('--p0range', help='+- from rvabs to start the walkers [m/s]', type=float, default=30)
 
     parser.add_argument('--obo', help='Run MCMC order by order, to get an RV per order', action='store_true')
 
@@ -706,7 +707,29 @@ def main():
     # ------------
 
     filmask = args.filmask
-    wm, fm, sfm, nordm, ordsm, headerm = spectrographutils.read_spec_model(filmask, args.tpltype)  # `m` stands for mask or model
+    if (args.tpltype != 'mask') and (args.tpltype != 'maskinterp'):
+        wm, fm, sfm, nordm, ordsm, headerm = spectrographutils.read_spec_model(filmask, args.tpltype)  # `m` stands for mask or model
+    else:
+        # Read mask
+        if not args.maskformatharp:
+            wm, fm = np.loadtxt(filmask, usecols=[0, 1], unpack=True)
+        else:
+            wm1, wm2, fm = np.loadtxt(filmask, usecols=[0, 1, 2], unpack=True)
+            wm = (wm1 + wm2) / 2.
+            wm = spectrumutils.wair2vac(wm)
+            args.maskair = False
+        # Transform to vacuum
+        if args.maskair:
+            wm = spectrumutils.wair2vac(wm)
+            args.maskair = False
+        nordm = 1
+        ordsm = np.arange(0, nordm, 1)
+        wm = np.array([wm])
+        fm = np.array([fm])
+        wm_original, fm_original = wm.copy(), fm.copy()
+        nlinoriginal = len(wm)
+        verboseprint('  {} lines in mask'.format(nlinoriginal))
+
 
     # Flag bad orders in model
     # ------------------------
@@ -748,6 +771,57 @@ def main():
             #         wm 
         else:
             wm = wm * (1 - args.tplrv / C_KMS)
+
+
+    # Mask ready to be interpolated
+    # Following Matteo's code
+    if args.tpltype == 'maskinterp':
+
+        # wM0, wM1, fM = np.loadtxt('K5.txt',unpack=True)
+        # wM = 0.5 * (wM0+wM1)   # Centroid (centre-width)
+        # nL = len(fM) # Number of lines
+        wM = wm[0]
+        fM = fm[0]
+        nL = len(fM)
+
+        res = 1E6     # Resolving power of the binary mask (equivalent pixel R)
+        pixPerFWHM = 4.0  # Line sampling (minimum 2.0 = Nyquist sampling)
+        assert pixPerFWHM >= 2.0
+
+        ''' Defining the wavelength vector for the model at constant R '''
+        # wlMin = 3779.0
+        # wlMax = 6917.0
+        wlMin = 2000.0
+        wlMax = 8000.0
+
+        ''' Creating the wavelength vector at constant delta(lam)/lam '''
+        a = (1+1/res)
+        nW = int(np.log(wlMax/wlMin) / np.log(a))
+        wOut = wlMin * a**np.arange(nW)
+        fOut = np.zeros(nW)
+
+        for il in range(nL):
+            # progress(il+1,nL)
+            cent = wM[il]
+            fwhm = pixPerFWHM * cent / res
+            sig = 0.5 * fwhm / np.sqrt(2.0 * np.log(2.0))
+            idx = (wOut > (cent - 4.0*fwhm)) * (wOut < (cent + 4.0*fwhm))
+            # fOut[(wOut>=wM0[il])*(wOut<=wM1[il])]=fM[il]
+            fOut[idx] += fM[il] * np.exp(-0.5 * (wOut[idx]-wM[il])**2 / sig**2)
+
+        # Invert mask (i.e. need absorption lines)
+        fOut = 1 - fOut
+
+        # # wMask = air_to_vac(wOut)
+        # # plt.plot(wMask,fOut,lw=1)
+        # # plt.show()
+        # plt.plot(wOut, fOut, alpha=0.5)
+        # plt.vlines(wm, 0, fm, colors='C1', alpha=0.5)
+        # plt.show(), plt.close()
+
+        wm = np.array([wOut])
+        fm = np.array([fOut])
+
 
     ###########################################################################
 
@@ -871,8 +945,12 @@ def main():
             wm0 = np.nanmin(wm[ordsm_use])
             wm1 = np.nanmax(wm[ordsm_use])
         else:
-            wm0 = wm[0]
-            wm1 = wm[-1]
+            if len(wm) == 1:  # if considering that mask/model can have different orders, i.e. wm = [[data]] instead of wm = [data]
+                wm0 = wm[0][0]
+                wm1 = wm[0][-1]
+            else:
+                wm0 = wm[0]
+                wm1 = wm[-1]
         wmin = np.nanmin([wspecmin, wm0, wt_broaden_join[0]]) - 500.
         wmax = np.nanmax([wspecmax, wm1, wt_broaden_join[-1]]) + 500.
         wt_broaden_join = np.concatenate(([wmin], wt_broaden_join, [wmax]))
@@ -900,28 +978,54 @@ def main():
 
         # Binary masks
         if nordm == 1:
-            mask = [[]] * len(rvnew)
-            for i, maskshift in enumerate(rvnew):
-                wm_shift = wm * (1 + maskshift / C_KMS)  # works for 1D and 2D wm
+            if len(wm) == 1:  # if considering that mask/model can have different orders, i.e. wm = [[data]] instead of wm = [data]
+                wm = wm[0]
+                fm = fm[0]
+                mask = [[]] * len(rvnew)
+                for i, maskshift in enumerate(rvnew):
+                    wm_shift = wm * (1 + maskshift / C_KMS)  # works for 1D and 2D wm
 
-                # Flag lines in bad regions: False in bad region, True otherwise
-                mask[i] = np.array(Maskbad_inv(wm_shift), dtype=bool)
+                    # Flag lines in bad regions: False in bad region, True otherwise
+                    mask[i] = np.array(Maskbad_inv(wm_shift), dtype=bool)
 
-            # Join masks for each RV shift
-            maskjoin = np.prod(mask, axis=0, dtype=bool)
+                # Join masks for each RV shift
+                maskjoin = np.prod(mask, axis=0, dtype=bool)
 
-            # # Plot: Check mask join is OK
-            # for i in range(len(mask)):
-            #     plt.plot(np.arange(len(mask[0])), mask[i], 'o')
-            # plt.plot(np.arange(len(mask[0])), maskjoin, '+', ms=10)
-            # plt.show()
-            # plt.close()
+                # # Plot: Check mask join is OK
+                # for i in range(len(mask)):
+                #     plt.plot(np.arange(len(mask[0])), mask[i], 'o')
+                # plt.plot(np.arange(len(mask[0])), maskjoin, '+', ms=10)
+                # plt.show()
+                # plt.close()
 
-            # Remove lines in telluric regions
-            wm = wm[maskjoin]
-            fm = fm[maskjoin]
+                # Remove lines in telluric regions
+                wm = np.array(wm[maskjoin])
+                fm = np.array(fm[maskjoin])
 
-            nlin = len(wm)
+                nlin = len(wm)
+            else:
+                mask = [[]] * len(rvnew)
+                for i, maskshift in enumerate(rvnew):
+                    wm_shift = wm * (1 + maskshift / C_KMS)  # works for 1D and 2D wm
+
+                    # Flag lines in bad regions: False in bad region, True otherwise
+                    mask[i] = np.array(Maskbad_inv(wm_shift), dtype=bool)
+
+                # Join masks for each RV shift
+                maskjoin = np.prod(mask, axis=0, dtype=bool)
+
+                # # Plot: Check mask join is OK
+                # for i in range(len(mask)):
+                #     plt.plot(np.arange(len(mask[0])), mask[i], 'o')
+                # plt.plot(np.arange(len(mask[0])), maskjoin, '+', ms=10)
+                # plt.show()
+                # plt.close()
+
+                # Remove lines in telluric regions
+                wm = wm[maskjoin]
+                fm = fm[maskjoin]
+
+                nlin = len(wm)
 
             verboseprint('Remove mask lines affected by tellurics')
             verboseprint('  {} lines in mask after removing tellurics'.format(nlin))
@@ -1046,10 +1150,16 @@ def main():
             wmords[o] = wm[o][mask]
             fmords[o] = fm[o][mask]
     else:
-        for o in ords:
-            mask = (wm >= wominshift[o]) & (wm <= womaxshift[o])
-            wmords[o] = wm[mask]
-            fmords[o] = fm[mask]
+        if (args.tpltype != 'mask') and (args.tpltype != 'maskinterp'):
+            for o in ords:
+                mask = (wm >= wominshift[o]) & (wm <= womaxshift[o])
+                wmords[o] = wm[mask]
+                fmords[o] = fm[mask]
+        else:  # use wider mask range to avoid interpolation issues for now
+            for o in ords:
+                mask = (wm >= (wominshift[o] - 10)) & (wm <= (womaxshift[o] + 10))
+                wmords[o] = wm[mask]
+                fmords[o] = fm[mask]
 
     # NOTE: wmords and fmords are the vectors used in the model interpolation
 
@@ -1311,6 +1421,9 @@ def main():
         else: shifterr_use = 0.
         wcorr = [w[o] * (1. - (shift_use) / C_MS) for o in ords]
 
+        # print('++++++++ shift', i, shift_use)
+        # continue
+
         # Readout noise
         ron = dataobs.loc[filobs]['ron']
 
@@ -1350,13 +1463,14 @@ def main():
         #         splrep(wmords[om], fmords[om], s=0)
 
         # # No yerr
-        # liscs = [splrep(wmords[om], fmords[om], s=0) if om in ords_use_lines else np.nan for om in ordsm ]
-        liscs = [splrep(wmords[om], fmords[om], k=1) if om in ords_use_lines else np.nan for om in ordsm]
-        # liscs = [splrep(wmords[om], fmords[om], w=1./sfm[o], s=0) if om in ords_use_lines else np.nan for om in ordsm ]  # using weight w results in all nan when interpolating
-        # TODO: This can be done outside the observation loop
 
-
-
+        if nordm == 1:
+            liscs = [splrep(wmords[om], fmords[om], k=args.splk) if om in ords_use_lines else np.nan for om in ords]
+        else:
+            # liscs = [splrep(wmords[om], fmords[om], s=0) if om in ords_use_lines else np.nan for om in ordsm ]
+            liscs = [splrep(wmords[om], fmords[om], k=args.splk) if om in ords_use_lines else np.nan for om in ordsm]
+            # liscs = [splrep(wmords[om], fmords[om], w=1./sfm[o], s=0) if om in ords_use_lines else np.nan for om in ordsm ]  # using weight w results in all nan when interpolating
+            # TODO: This can be done outside the observation loop
 
 
         # # Variables to store data
@@ -1720,6 +1834,20 @@ def main():
                 lissf2[o] = (lisfVec[o][lismtell_obs[o]] @ lisfVec[o][lismtell_obs[o]]) / lisN[o]  # stdev spectrum
 
             # ------
+
+            # ipdb.set_trace()
+            if False:
+                o = 60
+                fig, ax = plt.subplots(2, 1, sharex=True)
+                ax[0].plot(wcorr[o], lisfVec[o], label='Obs')
+                fminterp = splev(wcorr[o], liscs[o], der=0, ext=2)
+                ax[0].plot(wcorr[o], fminterp * 10 * np.abs(np.nanmax(lisfVec[o])) - np.abs(np.nanmin(lisfVec[o])), color='C1', alpha=0.5, label='Mask offset + scale')
+                # ax[0].plot(spectrumutils.dopplershift(wcorr[o], np.nanmean(rv) * 1.e3, rel=True), splev(wcorr[o], liscs[o], der=0, ext=2) * 2 * np.nanmax(lisfVec[o]) - np.abs(np.nanmin(lisfVec[o])), color='C2', alpha=0.5)
+                ax[1].plot(wcorr[o], splev(wcorr[o], liscs[o], der=0, ext=2), label='Mask')
+                for a in ax: a.legend(fontsize='xx-small')
+                plt.show(), plt.close()
+
+
 
             # MCMC to sample logL peak
             # ------------------------

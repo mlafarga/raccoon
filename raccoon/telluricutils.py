@@ -188,7 +188,7 @@ def join_overlap_wlimits(w1, w2):
 
 def plot_mask(w, f, ax=None, fscale=1., zorder=0, xlab='', ylab='', leglab='', title='', **kwargs):
     if ax is None: ax = plt.gca()
-    ax.fill_between(w, f, zorder=zorder, label=leglab, **kwargs)
+    ax.fill_between(w, f*fscale, zorder=zorder, label=leglab, **kwargs)
     ax.set_title(title)
     ax.set_xlabel(xlab)
     ax.set_ylabel(ylab)
