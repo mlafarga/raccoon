@@ -115,3 +115,21 @@ Mask available for CARMENES VIS and NIR:
 | `J20260+585default`  | M5.0 V |       <= 2.0 | `J20260+585serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas`  |
 | `J10564+070default`  | M6.0 V |          2.9 | `J10564+070serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas`  |
 | `J02530+168default`  | M7.0 V |       <= 2.0 | `J02530+168serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas`  |
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------------
+
+## Developer notes
+
+- Install editable with `python -m pip install -e .` in the main `raccoon` directory.
+- When adding a new module, add it to `raccoon/__init__.py` and to `py_sources` in `meson.build`.
+
+
+
