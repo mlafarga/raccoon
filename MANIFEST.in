@@ -1,2 +1,12 @@
 include README.md LICENSE
 graft raccoon/data
+prune build
+prune docs/_build
+prune docs/api
+global-exclude *.pyc *.o
+prune .github
+exclude .mailmap
+exclude .gitignore
+exclude .gitattributes
+exclude *.yml
+exclude *.yaml
