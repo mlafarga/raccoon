@@ -140,6 +140,6 @@ python -m pip install .
 # python -m pip install -e .
 raccoonccf -h
 raccoonccf /Users/marina/work/data/carmenes_gto/caracal/CARM_VIS/J07446+035/lisobs.txt CARM_VIS J07274+052default --dirout testraccoon --plot_sv --verbose --plottest_sv  # some error probably from telluric plot TODO check
-raccoonccf /Users/marina/work/data/carmenes_gto/caracal/CARM_VIS/J07446+035/lisobs.txt CARM_VIS J07274+052default --rvabs 26.66 --dirout testraccoon --plot_sv --verbose --testnobs 10
+raccoonccf /Users/marina/work/data/carmenes_gto/caracal/CARM_VIS/J07446+035/lisobs.txt CARM_VIS J07274+052default --obj J07446+035 --rvabs 26.66 --filtell default --rvshift header --fcorrorders obshighsnr --ords_use 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 --dirout testraccoon --plot_sv --verbose --testnobs 10
 # Default masks in: /Users/marina/anaconda3/envs/raccoontest2/lib/python3.9/site-packages/raccoon/data/mask/CARM_VIS/J07274+052serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas
 ``` -->
