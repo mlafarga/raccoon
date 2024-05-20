@@ -14,10 +14,11 @@ The methods implemented in this code are explained in this article: https://ui.a
 
 `raccoon` is mainly implemented in python 3. It also uses some fortran subroutines that, in order to be called from python, are compiled with `numpy.f2py`.
 
-Create and activate an environment with `pip` with e.g. conda:
+Create and activate an environment with e.g. conda and install `pip`:
 ```bash
 conda create -n raccoon
 conda activate raccoon
+conda install pip
 ```
 
 ### From source
