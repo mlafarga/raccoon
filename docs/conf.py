@@ -80,3 +80,10 @@ html_static_path = ['_static']
 
 # -- Options for EPUB output -------------------------------------------------
 epub_show_urls = 'footnote'
+
+
+
+
+
+autodoc_mock_imports = ['gfortran', 'flang', 'nvfortran', 'pgfortran', 'ifort', 'ifx', 'g95']
+
