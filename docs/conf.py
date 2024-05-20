@@ -15,7 +15,7 @@ import sys
 # sys.path.insert(0, os.path.abspath('.'))
 sys.path.insert(0, os.path.abspath('./../raccoon/'))
 
-import raccoon
+# import raccoon
 
 # -- Project information -----------------------------------------------------
 
@@ -23,7 +23,8 @@ project = 'raccoon'
 copyright = '2024, Marina Lafarga Magro'
 author = 'Marina Lafarga Magro'
 
-version = raccoon.__version__
+# version = raccoon.__version__
+version = "0.0.2"
 
 # -- General configuration ---------------------------------------------------
 

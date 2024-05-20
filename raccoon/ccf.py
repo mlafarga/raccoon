@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
-from scipy.interpolate import griddata
+# from scipy.interpolate import griddata
 
 import ipdb
 

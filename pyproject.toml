@@ -20,7 +20,8 @@ dependencies = [
     "lmfit",
     "ipdb",
 ]
-dynamic = ["version"]
+# dynamic = ["version"]
+version = "0.0.2"
 
 classifiers = [
     'License :: OSI Approved :: MIT License',
@@ -61,6 +62,9 @@ docs = [
     "numpydoc",
     "sphinx_rtd_theme",
     "nbsphinx",
+    # "meson-python",
+    # "meson >= 1.1.0",
+    # "numpy",
 ]
 
 [project.scripts]

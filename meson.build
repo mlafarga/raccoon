@@ -2,7 +2,7 @@ project(
     'raccoon',
     'c',
     # ['c', 'fortran'],
-    version: '0.0.1',
+    version: '0.0.2',
     # Cannot get dynamic version from SCM as with setuptools_scm?
     # Use a static version for now.
     # Some ideas (untested) below:
