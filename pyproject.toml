@@ -18,6 +18,7 @@ dependencies = [
     "tqdm",
     "progress",
     "lmfit",
+    "ipdb",
 ]
 dynamic = ["version"]
 

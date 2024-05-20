@@ -45,29 +45,34 @@ py_dep = py.dependency()
 # raccoon python modules
 # ----------------------
 
-py_sources = [
-    'raccoon/__init__.py',
-    'raccoon/carmenesutils.py',
-    'raccoon/ccf.py',
-    'raccoon/espressoutils.py',
-    'raccoon/expresutils.py',
-    'raccoon/fitsutils.py',
-    'raccoon/harpnsolarutils.py',
-    'raccoon/maroonxutils.py',
-    'raccoon/peakutils.py',
-    'raccoon/phoenixutils.py',
-    'raccoon/plotutils.py',
-    'raccoon/pyutils.py',
-    'raccoon/spectrographutils.py',
-    'raccoon/spectrumutils.py',
-    'raccoon/telluricutils.py',
-    'raccoon/scripts/ccfcompute.py',
-    'raccoon/scripts/maskcompute.py',
-]
+# py_sources = [
+#     'raccoon/__init__.py',
+#     'raccoon/carmenesutils.py',
+#     'raccoon/ccf.py',
+#     'raccoon/espressoutils.py',
+#     'raccoon/expresutils.py',
+#     'raccoon/fitsutils.py',
+#     'raccoon/harpsutils.py',
+#     'raccoon/harpnsolarutils.py',
+#     'raccoon/maroonxutils.py',
+#     'raccoon/peakutils.py',
+#     'raccoon/phoenixutils.py',
+#     'raccoon/plotutils.py',
+#     'raccoon/pyutils.py',
+#     'raccoon/spectrographutils.py',
+#     'raccoon/spectrumutils.py',
+#     'raccoon/telluricutils.py',
+#     'raccoon/scripts/ccfcompute.py',
+#     'raccoon/scripts/maskcompute.py',
+# ]
 
-py.install_sources(py_sources,
-  subdir: 'raccoon',
-)
+# py.install_sources(py_sources,
+#   subdir: 'raccoon',
+# )
+
+# Seems like you don't need the above if have this line below
+# Needed to get scripts raccoonccf and raccoonmask installed
+install_subdir('raccoon', install_dir: py.get_install_dir() / 'raccoon', strip_directory: true)
 
 # -----------------------------------------------
 
@@ -103,8 +108,3 @@ py.extension_module('ccflibfort',
   subdir: 'raccoon',
   install : true,
 )
-
-# -----------------------------------------------
-
-# Needed to get scripts raccoonccf and raccoonmask installed
-install_subdir('raccoon', install_dir: py.get_install_dir() / 'raccoon', strip_directory: true)

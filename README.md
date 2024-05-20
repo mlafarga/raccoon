@@ -129,7 +129,5 @@ Mask available for CARMENES VIS and NIR:
 ## Developer notes
 
 - Install editable with `python -m pip install -e .` in the main `raccoon` directory.
-- When adding a new module, add it to `raccoon/__init__.py` and to `py_sources` in `meson.build`.
-
-
-
+<!-- - When adding a new module, add it to `raccoon/__init__.py` and to `py_sources` in `meson.build`. -->
+- When adding a new module, add it to `raccoon/__init__.py`.
