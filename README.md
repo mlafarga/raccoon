@@ -12,14 +12,13 @@ The methods implemented in this code are explained in this article: https://ui.a
 
 ## Installation
 
-`raccoon` is mainly implemented in python. It also uses some fortran subroutines that, in order to be called from python, are compiled with `f2py`.
+`raccoon` is mainly implemented in python 3. It also uses some fortran subroutines that, in order to be called from python, are compiled with `numpy.f2py`.
 
-Before installing it needs a python 3 distribution with `numpy`.
-
-If you use conda you can create and activate a conda environment with:
+Create and activate an environment with e.g. conda and install `pip`:
 ```bash
-conda create -n raccoon python=3.7 numpy scipy astropy pandas lmfit
+conda create -n raccoon
 conda activate raccoon
+conda install pip
 ```
 
 ### From source
@@ -28,7 +27,13 @@ The source code for `raccoon` can be downloaded from GitHub and installed by run
 ```bash
 git clone https://github.com/mlafarga/raccoon.git
 cd raccoon
-python setup.py install
+python -m pip install .
+```
+
+To test the installation, the following command should display all the options for the script `raccoonccf`
+```bash
+# If installed from source, leave the source directory before testing this command
+raccoonccf -h
 ```
 
 <!---
@@ -115,3 +120,26 @@ Mask available for CARMENES VIS and NIR:
 | `J20260+585default`  | M5.0 V |       <= 2.0 | `J20260+585serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas`  |
 | `J10564+070default`  | M6.0 V |          2.9 | `J10564+070serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas`  |
 | `J02530+168default`  | M7.0 V |       <= 2.0 | `J02530+168serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas`  |
+
+
+
+-------------------------------------------------------------------------------
+
+## Developer notes
+
+- Install editable with `python -m pip install -e .` in the main `raccoon` directory.
+<!-- - When adding a new module, add it to `raccoon/__init__.py` and to `py_sources` in `meson.build`. -->
+- When adding a new module, add it to `raccoon/__init__.py`.
+<!-- - Test
+```bash
+conda create -n raccoontest2
+# conda create -n raccoontest python==3.9
+conda activate raccoontest2
+cd Users/marina/work/code/raccoon
+python -m pip install .
+# python -m pip install -e .
+raccoonccf -h
+raccoonccf /Users/marina/work/data/carmenes_gto/caracal/CARM_VIS/J07446+035/lisobs.txt CARM_VIS J07274+052default --dirout testraccoon --plot_sv --verbose --plottest_sv  # some error probably from telluric plot TODO check
+raccoonccf /Users/marina/work/data/carmenes_gto/caracal/CARM_VIS/J07446+035/lisobs.txt CARM_VIS J07274+052default --obj J07446+035 --rvabs 26.66 --filtell default --rvshift header --fcorrorders obshighsnr --ords_use 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 --dirout testraccoon --plot_sv --verbose --testnobs 10
+# Default masks in: /Users/marina/anaconda3/envs/raccoontest2/lib/python3.9/site-packages/raccoon/data/mask/CARM_VIS/J07274+052serval_tellbervmax_fwhm2.00-30.00_contrminmin0.06_depthwq0.60_contrastmeanfwhm-1.mas
+``` -->

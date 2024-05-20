@@ -1,0 +1,68 @@
+[project]
+name = "raccoon"
+description = "Radial velocities and Activity indicators from Cross-COrrelatiON with masks"
+readme = "README.md"
+authors = [
+    { name = "Marina Lafarga Magro", email = "marina.lafarga@gmail.com" }
+]
+# license = { text = "MIT License" }
+license = { file = "LICENSE" }
+dependencies = [
+    "numpy",
+    "scipy",
+    "astropy",
+    "pandas",
+    "matplotlib",
+    "cmocean",
+    "colorcet",
+    "tqdm",
+    "progress",
+    "lmfit",
+    "ipdb",
+]
+dynamic = ["version"]
+
+classifiers = [
+    'License :: OSI Approved :: MIT License',
+    'Programming Language :: Python :: 3',
+    'Intended Audience :: Science/Research',
+    'Topic :: Scientific/Engineering :: Astronomy',
+]
+
+[project.urls]
+homepage = "https://github.com/mlafarga/raccoon"
+
+[build-system]
+# build-backend = 'setuptools.build_meta'
+build-backend = "mesonpy"
+requires = [
+    # "setuptools>=45",
+    "wheel", 
+    # "setuptools_scm[toml]>=6.2",
+    # "oldest-supported-numpy",
+    # "meson",
+    "meson-python",
+    "meson >= 1.1.0",
+    # "pybind11",
+    "numpy",
+    ]
+
+# [tool.setuptools]
+
+# [tool.setuptools.packages.find]
+
+# [tool.setuptools_scm]
+# write_to = "raccoon/_version.py"
+
+[project.optional-dependencies]
+docs = [
+    "sphinx",
+    "sphinx-automodapi",
+    "numpydoc",
+    "sphinx_rtd_theme",
+    "nbsphinx",
+]
+
+[project.scripts]
+raccoonccf = 'raccoon.scripts.ccfcompute:main'
+raccoonmask = 'raccoon.scripts.maskcompute:main'

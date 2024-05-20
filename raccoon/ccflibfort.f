@@ -1,4 +1,4 @@
-!  f2py -m ccflibfort77 -c ccflibfort77.f
+!  f2py -m ccflibfort -c ccflibfort.f
 !----------------------------------------------------------------------
 
 ! Compute CCF
