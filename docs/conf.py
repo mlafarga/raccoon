@@ -85,5 +85,5 @@ epub_show_urls = 'footnote'
 
 
 
-autodoc_mock_imports = ['gcc', 'gfortran', 'flang', 'nvfortran', 'pgfortran', 'ifort', 'ifx', 'g95']
+# autodoc_mock_imports = ['gcc', 'gfortran', 'flang', 'nvfortran', 'pgfortran', 'ifort', 'ifx', 'g95']
 
