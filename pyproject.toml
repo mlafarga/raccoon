@@ -62,9 +62,9 @@ docs = [
     "numpydoc",
     "sphinx_rtd_theme",
     "nbsphinx",
-    "meson-python",
-    "meson >= 1.1.0",
-    "numpy",
+    # "meson-python",
+    # "meson >= 1.1.0",
+    # "numpy",
 ]
 
 [project.scripts]

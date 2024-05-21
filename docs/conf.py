@@ -32,7 +32,7 @@ version = "0.0.2"
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    # 'sphinx.ext.autodoc',  # include documentation from docstrings
+    'sphinx.ext.autodoc',  # include documentation from docstrings
     # 'sphinx.ext.autosummary',  # generate autodoc summaries
     'sphinx_automodapi.automodapi',  # automatic generation of API documentation pages for Python package modules
     'sphinx_automodapi.smart_resolver',
