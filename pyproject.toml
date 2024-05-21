@@ -19,6 +19,7 @@ dependencies = [
     "progress",
     "lmfit",
     "ipdb",
+    "popurri@git+https://github.com/mlafarga/popurri",
 ]
 # dynamic = ["version"]
 version = "0.0.2"
