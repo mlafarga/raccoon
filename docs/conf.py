@@ -44,7 +44,7 @@ extensions = [
     'sphinx_rtd_theme',  # readthedocs theme
     # 'sphinx_search.extension',  #  enable search as you type for docs
     'nbsphinx',  # jupyter notebook support
-    'sphinx-copybutton',  # add a copy button to code blocks
+    'sphinx_copybutton',  # add a copy button to code blocks
 ]
 
 intersphinx_mapping = {
@@ -63,6 +63,10 @@ templates_path = ['_templates']
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+
+# The name of the Pygments (syntax highlighting) style to use
+# https://stackoverflow.com/questions/48615629/how-to-include-pygments-styles-in-a-sphinx-project
+pygments_style = 'monokai'
 
 # -- Options for HTML output -------------------------------------------------
 
