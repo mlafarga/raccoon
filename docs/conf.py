@@ -44,6 +44,7 @@ extensions = [
     'sphinx_rtd_theme',  # readthedocs theme
     # 'sphinx_search.extension',  #  enable search as you type for docs
     'nbsphinx',  # jupyter notebook support
+    'sphinx-copybutton',  # add a copy button to code blocks
 ]
 
 intersphinx_mapping = {
