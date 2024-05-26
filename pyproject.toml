@@ -64,6 +64,10 @@ docs = [
     "sphinx_rtd_theme",
     "nbsphinx",
 ]
+test = [
+    "pytest",
+    # "pytest-doctestplus",
+]
 
 [project.scripts]
 raccoonccf = 'raccoon.scripts.ccfcompute:main'

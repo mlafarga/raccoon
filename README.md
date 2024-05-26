@@ -1,5 +1,8 @@
 # raccoon
 
+[![Documentation Status](https://readthedocs.org/projects/raccoonccf/badge/?version=latest)](https://raccoonccf.readthedocs.io/en/latest/?badge=latest)
+      
+
 Radial velocities and Activity indicators from Cross-COrrelatiON with masks
 
 `raccoon` is an open source python package the implements the cross-correlation function (CCF) method.
@@ -10,11 +13,14 @@ It is able to
 
 The methods implemented in this code are explained in this article: https://ui.adsabs.harvard.edu/abs/2020A%26A...636A..36L/abstract ([pdf](https://www.aanda.org/articles/aa/pdf/2020/04/aa37222-19.pdf))
 
+See the documentation at https://raccoonccf.readthedocs.io/
+
+
 ## Installation
 
 `raccoon` is mainly implemented in python 3. It also uses some fortran subroutines that, in order to be called from python, are compiled with `numpy.f2py`.
 
-Create and activate an environment with e.g. conda and install `pip`:
+Recommended: Create and activate an environment with e.g. conda and install `pip`:
 ```bash
 conda create -n raccoon
 conda activate raccoon
@@ -36,15 +42,24 @@ To test the installation, the following command should display all the options f
 raccoonccf -h
 ```
 
-<!---
-### Using pip
-
-`raccoon` can be easily install using `pip` (after installing `numpy`)
-
+To install in editable mode and/or include also the dependencies for the documentation and testing, run:
 ```bash
-pip install raccoon
+python -m pip install -e .
+
+# With docs dependencies
+python -m pip install -e .[docs]
+
+# With testing dependencies
+python -m pip install -e .[test]
+
+# With docs and testing dependencies
+python -m pip install -e .[docs,test]
 ```
--->
+
+macOS note: zsh uses square brackets for globbing / pattern matching, so need to use e.g.
+```bash
+python -m pip install -e ."[docs,test]"
+```
 
 
 ## Basic usage
