@@ -27,8 +27,16 @@ version = "0.0.2"
 classifiers = [
     'License :: OSI Approved :: MIT License',
     'Programming Language :: Python :: 3',
+    'Programming Language :: Fortran',
     'Intended Audience :: Science/Research',
     'Topic :: Scientific/Engineering :: Astronomy',
+    'Topic :: Scientific/Engineering :: Physics',
+]
+
+keywords = [
+    "astronomy",
+    "astrophysics",
+    "science",
 ]
 
 [project.urls]
@@ -63,7 +71,7 @@ docs = [
     "numpydoc",
     "sphinx_rtd_theme",
     "nbsphinx",
-    "sphinx-copybutton",
+    "sphinx_copybutton",
 ]
 test = [
     "pytest",

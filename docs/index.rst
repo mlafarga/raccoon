@@ -5,6 +5,10 @@
 Welcome to raccoon's documentation!
 ===================================
 
+.. image:: https://readthedocs.org/projects/raccoonccf/badge/?version=latest
+    :target: https://raccoonccf.readthedocs.io/en/latest/?badge=latest
+    :alt: Documentation Status
+
 .. note::
 
    This project is under development.
