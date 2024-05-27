@@ -9,13 +9,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Here we manually list two nox sessions
+        # Here we manually list nox sessions
         nox_session: ["tests-3.8", "tests-3.9", "tests-3.10", "tests-3.11"]
     name: Run nox session ${{ matrix.nox_session }}
     runs-on: ubuntu-latest
     steps:
-      # (other steps before this: checkout code, install python and nox...)
-      - uses: actions/checkout@v4.1.1
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
       - uses: wntrblm/nox@main
       - run: nox -s "${{ matrix.nox_session }}"
       
