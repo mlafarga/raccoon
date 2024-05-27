@@ -4,7 +4,7 @@ import nox
 def tests(session):
     session.install(".[tests]")
 
-    session.run("pytest", *session.posargs)
+    session.run("python -m pytest", *session.posargs)
 
 
 # # Integrate with GitHub Actions
