@@ -5,27 +5,40 @@ on:
   workflow_dispatch:
 
 jobs:
-  list_nox_test_sessions:
-    runs-on: ubuntu-latest
-    steps:
-        # (other steps before this: checkout code, install python and nox...)
-
-        - name: list all test sessions
-          id: set-matrix
-          run: echo "::set-output name=matrix::$(nox -s gha_list -- tests)"
-
-    # save the list into the outputs
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-
   run_all_tests:
-    needs: list_nox_test_sessions
     strategy:
       fail-fast: false
       matrix:
-        nox_session: ${{ fromJson(needs.list_nox_test_sessions.outputs.matrix) }}
+        # Here we manually list two nox sessions
+        nox_session: ["tests-3.8", "tests-3.9", "tests-3.10", "tests-3.11"]
     name: Run nox session ${{ matrix.nox_session }}
     runs-on: ubuntu-latest
     steps:
-      # (other steps before this: checkout code, install python)
+      # (other steps before this: checkout code, install python and nox...)
       - run: nox -s "${{ matrix.nox_session }}"
+      
+# jobs:
+#   list_nox_test_sessions:
+#     runs-on: ubuntu-latest
+#     steps:
+#         # (other steps before this: checkout code, install python and nox...)
+
+#         - name: list all test sessions
+#           id: set-matrix
+#           run: echo "::set-output name=matrix::$(nox -s gha_list -- tests)"
+
+#     # save the list into the outputs
+#     outputs:
+#       matrix: ${{ steps.set-matrix.outputs.matrix }}
+
+#   run_all_tests:
+#     needs: list_nox_test_sessions
+#     strategy:
+#       fail-fast: false
+#       matrix:
+#         nox_session: ${{ fromJson(needs.list_nox_test_sessions.outputs.matrix) }}
+#     name: Run nox session ${{ matrix.nox_session }}
+#     runs-on: ubuntu-latest
+#     steps:
+#       # (other steps before this: checkout code, install python)
+#       - run: nox -s "${{ matrix.nox_session }}"
