@@ -578,6 +578,9 @@ def main():
 
         # Plot spectrum+mask and CCF test
         if doplottest:
+            if args.filtell == 'default':
+                args.filtell = ccflib.selecttell_default(args.inst)
+        
             fig, ax = plt.subplots(2, 1, figsize=(16, 10))
             # fig, ax = plt.subplots(1,2, figsize=(16, 5), gridspec_kw={'width_ratios': [2,1]})
             # Spec

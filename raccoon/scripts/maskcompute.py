@@ -377,6 +377,10 @@ def main():
     if args.filtell is not None:
         verboseprint('\nRead telluric mask', args.filtell)
 
+        if args.filtell == 'default':
+            args.filtell = ccflib.selecttell_default(args.inst)
+            verboseprint('  ', args.filtell)
+
         # Tellurics
         wt, ft = telluricutils.read_mask(args.filtell)
         wt1, wt2 = telluricutils.mask2wlimits(wt, ft)
