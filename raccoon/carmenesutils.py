@@ -73,6 +73,7 @@ def caracal_lisobs_obj(dirin, pattern='car*_A.fits'):
         Directory containing the FITS files.
     pattern : str (default: `car*_A.fits`)
         Search pattern.
+        Default CARMENES files follow "car*_A.fits". For telluric corrected files, change pattern to "car*_A-tac.fits".
 
     Return
     ------
@@ -416,7 +417,10 @@ def caracal_rvcorrection_lisobs(lisobs, use_berv=True, use_drift=True, notfound=
     for obs in lisobs:
         shift, shifterr, dicshift = caracal_rvcorrection(obs, use_berv=True, use_drift=True, notfound=notfound)
         dicshift['obs'] = obs
-        dicshift['timeid'] = os.path.basename(obs).replace('_A.fits', '.fits')
+        if '_A.fits' in os.path.basename(obs):
+            dicshift['timeid'] = os.path.basename(obs).replace('_A.fits', '.fits')
+        elif '_A-tac.fits' in os.path.basename(obs):
+            dicshift['timeid'] = os.path.basename(obs).replace('_A-tac.fits', '.fits')
         lisdicshift.append(dicshift)
     datashift = pd.DataFrame(lisdicshift)
     datashift.set_index('timeid', inplace=True)
@@ -1502,7 +1506,12 @@ def serval_read_mlc(fil, ifnofilout='empty', nrow=1):
 def serval_lisobs(listimeid):
     """Get observation filename, i.e. add change ".fits" to "_A.fits" in `timeid` column.
     """
-    lisobs = [i.replace('.fits', '_A.fits') for i in listimeid]
+    # lisobs = [i.replace('.fits', '_A.fits') for i in listimeid]
+    # TODO not sure if this works!!!!
+    if '-tac.fits' in listimeid[0]:
+        lisobs = [i.replace('-tac.fits', '_A-tac.fits') for i in listimeid]
+    else:
+        lisobs = [i.replace('.fits', '_A.fits') for i in listimeid]
     data = pd.DataFrame({'obs': lisobs}, index=listimeid)
     return data
 
@@ -1646,7 +1655,10 @@ def serval_caracal_rvcorrection(filobs, servalin, obj=None, use_caracal=True, ca
     """
     verboseprint = print if verb else lambda *a, **k: None
 
-    timeidobs = filobs.replace('_A.fits', '.fits')
+    if '_A.fits' in filobs:
+        timeidobs = filobs.replace('_A.fits', '.fits')
+    elif '_A-tac.fits' in filobs:
+        timeidobs = filobs.replace('_A-tac.fits', '.fits')
 
     header = False
 
