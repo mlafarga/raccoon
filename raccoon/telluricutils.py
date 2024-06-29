@@ -1,12 +1,10 @@
-#!/usr/bin/env python
 """
-Telluric mask file format:
-    - Columns: (0) wavelength [A], (1) "flux".
-    - Every region (line or set of lines) that should be blocked because it is affected by tellurics is represented by 0110 in the flux column.
-"""
-from __future__ import division
-from __future__ import print_function
+Telluric utils
 
+Telluric mask file format:
+- Columns: (0) wavelength [A], (1) "flux".
+- Every region (line or set of lines) that should be blocked because it is affected by tellurics is represented by 0110 in the flux column.
+"""
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.interpolate import interp1d
@@ -15,8 +13,8 @@ from scipy.interpolate import interp1d
 C_MS = 2.99792458*1.e8  # Light speed [m/s]
 C_KMS = 2.99792458*1.e5  # Light speed [km/s]
 
-###############################################################################
 
+###############################################################################
 
 def read_mask(filin):
     w, f = np.loadtxt(filin, usecols=[0, 1], unpack=True)

@@ -691,6 +691,9 @@ class Crosscorr():
     def computeccf_initial_test(self, test_rvcen=0., test_rvrng=200., test_rvstp=1., test_o=None, ccftestdmin=2,):
         """
         Compute the cross-correlation on a reference order (the ord_ref of the instrument by default), on a reference observation (the one with highest S/N by default), to find the adequate centre and range of the CCF, if not provided with `rvcen` and `rvrng`.
+
+        test_rvcen_result
+        test_rvrng_result
         """
         # Inputs
         self.test_rvcen = test_rvcen

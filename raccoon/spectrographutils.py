@@ -10,6 +10,7 @@ import os
 import sys
 import ipdb
 
+from astropy.io import fits
 import numpy as np
 import pandas as pd
 
@@ -549,6 +550,15 @@ def read_spec_model(filtpl, tpltype):
     """
     if tpltype == 'serval':
         w, f, sf, header = carmenesutils.serval_tpl_read(filtpl)
+        nord = len(w)
+        ords = np.arange(0, nord, 1)
+
+    elif tpltype == 'serval_mx':  # tpl stored with w not in ln
+        with fits.open(filtpl) as hdulist:
+            w = hdulist['WAVE'].data
+            f = hdulist['SPEC'].data
+            sf = hdulist['SIG'].data
+            header = hdulist[0].header
         nord = len(w)
         ords = np.arange(0, nord, 1)
 
