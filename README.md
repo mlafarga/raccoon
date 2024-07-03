@@ -27,6 +27,8 @@ conda activate raccoon
 conda install pip
 ```
 
+If not installed already, you might also need to install the compilers `gfortran` and/or `gcc` for the next step to work.
+
 ### From source
 
 The source code for `raccoon` can be downloaded from GitHub and installed by running
