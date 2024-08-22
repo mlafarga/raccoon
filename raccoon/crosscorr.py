@@ -157,12 +157,15 @@ class Model():
             print('Model type not recognized.')
             sys.exit(1)
 
+        # Save nord
+        self.nord = int(nord)
+
         # Convert from air to vacuum
         if self.maskair:
             wm = spectrum.wair2vac(wm)
             self.maskair = False
 
-        datamod = {'wm': wm, 'fm': fm, 'nlin': nlin, 'ords': ords, 'nord': nord}
+        datamod = {'wm': wm, 'fm': fm, 'nlin': int(nlin), 'ords': ords, 'nord': int(nord)}
         return datamod
 
 
@@ -566,14 +569,14 @@ class Crosscorr():
     def __init__(self, data, model, tellmask=None, dirout='./', tag=None,
         ords_use=None,
         bervmax=None,
-        obs_ref=None,
+        obs_ref=None,  # Observation id, i.e. the index in dataheader, the filename without path or extension. Defaults to the one with highest S/N.
         verbose=True,
-        # Initial test CCF parameters
-        ccftestrun=True, 
+        # # Initial test CCF parameters
+        # ccftestrun=True, 
         ):
         self.data = data  # popurri.spectrum.Spectra
-        self.model = model  # Model
-        self.tellmask = tellmask
+        self.model = model  # raccoon.crosscorr.Model
+        self.tellmask = tellmask  # popurri.telluricutils.Mask
         self.ords_use = ords_use if ords_use is not None else self.data.ords
         self.tag = tag
         self.dirout = dirout
@@ -606,11 +609,13 @@ class Crosscorr():
         self.fluxratio = None
         self.nlinmin = 0
 
-        # Select obs with highest S/N
+        # Select obs with highest S/N unless another observation is passed as `obs_ref`
         self.obs_ref = obs_ref
         if self.obs_ref is None:
-            self.obs_ref = self.data.dataheader[f'snro{self.data.ord_ref}'].idxmax()
-            # self.obs_ref = 0
+            self.obs_ref = self.data.dataheader[f'snro{int(self.data.ord_ref)}'].idxmax()
+
+        # Get reference observation index
+        self.iobs_ref = self.data.dataheader.loc[self.obs_ref, 'idx']
 
         # If the model has more than 1 "order", check if data and model have the same number orders (they should)
         if self.model.nord > 1:
@@ -626,59 +631,139 @@ class Crosscorr():
 
     def compute_ord_fluxratio(self, fluxratiotype='obshighsnr', save=True):
         """
-        Get order relative flux correction
+        Get order relative flux correction.
 
-        Flux correction obtained from reference observation `obs_ref`, so that the flux of the  orders of all the observations always have the same ratio.
+        Flux correction obtained from a reference observation, so that the flux of the  orders of all the observations always have the same ratio.
+        
         Returns the flux ratios per order (all orders, not only those in ords_use), to be used as weights in the CCF computation.
+
+        Parameters
+        ----------
+        fluxratiotype : str, default 'obshighsnr'
+            Type of flux correction. Options: 
+            - 'obshighsnr': Use observation with highest S/N as reference.
+            - 'obsref': Use observation `obs_ref` as reference. Usually this one also is the one with the highest S/N.
         """
         self.fluxratiotype = fluxratiotype
-        if self.fluxratiotype == 'obshighsnr':
-            
-            # Reference order
-            oref = self.data.ord_ref
 
-            # Make sure reference obs is the one with highest S/N
-            obssnrmax = self.data.dataheader[f'snro{oref}'].idxmax()
-            iobs = self.data.dataheader.index.get_loc(obssnrmax)
-
-            # Flux of reference obs
-            f = self.data.dataspec['f'][iobs]
-            # c = self.data.dataspec['c'][self.obs_ref][self.test_o]
-
-            # TODO Revise divide by cont, or not
-            # TODO Revise normalise flux to snr, or not
-            # # Cont
-            # f = [f[o]/c[o] for o in ords]
-            # # fluxratio2 = [np.nanmedian(f[o]) / np.nanmedian(f[oref]) for o in ords]
-            # # SNR
-            # if args.inst == 'CARM_VIS' or args.inst == 'CARM_NIR':
-            #     f = [f[o] * dataobs.loc[filobsref]['snro{:d}'.format(o)]**2 / np.nanmedian(f[o]) for o in ords]
-            ##### NEW
-            ##### lissnro = [self.data.dataheader.loc[self.obs_ref, f'snro{o}'] for o in self.ords]
-
-            fluxratio = [np.nanmedian(f[o]) / np.nanmedian(f[oref]) for o in self.ords]
-
-        else:
+        if self.fluxratiotype is None:
             # Set all ratios to 1
             fluxratio = np.ones_like(self.ords)
+            self.fluxratio = fluxratio
+            return
+
+        # Reference order
+        oref = int(self.data.ord_ref)
+
+        if self.fluxratiotype == 'obsref':
+            # Reference observation index
+            iobs = self.iobs_ref
+
+        elif self.fluxratiotype == 'obshighsnr':
+            # Find obs with highest S/N
+            obssnrmax = self.data.dataheader[f'snro{oref}'].idxmax()
+            # iobs = self.data.dataheader.index.get_loc(obssnrmax)  # might change is row sort changes, use the column "idx" instead
+            iobs = self.data.dataheader.index.loc[obssnrmax, 'idx']
+
+        # Flux of reference obs
+        f = self.data.dataspec['f'][iobs]
+        # c = self.data.dataspec['c'][self.obs_ref][self.test_o]
+
+        # TODO Revise divide by cont, or not
+        # TODO Revise normalise flux to snr, or not
+        # # Cont
+        # f = [f[o]/c[o] for o in ords]
+        # # fluxratio2 = [np.nanmedian(f[o]) / np.nanmedian(f[oref]) for o in ords]
+        # # SNR
+        # if args.inst == 'CARM_VIS' or args.inst == 'CARM_NIR':
+        #     f = [f[o] * dataobs.loc[filobsref]['snro{:d}'.format(o)]**2 / np.nanmedian(f[o]) for o in ords]
+        ##### NEW
+        ##### lissnro = [self.data.dataheader.loc[self.obs_ref, f'snro{o}'] for o in self.ords]
+
+        # Compute flux ratio
+        fluxratio = [np.nanmedian(f[o]) / np.nanmedian(f[oref]) for o in self.ords]
 
         self.fluxratio = fluxratio
+
         # Save flux ratios per order: Order, flux ratio (i.e. weight), lambda min order, lambda max order
         if save:
             w = self.data.dataspec['w'][iobs]
-            arrwmin = [np.nanmin(w[o]) for o in self.ords]
-            arrwmax = [np.nanmax(w[o]) for o in self.ords]
-            filout = os.path.join(args.dirout, f'{args.obj}.fluxratio.csv')
-            np.savetxt(filout, np.vstack((self.ords, fluxratio, arrwmin, arrwmax)).T, delimiter=',', fmt=['%d', '%.8f', '%.8f', '%.8f'])
+            arrwmin = np.nanmin(w, axis=1)  # wmin per order
+            arrwmax = np.nanmin(w, axis=1)  # wmax per order
+            filout = os.path.join(self.dirout, f'{self.data.obj}.fluxratio.csv')
+            np.savetxt(filout, np.vstack((self.data.ords, fluxratio, arrwmin, arrwmax)).T, delimiter=',', fmt=['%d', '%.8f', '%.8f', '%.8f'])
+        
+        return
+
+
+    def broaden_tellmask(self, vbroadtype='value', vbroad=0):
+        """
+        Parameters
+        ----------
+        vbroadtype : str, default 'value'
+            How to get the velocity broadening of the telluric mask. Options:
+            - 'value': Use the value provided with `vbroad`.
+            - `obsall`: Use the maximum BERV value of all observations.
+            - `bervmax`: Use the value in Crosscorr.bervmax. TODO
+        vbroad : float, default 0
+            Broadening velocity in km/s. Only used of `vbroadtype` is 'value'.
+
+        Returns
+        -------
+        Does not return anything, but sets the following attributes:
+        - self.vbroad: Broadening velocity used (km/s).
+        - self.
+        """
+        # Do not run if no telluric mask provided
+        if self.tellmask is None:
+            print('No telluric mask provided.')
             return
+        
+        # Broaden velocity [km/s]
+        if vbroadtype == 'value':
+            self.vbroad = vbroad
+        elif vbroadtype == 'obsall':
+            self.vbroad = self.data.dataheader['berv'].abs().max()
+        elif vbroadtype == 'bervmax':
+            self.vbroad = self.bervmax
+        if self.verbose: print(f'Broaden telluric lines by {vbroad:.3f} km/s'
+                               
+        # Broaden
+        # TODO continue from ccfcompute line 787 (use own functions)
+
+        return
 
 
     def select_masklines_telloverlap(self):
         pass
         return
 
-
     def select_masklines_freetellurics(self):
+        """
+        Remove mask lines that overlap with tellurics
+        """
+        pass
+        return
+
+    def select_always_visible_masklines(self):
+        """
+        Select mask lines that are always visible in all observations (i.e. at any epoch).
+        """
+        pass
+        return
+
+
+    def prepare_mask(self, ):
+        """Wrapper to prepare mask for CCF computation.
+
+        Uses
+        ----
+        - select_masklines_freetellurics
+        - select_always_visible_masklines
+        """
+        # Remove mask lines in telluric regions
+
+        # Select mask lines per order usable at eny epoch
         pass
         return
     
@@ -700,8 +785,8 @@ class Crosscorr():
         self.test_rvcen = test_rvcen
         self.test_rvrng = test_rvrng
         self.test_rvstp = test_rvstp
-        self.test_o = test_o if test_o is not None else self.data.ord_ref
-        self.test_dmin = ccftestdmin
+        self.test_o = int(test_o) if test_o is not None else int(self.data.ord_ref)
+        self.test_dmin = int(ccftestdmin)
         # Outputs
         self.test_rv = None
         self.test_ccf = None
