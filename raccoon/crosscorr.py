@@ -837,12 +837,15 @@ class Crosscorr():
             - 'obshighsnr': Use observation with highest S/N as reference.
             - 'obsref': Use observation `obs_ref` as reference. Usually this one also is the one with the highest S/N.
         """
+        if self.verbose: print('Computing flux ratios per order, with fluxratiotype:', fluxratiotype)
+
         self.fluxratiotype = fluxratiotype
 
         if self.fluxratiotype is None:
             # Set all ratios to 1
             fluxratio = np.ones_like(self.ords)
             self.fluxratio = fluxratio
+            if self.verbose: print('Flux ratios per order set to 1')
             return
 
         # Reference order
@@ -856,7 +859,7 @@ class Crosscorr():
             # Find obs with highest S/N
             obssnrmax = self.data.dataheader[f'snro{oref}'].idxmax()
             # iobs = self.data.dataheader.index.get_loc(obssnrmax)  # might change is row sort changes, use the column "idx" instead
-            iobs = self.data.dataheader.index.loc[obssnrmax, 'idx']
+            iobs = self.data.dataheader.loc[obssnrmax, 'idx']
 
         # Flux of reference obs
         f = self.data.dataspec['f'][iobs]
@@ -874,7 +877,7 @@ class Crosscorr():
         ##### lissnro = [self.data.dataheader.loc[self.obs_ref, f'snro{o}'] for o in self.ords]
 
         # Compute flux ratio
-        fluxratio = [np.nanmedian(f[o]) / np.nanmedian(f[oref]) for o in self.ords]
+        fluxratio = [np.nanmedian(f[o]) / np.nanmedian(f[oref]) for o in self.data.ords]
 
         self.fluxratio = fluxratio
 
@@ -967,102 +970,7 @@ class Crosscorr():
     # CCF computation functions
     # -------------------------
 
-    def computeccf_initial_test(self, test_rvcen=0., test_rvrng=200., test_rvstp=1., test_o=None, ccftestdmin=2,):
-        """
-        Compute the cross-correlation on a reference order (the ord_ref of the instrument by default), on a reference observation (the one with highest S/N by default), to find the adequate centre and range of the CCF, if not provided with `rvcen` and `rvrng`.
 
-        test_rvcen_result
-        test_rvrng_result
-        """
-        # Inputs
-        self.test_rvcen = test_rvcen
-        self.test_rvrng = test_rvrng
-        self.test_rvstp = test_rvstp
-        self.test_o = int(test_o) if test_o is not None else int(self.data.ord_ref)
-        self.test_dmin = int(ccftestdmin)
-        # Outputs
-        self.test_rv = None
-        self.test_ccf = None
-        self.test_rvcen_result = None
-        self.test_rvrng_result = None
-        self.test_fitpar = None
-
-        if self.verbose: print(f'Computing initial test CCF on order {self.test_o}, RV center {self.test_rvcen}, RV range +- {self.test_rvrng}, and RV step {self.test_rvstp}, on observation {self.obs_ref}, {self.data.lisfil[self.obs_ref]}')
-
-        w = self.data.dataspec['wcorr'][self.obs_ref][self.test_o]
-        f = self.data.dataspec['f'][self.obs_ref][self.test_o]
-        c = self.data.dataspec['c'][self.obs_ref][self.test_o]
-        wm = self.model.datamod['wm']
-        fm = self.model.datamod['fm']
-        self.test_rv = np.arange(self.test_rvcen-self.test_rvrng, self.test_rvcen+self.test_rvrng+self.test_rvstp, self.test_rvstp)
-
-        # Compute CCF test
-        self.test_ccf = ccflibfort.computeccf(w, f, c, wm, fm, self.test_rv)
-
-        # Find CCF centre (minimum)
-        imin = np.nanargmin(self.test_)
-        test_rvcen_result = self.test_rv[imin]
-        if self.verbose: print('  RV cen: {} km/s'.format(test_rvcen_result))
-
-        # Fit Gaussian to estimate CCF range
-
-        # - Determine fit range: CCF maxima closest to absolute minimum (helps with noisy CCFs)
-        # -- CCF absolute minima and maxima
-        mnan = np.isfinite(self.test_ccf)  # Mask nans
-        rv, ccf = self.test_rv[mnan], self.test_ccf[mnan]
-        limin, limax1, limax2 = peakutils.find_abspeaks(ccf, method='custom')
-        # - Maxima closest to CCF minimum
-        imin = np.nanargmin(ccf)
-        i = np.where(limin == imin)[0][0]
-        imax1, imax2 = limax1[i], limax2[i]
-        # - Handle array ends
-        if imax2 < len(ccf): imax2p = imax2 + 1
-        else: imax2p = imax2
-
-        # - Check that the distance in RV between maxima is at least self.test_dmin (2 km/s by default)
-        # If not, select next maxima until it happens
-        # If never happens, will fit all RV range
-        # Helps with noisy CCFs
-        i1, i2 = i, i
-        while rv[imax2p] - rv[imax1] < self.test_dmin:
-            # If reached end of RV array, the fit limits are all the range
-            if imax1 == limax1[0] or imax2p == limax2[-1]:
-                imax1 = limax1[0]
-                imax2p = limax2[-1]
-                if self.verbose: print(f'  Cannot constrain CCF minimum range. Using all range ({rv[imax1]} -- {imax2p}) to fit a Gaussian and determine width.')
-                break
-            # Go to next closest maxima at each side
-            i1 = i1 - 1
-            i2 = i2 + 1
-            imax1, imax2 = limax1[i1], limax2[i2]
-            if imax2 != limax2[-1]: imax2p = imax2 + 1
-            else: imax2p = imax2
-
-        # - Fit Gaussian
-        x = rv[imax1:imax2p]
-        y = ccf[imax1:imax2p]
-        lmfitresult = peakutils.fit_gaussian_peak(x, y, amp_hint=np.nanmin(y) - np.nanmax(y), cen_hint=rv[imin], wid_hint=1., shift_hint=np.nanmax(y), minmax='min')
-
-        fitpar = {}
-        for p in lmfitresult.params.keys():
-            if lmfitresult.params[p].value is not None: fitpar['fit'+p] = lmfitresult.params[p].value
-            else: fitpar['fit'+p] = np.nan
-            if lmfitresult.params[p].stderr is not None: fitpar['fit'+p+'err'] = lmfitresult.params[p].stderr
-            else: fitpar['fit'+p+'err'] = np.nan
-        fitpar['fwhm'] = peakutils.gaussian_fwhm(wid=fitpar['fitwid'])
-        fitpar['fitredchi2'] = lmfitresult.redchi
-
-        # Determine CCF width: About 3 * FWHM
-        test_rvrng_result = round(np.ceil(fitpar['fwhm']*3.))  # [km/s]
-        # test_rvrng_result = round(np.ceil(fitpar['fwhm']*3.)/5)*5 # [km/s], round to 5
-        if self.verbose: print(f'  RV range: {test_rvrng_result} km/s (FWHM {fitpar["fwhm"]}, chi2red {fitpar["fitredchi2"]})')
-
-        # The Gaussian fit can give a more accurate minimum for the CCF, but can be problematic with noisy CCFs, so keep as rvcen_result the minimum found with np.argmin
-
-        # Save results
-        self.test_rvcen_result = test_rvcen_result
-        self.test_rvrng_result = test_rvrng_result
-        return
 
 
     def computeccf_lisobs(self,
@@ -1086,7 +994,7 @@ class Crosscorr():
             `computeccf_initial_test` must have been run before!
             Overrides `rvcen` and `rvrng`.
         """
-        if self.verbose: print(f'Computing CCFs for {len(self.data.lisfil)} obs')
+        if self.verbose: print(f'Computing CCFs for {len(self.data.nobs)} obs')
 
         # Set CCF parameters
         self.rvcen = rvcen if use_test and (self.test_rvcen_result is not None) else rvcen
