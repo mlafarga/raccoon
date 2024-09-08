@@ -888,33 +888,43 @@ class Crosscorr():
             arrwmax = np.nanmin(w, axis=1)  # wmax per order
             filout = os.path.join(self.dirout, f'{self.data.obj}.fluxratio.csv')
             np.savetxt(filout, np.vstack((self.data.ords, fluxratio, arrwmin, arrwmax)).T, delimiter=',', fmt=['%d', '%.8f', '%.8f', '%.8f'])
+            if self.verbose: print(f'Flux ratios per order saved in {filout}')
         
         return
 
 
-    def broaden_tellmask(self, vbroadtype='value', vbroad=0):
+    def broaden_tellmask_value(self, vbroadtype='value', vbroad=0):
         """
+        Select value by which to broaden the telluric mask.
+
         Parameters
         ----------
         vbroadtype : str, default 'value'
             How to get the velocity broadening of the telluric mask. Options:
             - 'value': Use the value provided with `vbroad`.
             - `obsall`: Use the maximum BERV value of all observations.
-            - `bervmax`: Use the value in Crosscorr.bervmax. TODO
+            - `bervmax`: Use the value in Crosscorr.data.bervmax. TODO: Compute BERV max of the star
         vbroad : float, default 0
             Broadening velocity in km/s. Only used of `vbroadtype` is 'value'.
 
         Returns
         -------
         Does not return anything, but sets the following attributes:
+        - self.vbroadtype: Broadening velocity type used.
         - self.vbroad: Broadening velocity used (km/s).
-        - self.
         """
         # Do not run if no telluric mask provided
         if self.tellmask is None:
             print('No telluric mask provided.')
             return
         
+        # Check if telluric mask has been broadened when initialised
+        if self.tellmask.broaden_dv is not None:
+            print(f'Warning: Telluric mask already broadened when initialised, by {self.tellmask.broaden_dv:.3f} m/s')  # Note: tellmask.broaden_dv is in m/s
+
+        # Broaden type
+        self.vbroadtype = vbroadtype
+
         # Broaden velocity [km/s]
         if vbroadtype == 'value':
             self.vbroad = vbroad
@@ -922,11 +932,8 @@ class Crosscorr():
             self.vbroad = self.data.dataheader['berv'].abs().max()
         elif vbroadtype == 'bervmax':
             self.vbroad = self.bervmax
-        if self.verbose: print(f'Broaden telluric lines by {vbroad:.3f} km/s'
-                               
-        # Broaden
-        # TODO continue from ccfcompute line 787 (use own functions)
 
+        if self.verbose: print(f'Telluric mask to be broadened by {self.vbroad:.3f} km/s (vbroadtype: {self.vbroadtype})')
         return
 
 
