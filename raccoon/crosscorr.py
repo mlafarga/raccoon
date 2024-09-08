@@ -581,6 +581,7 @@ class Crosscorr():
         self.tag = tag
         self.dirout = dirout
         if not os.path.exists(self.dirout): os.makedirs(self.dirout)
+        self.verbose = verbose
 
         # Initial test CCF parameters
         # Only initialise to None, they will be set in `computeccf_initial_test`, if run
@@ -595,13 +596,16 @@ class Crosscorr():
         self.test_rvcen_result = None
         self.test_rvrng_result = None
         self.test_fitpar = None
+        self.test_rv_new = None
 
         # CCF parameters
         # Only initialise to None, they will be set in `computeccf`, if run
         self.rvcen = None
         self.rvrng = None
         self.rvstp = None
-        self.rvstpreal = None
+        self.rvstpreal = None  # set below
+        self.rvgrid = None
+        self.rvgridreal = None
         self.fitfunc = None
         self.fitrng = None
         self.fitrngeach = None
@@ -623,11 +627,200 @@ class Crosscorr():
                 print('Data and model have different number of orders.')
                 sys.exit(1)
         
+        # Get RV grid step real
+        self.rvstpreal = self.data.Spectrograph.pixel_ms * 1.e-3  # km/s
 
     # =========================================================================
 
     # CCF preparation functions
     # -------------------------
+
+    def computeccf_initial_test(self, test_rvcen=0., test_rvrng=200., test_rvstp=1., test_o=None, ccftestdmin=2, x='w', y='f', sh=True, sv=False):
+        """
+        Compute the cross-correlation on a reference order (the ord_ref of the instrument by default), on a reference observation (the one with highest S/N by default), to find the adequate centre and range of the CCF, if not provided with `rvcen` and `rvrng`.
+
+        test_o : int
+            Avoid order with tellurics.
+
+        test_rvcen_result
+        test_rvrng_result
+        """
+        # Inputs
+        self.test_rvcen = test_rvcen
+        self.test_rvrng = test_rvrng
+        self.test_rvstp = test_rvstp
+        self.test_o = int(test_o) if test_o is not None else int(self.data.ord_ref)
+        self.test_dmin = int(ccftestdmin)
+        # Outputs
+        self.test_rv = None
+        self.test_ccf = None
+        self.test_rvcen_result = None
+        self.test_rvrng_result = None
+        self.test_fitpar = None
+
+        # Reference obs
+        idx = self.iobs_ref
+
+        if self.verbose: print(f'Computing initial test CCF with RV center {self.test_rvcen}, RV range +- {self.test_rvrng}, and RV step {self.test_rvstp}, on order {self.test_o} of observation {self.obs_ref}')
+
+        # Data
+        w = self.data.dataspec[x][idx][self.test_o]
+        f = self.data.dataspec[y][idx][self.test_o]
+        c = self.data.dataspec['c'][idx][self.test_o]
+        # Model
+        wm = self.model.datamod['wm']
+        fm = self.model.datamod['fm']
+        
+        # RV range
+        self.test_rv = np.arange(self.test_rvcen-self.test_rvrng, self.test_rvcen+self.test_rvrng+self.test_rvstp, self.test_rvstp)
+
+        # Compute CCF test
+        self.test_ccf = ccflibfort.computeccf(w, f, c, wm, fm, self.test_rv)
+
+        # Find CCF centre (minimum)
+        imin = np.nanargmin(self.test_ccf)
+        test_rvcen_result = self.test_rv[imin]
+        if self.verbose: print('  RV cen: {} km/s'.format(test_rvcen_result))
+
+        # Fit Gaussian to estimate CCF range
+
+        # - Determine fit range: CCF maxima closest to absolute minimum (helps with noisy CCFs)
+        # -- CCF all minima and maxima
+        mnan = np.isfinite(self.test_ccf)  # Mask nans
+        rv, ccf = self.test_rv[mnan], self.test_ccf[mnan]
+        limin, limax1, limax2 = peakutils.find_abspeaks(ccf, method='custom')
+        # - Maxima closest to CCF minimum
+        imin = np.nanargmin(ccf)
+        i = np.where(limin == imin)[0][0]
+        imax1, imax2 = limax1[i], limax2[i]
+        # - Handle array ends (needed if slicing)
+        if imax2 < len(ccf): imax2p = imax2 + 1
+        else: imax2p = imax2
+
+        # - Check that the distance in RV between maxima is at least self.test_dmin (2 km/s by default)
+        # If not, select next maxima until it happens
+        # If never happens, will fit all RV range
+        # Helps with noisy CCFs
+        i1, i2 = i, i
+        while rv[imax2p] - rv[imax1] < self.test_dmin:
+            # If reached end of RV array, the fit limits are all the range
+            if imax1 == limax1[0] or imax2p == limax2[-1]:
+                imax1 = limax1[0]
+                imax2p = limax2[-1]
+                if self.verbose: print(f'  Cannot constrain CCF minimum range. Using all range ({rv[imax1]} -- {rv[imax2p]}) to fit a Gaussian and determine width')
+                break
+            # Go to next closest maxima at each side
+            i1 = i1 - 1
+            i2 = i2 + 1
+            imax1, imax2 = limax1[i1], limax2[i2]
+            if imax2 != limax2[-1]: imax2p = imax2 + 1
+            else: imax2p = imax2
+
+        # - Fit Gaussian
+        x = rv[imax1:imax2p]
+        y = ccf[imax1:imax2p]
+        lmfitresult = peakutils.fit_gaussian_peak(x, y, amp_hint=np.nanmin(y) - np.nanmax(y), cen_hint=rv[imin], wid_hint=1., shift_hint=np.nanmax(y), minmax='min')
+
+        fitpar = {}
+        for p in lmfitresult.params.keys():
+            if lmfitresult.params[p].value is not None: fitpar['fit'+p] = lmfitresult.params[p].value
+            else: fitpar['fit'+p] = np.nan
+            if lmfitresult.params[p].stderr is not None: fitpar['fit'+p+'err'] = lmfitresult.params[p].stderr
+            else: fitpar['fit'+p+'err'] = np.nan
+        fitpar['fwhm'] = peakutils.gaussian_fwhm(wid=fitpar['fitwid'])
+        fitpar['fitredchi2'] = lmfitresult.redchi
+
+        # Determine CCF width: About 3 * FWHM
+        test_rvrng_result = round(np.ceil(fitpar['fwhm']*3.))  # [km/s]
+        # test_rvrng_result = round(np.ceil(fitpar['fwhm']*3.)/5)*5 # [km/s], round to 5
+        if self.verbose: print(f'  RV range: {test_rvrng_result} km/s (FWHM {fitpar["fwhm"]}, chi2red {fitpar["fitredchi2"]})')
+
+        # The Gaussian fit can give a more accurate minimum for the CCF, but can be problematic with noisy CCFs, so keep as rvcen_result the minimum found with np.argmin
+
+        # Save results
+        self.test_rvcen_result = test_rvcen_result
+        self.test_rvrng_result = test_rvrng_result
+        self.test_fitpar = fitpar
+        self.test_rv_new = np.arange(self.test_rvcen_result-self.test_rvrng_result, self.test_rvcen_result+self.test_rvrng_result+self.test_rvstp, self.test_rvstp)  # Updated RV, the one to be used in the final CCF
+
+        # Plot CCF test
+        if sh or sv:
+            fig, ax = plt.subplots(1, 2, figsize=(16, 5), constrained_layout=True, gridspec_kw={'width_ratios': [3, 1]})
+            # Spec
+            ax[0].plot(self.test_rv[mnan], self.test_ccf[mnan], 'k-', label='CCF initial test')
+            rv_min, rv_max = self.test_rv_new[0], self.test_rv_new[-1]
+            rvplot_imin, rvplot_imax = np.argmin(np.abs(self.test_rv - rv_min)), np.argmin(np.abs(self.test_rv - rv_max))
+            rvplot_imaxp = rvplot_imax + 1 if rvplot_imax < len(self.test_rv) else rvplot_imax
+            ax[1].plot(self.test_rv[rvplot_imin:rvplot_imaxp], self.test_ccf[rvplot_imin:rvplot_imaxp], 'k-')
+            for a in ax:
+                ylim = a.get_ylim()
+                xlim = a.get_xlim()
+                # Minimum and maxima
+                a.vlines(rv[imin], *ylim, color='0.5', linestyle='--', zorder=-1, label='Grid min')
+                a.vlines(rv[imax1], *ylim, color='b', linestyle='-.', zorder=-1, label='Grid blue max (fit limit)')
+                a.vlines(rv[imax2], *ylim, color='r', linestyle='-.', zorder=-1, label='Grid red max (fit limit)')
+                # Fit
+                x_extra = np.linspace(x[0], x[-1], 100)
+                a.plot(x_extra, peakutils.gaussian(x_extra, **lmfitresult.best_values), '-', color='goldenrod', alpha=0.8, lw=4, label='Gaussian fit')
+                # Final RV range (shade RVs not included)
+                a.axvspan(xlim[0], self.test_rv[rvplot_imin], color='0.9', label='RVs excluded in final CCF')
+                a.axvspan(self.test_rv[rvplot_imax], xlim[1], color='0.9')
+                a.set_ylim(ylim)
+                a.set_xlim(xlim)
+                a.minorticks_on()
+                a.set(xlabel='RV [km/s]', ylabel='CCF')
+            # ax[0].set(title='CCF initial test')
+            ax[0].set(title=f'{self.obs_ref} order {self.test_o}')
+            strchired = '$\chi^2_\mathrm{red}$'
+            strinfo = f'Centre {self.test_rvcen_result:.1f} km/s\nFit centre {self.test_fitpar["fitcen"]:.3f} km/s\nRange {self.test_rvrng_result:.1f} km/s\nFit FWHM {self.test_fitpar["fwhm"]:.3f} km/s\nFit {strchired} {self.test_fitpar["fitredchi2"]:.2e}'
+            ax[0].text(0.98, 0.04, strinfo, transform=ax[0].transAxes, ha='right', va='bottom', fontsize='small', bbox=dict(facecolor='white', edgecolor='white', alpha=0.8))
+            ax[0].legend(loc='lower left', fontsize='small')
+            if sh: plt.show()
+            if sv: plt.savefig(os.path.join(self.dirout, f'{self.data.obj}.ccf_test.pdf'))
+            plt.close()
+
+        return
+
+
+    def set_rvgrid(self, rvcen=None, rvrng=None, rvstp=None, rvstpreal=None):
+        """Set the RV grid for the final CCF computation"""
+        # Step
+        if rvstpreal is not None:
+            print(f'Warning: Setting RV grid step real to {rvstpreal}, which might be different from the tabulated one ({self.rvstpreal})')
+            self.rvstpreal = rvstpreal  # Warning: Overwrite default
+        if self.rvstp is None: self.rvstp = self.rvstpreal
+
+        # Centre
+        if rvcen is not None:
+            if self.rvcen is not None:
+                print(f'Warning: Overwritting RV grid centre from {self.rvcen} to {rvcen}')
+            self.rvcen = rvcen
+        elif rvcen is None and self.rvcen is None:
+            sys.exit('Need to set RV grid centre `rvcen`')
+
+        # Range
+        if rvrng is not None:
+            if self.rvrng is not None:
+                print(f'Warning: Overwritting RV grid centre from {self.rvrng} to {rvrng}')
+            self.rvrng = rvrng
+        elif rvrng is None and self.rvrng is None:
+            sys.exit('Need to set RV grid range `rvrng`')
+
+        # Grid
+        self.rvgrid = np.arange(self.rvcen - self.rvrng, self.rvcen + self.rvrng + self.rvstp, self.rvstp)
+        self.rvgridreal = np.arange(self.rvcen - self.rvrng, self.rvcen + self.rvrng + self.rvstpreal, self.rvstpreal)
+        if self.verbose: print(f'RV grid set\n  RV centre {self.rvcen}\n  RV range {self.rvrng}\n  RV step {self.rvstp}\n  RV step real {self.rvstpreal}\n  RV grid length {len(self.rvgrid)}\n  RV grid real length {len(self.rvgridreal)}')
+        return
+    
+
+    def set_rvgrid_from_initial_test(self):
+        """Set the RV range and centre from the initial test CCF"""
+        self.rvcen = self.test_rvcen_result
+        self.rvrng = self.test_rvrng_result
+        if self.verbose: print(f'RV range and centre set from initial test CCF')
+        self.set_rvgrid()
+        return
+
 
     def compute_ord_fluxratio(self, fluxratiotype='obshighsnr', save=True):
         """
