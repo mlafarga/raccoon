@@ -896,13 +896,15 @@ class Crosscorr():
     def broaden_tellmask_value(self, vbroadtype='value', vbroad=0):
         """
         Select value by which to broaden the telluric mask.
+        TODO: Ideally run before loading the telluric mask!
 
         Parameters
         ----------
         vbroadtype : str, default 'value'
             How to get the velocity broadening of the telluric mask. Options:
             - 'value': Use the value provided with `vbroad`.
-            - `obsall`: Use the maximum BERV value of all observations.
+            - `bervminmaxobs`: TODO different range blue/red
+            - `bervabsmaxobs`: Use the absolute maximum BERV value of all observations.
             - `bervmax`: Use the value in Crosscorr.data.bervmax. TODO: Compute BERV max of the star
         vbroad : float, default 0
             Broadening velocity in km/s. Only used of `vbroadtype` is 'value'.
@@ -928,8 +930,9 @@ class Crosscorr():
         # Broaden velocity [km/s]
         if vbroadtype == 'value':
             self.vbroad = vbroad
-        elif vbroadtype == 'obsall':
-            self.vbroad = self.data.dataheader['berv'].abs().max()
+        elif vbroadtype == 'bervabsmaxobs':
+            # self.vbroad = self.data.dataheader['berv'].abs().max()
+            self.vbroad = self.data.bervabsmaxobs
         elif vbroadtype == 'bervmax':
             self.vbroad = self.bervmax
 
@@ -937,8 +940,32 @@ class Crosscorr():
         return
 
 
+    def extend_tellMask(self, dw_extra=500.):
+        """
+        Extend the end wavelengths of the telluric mask (with flux 0) to cover all the data (observed spectrum) and model (mask) range, so there are no interpolation problems.
+
+        dw_extra : float, default 500
+            Extra wavelength range to extend the telluric mask [A].
+        """
+        wspecmin, wspecmax = self.data.dataspec['w'].min(), self.data.dataspec['w'].max()
+        wmmin, wmmax = self.model.datamod['wm'][0], self.model.datamod['wm'][-1]
+        wtmin, wtmax = self.tellmask.w[0], self.tellmask.w[-1]
+
+        wmin = np.nanmin([wspecmin, wmmin, wtmin]) - dw_extra
+        wmax = np.nanmax([wspecmax, wmmax, wtmax]) + dw_extra
+        self.tellmask.w = np.concatenate(([wmin], self.tellmask.w, [wmax]))
+        self.tellmask.f = np.concatenate(([0], self.tellmask.f, [0]))
+
+        # Original masks: 0 good regions, 1 regions to be masked
+        # Invert masks: 0 to bad, 1 to good
+        self.tellmask.Mask, _ = telluricutils.interp_mask_inverse(self.tellmask.w, self.tellmask.f, kind='linear')
+        self.tellmask.w1, self.tellmask.w2 = telluricutils.mask2wlimits(self.tellmask.w, self.tellmask.f)
+        return
+
+
     def select_masklines_telloverlap(self):
         pass
+        # TODO continue from line 819 in ccfcompute.py
         return
 
     def select_masklines_freetellurics(self):
