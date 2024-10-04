@@ -655,7 +655,8 @@ def serval_tpl_read(filin, ln=False):
         header = hdulist[0].header
         wln = hdulist['wave'].data
         f = hdulist['spec'].data
-        sf = hdulist['sig'].data
+        try: sf = hdulist['sig'].data
+        except: sf = np.nan
 
     # Wavelength scale
     if ln:
