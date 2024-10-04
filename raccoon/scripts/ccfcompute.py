@@ -593,8 +593,9 @@ def main():
             # Mask
             ax[0].vlines(wm, fminn, fminn + fm / np.nanmax(fm) * fmaxn, colors='C1', label='Mask norm')
             # Tellurics
-            wt, ft = telluricutils.read_mask(args.filtell)
-            telluricutils.plot_mask(wt, ft*fmaxn, ax=ax[0], leglab='Telluric mask', alpha=.3, color='k')
+            if (args.filtell is not None):
+                wt, ft = telluricutils.read_mask(args.filtell)
+                telluricutils.plot_mask(wt, ft*fmaxn, ax=ax[0], leglab='Telluric mask', alpha=.3, color='k')
             ax[0].set_xlim(np.nanmin(wcorr[args.ccftesto]), np.nanmax(wcorr[args.ccftesto]))
             ax[0].set_ylim(fminn, fmaxn)
             ax[0].set_ylabel('Flux')
