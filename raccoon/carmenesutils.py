@@ -5,6 +5,7 @@ from __future__ import print_function
 import glob
 import os
 import sys
+# import ipdb
 
 from astropy.io import fits
 import numpy as np
@@ -1591,6 +1592,7 @@ def serval_get(dirin, obj=None, lisdataid=['rvc', 'info', 'brv', 'srv', 'halpha'
     # Remove duplicated columns (rvc...)
     data = data.loc[:, ~data.columns.duplicated()]
 
+
     # Get observation names
     if obs and 'info' in dataid:
 
@@ -1599,7 +1601,9 @@ def serval_get(dirin, obj=None, lisdataid=['rvc', 'info', 'brv', 'srv', 'halpha'
         mask = [type(d) == str for d in data['timeid']]
         data = data[mask]
 
-        data['obs'] = serval_lisobs(data['timeid'].values).values
+        # ipdb.set_trace()
+        # data['obs'] = serval_lisobs(data['timeid'].values).values  # new
+        data['obs'] = serval_lisobs(data['timeid'].values).values.flatten()
 
     return data
 
