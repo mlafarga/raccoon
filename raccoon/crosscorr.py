@@ -19,8 +19,12 @@ from popurri.plotutils import wavelength_label
 from popurri import spectrum
 from popurri import telluricutils
 
+from popurri.spectrum import dopplershift
+
+
 from . import ccflibfort
 from . import peakutils
+# from . import spectrumutils
 # from . import telluricutils
 
 # dirhere = os.path.dirname(__file__)
@@ -169,11 +173,53 @@ class Model():
         return datamod
 
 
-    def plot_mask(self, ax=None, ymin=0, yscale=1, xunit='A', xlabel=None, ylabel='Mask weight', leglabel='', title='', color='0.5', alpha=0.8, linestyles='solid', zorder=0, keeplims=False, **kwargs):
-        """Plot binary mask"""
+    def apply_mask(self, maskstr, xstr='wm', ystr='fm', inplace=False):
+        """
+        Apply a mask to remove certain regions of the model.
+        Assumes that the mask is a boolean array with the same shape as `self.datamod['wm']` and saved in `self.datamod[maskstr]`, where `maskstr` is the key to access the mask.
+        inplace : bool, default False
+            If True, overwrite the saved model by the model with the mask applied. Default is False, which returns the masked model arrays (and does not modify the saved model).
+        """
+        x = self.datamod[xstr]
+        y = self.datamod[ystr]
+        if maskstr in self.datamod.keys():
+            x = x[self.datamod[maskstr]]
+            y = y[self.datamod[maskstr]]
+            ntotal = len(self.datamod[maskstr])
+            nmasked = ntotal - np.count_nonzero(self.model.datamod[maskstr])
+            print(f'Mask {maskstr} applied to model. {nmasked} pixels masked out of {ntotal} total pixels.')
+        else:
+            print(f'Mask {mask} not found in model. Continue without masking any regions.')
+        # Return or save masked model
+        if inplace:
+            self.datamod[xstr] = x
+            self.datamod[ystr] = y
+            return
+        else:
+            return x, y
+
+
+    def plot_mask(self, ax=None, ymin=0, yscale=1, xdopplershift=0, maskstr=None, xunit='A', xlabel=None, ylabel='Mask weight', leglabel='', title='', color='0.5', alpha=0.8, linestyles='solid', zorder=0, keeplims=False, **kwargs):
+        """Plot binary mask
+        xdopplershift : float
+            Doppler shift to apply to the mask [m/s].
+        maskstr : str or None (default None)
+            If str, apply a mask to remove specific regions of the model, if None (default), do not do anything. Masks are boolean arrays with the same shape as `self.datamod['wm']` that mask specific regions of the mask. Can be added to the model with the methods in the `Crosscorr` class.
+        """
         if ax is None: ax = plt.gca()
         xlim, ylim = ax.get_xlim(), ax.get_ylim()
-        ax.vlines(self.datamod['wm'], ymin, self.datamod['fm']*yscale, color=color, linestyles=linestyles, alpha=alpha, zorder=zorder, label=leglabel, **kwargs)
+
+        x, y = self.datamod['wm'], self.datamod['fm']
+        
+        if maskstr is not None:
+            x, y = self.apply_mask(maskstr, inplace=False)
+        
+        # x = dopplershift(self.datamod['wm'], xdopplershift)
+        # y = self.datamod['fm']*yscale
+        x = dopplershift(x, xdopplershift)
+        y = y*yscale
+
+        ax.vlines(x, ymin, y, color=color, linestyles=linestyles, alpha=alpha, zorder=zorder, label=leglabel, **kwargs)
         if keeplims: ax.set(xlim=xlim, ylim=ylim)
         if xlabel is None: xlabel = wavelength_label(x=xunit)  # Assumes plotting wavelength in x-axis
         ax.set(xlabel=xlabel, ylabel=ylabel, title=title)
@@ -635,7 +681,7 @@ class Crosscorr():
     # CCF preparation functions
     # -------------------------
 
-    def computeccf_initial_test(self, test_rvcen=0., test_rvrng=200., test_rvstp=1., test_o=None, ccftestdmin=2, x='w', y='f', sh=True, sv=False):
+    def computeccf_initial_test(self, test_rvcen=0., test_rvrng=200., test_rvstp=1., test_o=None, test_dmin=2, test_nfwhm=3, x='w', y='f', sh=True, sv=False):
         """
         Compute the cross-correlation on a reference order (the ord_ref of the instrument by default), on a reference observation (the one with highest S/N by default), to find the adequate centre and range of the CCF, if not provided with `rvcen` and `rvrng`.
 
@@ -650,7 +696,9 @@ class Crosscorr():
         self.test_rvrng = test_rvrng
         self.test_rvstp = test_rvstp
         self.test_o = int(test_o) if test_o is not None else int(self.data.ord_ref)
-        self.test_dmin = int(ccftestdmin)
+        # self.test_dmin = int(test_dmin)
+        self.test_dmin = test_dmin
+        self.test_nfwhm = test_nfwhm
         # Outputs
         self.test_rv = None
         self.test_ccf = None
@@ -730,9 +778,11 @@ class Crosscorr():
         fitpar['fwhm'] = peakutils.gaussian_fwhm(wid=fitpar['fitwid'])
         fitpar['fitredchi2'] = lmfitresult.redchi
 
+        # TODO: Solution if fit fails and fwhm is nan
+
         # Determine CCF width: About 3 * FWHM
-        test_rvrng_result = round(np.ceil(fitpar['fwhm']*3.))  # [km/s]
-        # test_rvrng_result = round(np.ceil(fitpar['fwhm']*3.)/5)*5 # [km/s], round to 5
+        test_rvrng_result = round(np.ceil(fitpar['fwhm']*self.test_nfwhm))  # [km/s]
+        # test_rvrng_result = round(np.ceil(fitpar['fwhm']*self.test_nfwhm)/5)*5 # [km/s], round to 5
         if self.verbose: print(f'  RV range: {test_rvrng_result} km/s (FWHM {fitpar["fwhm"]}, chi2red {fitpar["fitredchi2"]})')
 
         # The Gaussian fit can give a more accurate minimum for the CCF, but can be problematic with noisy CCFs, so keep as rvcen_result the minimum found with np.argmin
@@ -826,7 +876,7 @@ class Crosscorr():
         """
         Get order relative flux correction.
 
-        Flux correction obtained from a reference observation, so that the flux of the  orders of all the observations always have the same ratio.
+        Flux correction obtained from a reference observation, so that the flux of the  orders of all the observations always have the same ratio (i.e. same SDE).
         
         Returns the flux ratios per order (all orders, not only those in ords_use), to be used as weights in the CCF computation.
 
@@ -961,6 +1011,18 @@ class Crosscorr():
         self.tellmask.Mask, _ = telluricutils.interp_mask_inverse(self.tellmask.w, self.tellmask.f, kind='linear')
         self.tellmask.w1, self.tellmask.w2 = telluricutils.mask2wlimits(self.tellmask.w, self.tellmask.f)
         return
+
+
+    def cut_masklines_w(self, wmin=None, wmax=None):
+        """
+        Cut mask lines to given `wmin` and `wmax`.
+        """
+        if self.verbose: print(f'Cutting mask lines ({self.model.datamod["nlin"]} lines now) to be within {wmin} -- {wmax}')
+        m = (self.model.datamod['wm'] >= wmin) & (self.model.datamod['wm'] <= wmax)
+        self.model.datamod['wm'] = self.model.datamod['wm'][m]
+        self.model.datamod['fm'] = self.model.datamod['fm'][m]
+        self.model.datamod['nlin'] = len(self.model.datamod['wm'])
+        if self.verbose: print('Mask lines cut, now have', self.model.datamod['nlin'])
 
 
     def select_masklines_telloverlap(self):
