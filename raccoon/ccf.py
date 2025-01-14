@@ -590,9 +590,9 @@ def selectmask_carmenesgto(filmask, spt, vsini, sptdefault='M3.5', vsinidefault=
 
     # Check valid inputs
     if spt is None:
-        stp = sptdefault
+        spt = sptdefault
     elif len(spt) != 4:
-        stp = sptdefault
+        spt = sptdefault
 
     if vsini is None:
         vsini = vsinidefault

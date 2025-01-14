@@ -411,7 +411,8 @@ def main():
     # - SpT
     if args.spt is not None:
         if args.spt == 'carmencita':
-            args.spt = datacarmencita['SpT'].loc[args.obj][:4]
+            # args.spt = datacarmencita['SpT'].loc[args.obj][:4]
+            args.spt = datacarmencita['SpT'].loc[args.obj][:4].replace('V', " ")
             # if not np.isfinite(args.spt):
             #     args.spt = None
         # elif pyutils.isfloatnum(args.spt):
