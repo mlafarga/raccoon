@@ -828,7 +828,7 @@ def main():
 
         # Make sure rvstp is small enough
         # If not make it half of the BERV, to be sure that no overlaps are missed
-        if rv[1] - rv[0] > 2 * args.bervmax / 1.e3:
+        if (args.bervmax > 0) and (rv[1] - rv[0] > 2 * args.bervmax / 1.e3):
             # TODO: fails is args.bermax is 0!!!
             rvnew = np.arange(rv[0], rv[-1] + (rv[1] - rv[0]), args.bervmax / 2.e3)
         else:
@@ -998,6 +998,24 @@ def main():
     # ccfpar = {}
     dataccfsumTS = {}
     first, firsto = True, True
+
+    # ----------------
+    # To save CCF values and errors
+    lisccfreal, lisccferr, lisccferrreal = [], [], []
+
+    header_ccfreal = 'rv ccfsumreal '
+    headero = ['ccfo{}real'.format(o) for o in ords]
+    header_ccfreal += ' '.join(headero)
+
+    header_ccferr = 'rv ccferrsum '
+    headero = ['ccferro{}'.format(o) for o in ords]
+    header_ccferr += ' '.join(headero)
+
+    header_ccferrreal = 'rv ccferrsumreal '
+    headero = ['ccferro{}real'.format(o) for o in ords]
+    header_ccferrreal += ' '.join(headero)
+    # ----------------
+
     for i, obs in enumerate(tqdm(lisfilobs)):
         filobs = lisfilobs[i]
         # verboseprint('{}/{} {}'.format(i+1, nobs, filobs))
@@ -1346,8 +1364,8 @@ def main():
             # Add nan in arrays
             ccf[o] = np.ones_like(rv) * np.nan
             ccferr[o] = np.ones_like(rv) * np.nan
-            ccfreal[o] = np.ones_like(rv) * np.nan
-            ccferrreal[o] = np.ones_like(rv) * np.nan
+            ccfreal[o] = np.ones_like(rvreal) * np.nan
+            ccferrreal[o] = np.ones_like(rvreal) * np.nan
             bx[o] = np.ones(args.bisectorn) * np.nan
             by[o] = np.ones(args.bisectorn) * np.nan
             bxerr[o] = np.ones(args.bisectorn) * np.nan
@@ -1540,6 +1558,24 @@ def main():
             # verboseprint('  CCF data saved in {}'.format(filout))
         elif args.output == 'gto':
             pass
+    
+        # Save CCF values and errors (sum and orders) in file
+        # NOTE: CCF orders saved laterccfreal. Ideally would be saved here, but not changing the code now
+        # ---------------------------------------
+        lisccfreal.append(np.vstack([rvreal, ccfsumreal, ccfreal]))
+        filout = os.path.join(args.dirout, os.path.basename(os.path.splitext(filobs)[0]) + '_ccfrealall.dat')
+        np.savetxt(filout, lisccfreal[i].T, fmt='%0.8f', delimiter=' ', newline='\n', header=header_ccfreal, comments='')
+
+        lisccferr.append(np.vstack([rv, ccfsumerr, ccferr]))
+        filout = os.path.join(args.dirout, os.path.basename(os.path.splitext(filobs)[0]) + '_ccferrall.dat')
+        np.savetxt(filout, lisccferr[i].T, fmt='%0.8f', delimiter=' ', newline='\n', header=header_ccferr, comments='')
+
+        lisccferrreal.append(np.vstack([rvreal, ccfsumrealerr, ccferrreal]))
+        filout = os.path.join(args.dirout, os.path.basename(os.path.splitext(filobs)[0]) + '_ccferrrealall.dat')
+        np.savetxt(filout, lisccferrreal[i].T, fmt='%0.8f', delimiter=' ', newline='\n', header=header_ccferrreal, comments='')
+        # ---------------------------------------
+
+
 
    # --- End observations loop ---
 
