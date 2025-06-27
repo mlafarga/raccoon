@@ -1496,90 +1496,90 @@ c Bisector span zone limits
       end
 ! ---------------------------------------------------------------------
 
-! Compute Bisector
-! Return bisector, not only bisector span
-      subroutine bisector2(nrv,rv,ccf,fitmax,bspan,rvfit,ccfit)
-      implicit double precision (a-h,o-z)
-      ! Input
-      integer,intent(in) :: nrv
-      double precision,dimension(nrv),intent(in) :: rv
-      double precision,dimension(nrv),intent(in) :: ccf
-      double precision,intent(in) :: fitmax !=a(4)
-      ! Output
-      double precision,intent(out) :: bspan
-      double precision,dimension(100),intent(out) :: ccfit,rvfit
+! ! Compute Bisector
+! ! Return bisector, not only bisector span
+!       subroutine bisector2(nrv,rv,ccf,fitmax,bspan,rvfit,ccfit)
+!       implicit double precision (a-h,o-z)
+!       ! Input
+!       integer,intent(in) :: nrv
+!       double precision,dimension(nrv),intent(in) :: rv
+!       double precision,dimension(nrv),intent(in) :: ccf
+!       double precision,intent(in) :: fitmax !=a(4)
+!       ! Output
+!       double precision,intent(out) :: bspan
+!       double precision,dimension(100),intent(out) :: ccfit,rvfit
 
-Cf2py integer,intent(in,hide) :: nrv
+! Cf2py integer,intent(in,hide) :: nrv
 
-c      ccfmn=1.d0
-      ccfmn=fitmax
-      ccfal=0.d0
-      ccfar=0.d0
+! c      ccfmn=1.d0
+!       ccfmn=fitmax
+!       ccfal=0.d0
+!       ccfar=0.d0
 
-      ! Find CCF minimum and maxima
-      do i=1,nrv
-       if(ccf(i).lt.ccfmn) then
-        ccfmn=ccf(i)
-        rvmax=rv(i)
-       endif
-      enddo
-      do i=1,nrv
-       if(ccf(i).gt.ccfal.and.rv(i).lt.rvmax) then
-        ccfal=ccf(i)
-        rvmaxl=rv(i)
-       endif
-       if(ccf(i).gt.ccfar.and.rv(i).gt.rvmax) then
-        ccfar=ccf(i)
-        rvmaxr=rv(i)
-       endif
-      enddo
-      ccfmx=fitmax
+!       ! Find CCF minimum and maxima
+!       do i=1,nrv
+!        if(ccf(i).lt.ccfmn) then
+!         ccfmn=ccf(i)
+!         rvmax=rv(i)
+!        endif
+!       enddo
+!       do i=1,nrv
+!        if(ccf(i).gt.ccfal.and.rv(i).lt.rvmax) then
+!         ccfal=ccf(i)
+!         rvmaxl=rv(i)
+!        endif
+!        if(ccf(i).gt.ccfar.and.rv(i).gt.rvmax) then
+!         ccfar=ccf(i)
+!         rvmaxr=rv(i)
+!        endif
+!       enddo
+!       ccfmx=fitmax
 
-      szon=200.d0
-      spre=2.d0
-      do i=1,100
-       ccfit(i)=ccfmn+spre*((ccfmx-ccfmn)/szon)+((szon-spre-1.d0)/(99.d
-     *0*szon))*(ccfmx-ccfmn)*(i-1)
-       do j=1,nrv
-        if(ccf(j).gt.ccfit(i).and.ccf(j+1).lt.ccfit(i).and.rv(j).lt.
-     *rvmax.and.rv(j).gt.rvmaxl) then
-       rv1=rv(j)+(rv(j+1)-rv(j))*(ccfit(i)-ccf(j))/(ccf(j+1)-ccf(j))
-        endif
-        if(ccf(j).lt.ccfit(i).and.ccf(j+1).gt.ccfit(i).and.rv(j).gt.
-     *rvmax.and.rv(j).lt.rvmaxr) then
-       rv2=rv(j)+(rv(j+1)-rv(j))*(ccfit(i)-ccf(j))/(ccf(j+1)-ccf(j))
-        endif
-       enddo
-       rvfit(i)=(rv2+rv1)/2.d0
-      enddo
-      close(1)
+!       szon=200.d0
+!       spre=2.d0
+!       do i=1,100
+!        ccfit(i)=ccfmn+spre*((ccfmx-ccfmn)/szon)+((szon-spre-1.d0)/(99.d
+!      *0*szon))*(ccfmx-ccfmn)*(i-1)
+!        do j=1,nrv
+!         if(ccf(j).gt.ccfit(i).and.ccf(j+1).lt.ccfit(i).and.rv(j).lt.
+!      *rvmax.and.rv(j).gt.rvmaxl) then
+!        rv1=rv(j)+(rv(j+1)-rv(j))*(ccfit(i)-ccf(j))/(ccf(j+1)-ccf(j))
+!         endif
+!         if(ccf(j).lt.ccfit(i).and.ccf(j+1).gt.ccfit(i).and.rv(j).gt.
+!      *rvmax.and.rv(j).lt.rvmaxr) then
+!        rv2=rv(j)+(rv(j+1)-rv(j))*(ccfit(i)-ccf(j))/(ccf(j+1)-ccf(j))
+!         endif
+!        enddo
+!        rvfit(i)=(rv2+rv1)/2.d0
+!       enddo
+!       close(1)
 
-c Bisector span zone limits
-      ccf10=ccfmx-(ccfmx-ccfmn)*0.1d0
-      ccf40=ccfmx-(ccfmx-ccfmn)*0.4d0
-      ccf60=ccfmx-(ccfmx-ccfmn)*0.6d0
-      ccf90=ccfmx-(ccfmx-ccfmn)*0.9d0
+! c Bisector span zone limits
+!       ccf10=ccfmx-(ccfmx-ccfmn)*0.1d0
+!       ccf40=ccfmx-(ccfmx-ccfmn)*0.4d0
+!       ccf60=ccfmx-(ccfmx-ccfmn)*0.6d0
+!       ccf90=ccfmx-(ccfmx-ccfmn)*0.9d0
 
-      bsp1=0.d0
-      bsp2=0.d0
-      ns1=0
-      ns2=0
-      do i=1,100
-       if(ccfit(i).lt.ccf10.and.ccfit(i).gt.ccf40) then
-        bsp1=bsp1+rvfit(i)
-        ns1=ns1+1
-       elseif(ccfit(i).lt.ccf60.and.ccfit(i).gt.ccf90) then
-        bsp2=bsp2+rvfit(i)
-        ns2=ns2+1
-       endif
-      enddo
-      bsp1=bsp1/dfloat(ns1)
-      bsp2=bsp2/dfloat(ns2)
-      bspan=bsp2-bsp1
+!       bsp1=0.d0
+!       bsp2=0.d0
+!       ns1=0
+!       ns2=0
+!       do i=1,100
+!        if(ccfit(i).lt.ccf10.and.ccfit(i).gt.ccf40) then
+!         bsp1=bsp1+rvfit(i)
+!         ns1=ns1+1
+!        elseif(ccfit(i).lt.ccf60.and.ccfit(i).gt.ccf90) then
+!         bsp2=bsp2+rvfit(i)
+!         ns2=ns2+1
+!        endif
+!       enddo
+!       bsp1=bsp1/dfloat(ns1)
+!       bsp2=bsp2/dfloat(ns2)
+!       bspan=bsp2-bsp1
 
-      return
-      end
-! ---------------------------------------------------------------------
+!       return
+!       end
+! ! ---------------------------------------------------------------------
 
 ! Sort an array (min to max)
       SUBROUTINE sort(n,arr)
