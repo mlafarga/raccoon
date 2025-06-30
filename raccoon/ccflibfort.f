@@ -1411,90 +1411,90 @@ c       print*,'Fitting sinc'
       END
 ! ---------------------------------------------------------------------
 
-! Compute Bisector
-      subroutine bisector(nrc,rdw,ccx,bspan,fitmax)
-      implicit double precision (a-h,o-z)
-      ! Input
-      integer,intent(in) :: nrc !=nrv
-      double precision,dimension(nrc),intent(in) :: rdw !=rv
-      double precision,dimension(nrc),intent(in) :: ccx !=ccf
-      double precision,intent(in) :: fitmax !=a(4)
-      ! Output
-      double precision,intent(out) :: bspan
-      ! Local
-      dimension ccfit(100),rvfit(100)
+! ! Compute Bisector
+!       subroutine bisector(nrc,rdw,ccx,bspan,fitmax)
+!       implicit double precision (a-h,o-z)
+!       ! Input
+!       integer,intent(in) :: nrc !=nrv
+!       double precision,dimension(nrc),intent(in) :: rdw !=rv
+!       double precision,dimension(nrc),intent(in) :: ccx !=ccf
+!       double precision,intent(in) :: fitmax !=a(4)
+!       ! Output
+!       double precision,intent(out) :: bspan
+!       ! Local
+!       dimension ccfit(100),rvfit(100)
 
-Cf2py integer,intent(in,hide) :: nrc
+! Cf2py integer,intent(in,hide) :: nrc
 
-c      ccfmn=1.d0
-      ccfmn=fitmax
-      ccfal=0.d0
-      ccfar=0.d0
+! c      ccfmn=1.d0
+!       ccfmn=fitmax
+!       ccfal=0.d0
+!       ccfar=0.d0
 
-      ! Find CCF minimum and maxima
-      do i=1,nrc
-       if(ccx(i).lt.ccfmn) then
-        ccfmn=ccx(i)
-        rvmax=rdw(i)
-       endif
-      enddo
-      do i=1,nrc
-       if(ccx(i).gt.ccfal.and.rdw(i).lt.rvmax) then
-        ccfal=ccx(i)
-        rvmaxl=rdw(i)
-       endif
-       if(ccx(i).gt.ccfar.and.rdw(i).gt.rvmax) then
-        ccfar=ccx(i)
-        rvmaxr=rdw(i)
-       endif
-      enddo
-      ccfmx=fitmax
+!       ! Find CCF minimum and maxima
+!       do i=1,nrc
+!        if(ccx(i).lt.ccfmn) then
+!         ccfmn=ccx(i)
+!         rvmax=rdw(i)
+!        endif
+!       enddo
+!       do i=1,nrc
+!        if(ccx(i).gt.ccfal.and.rdw(i).lt.rvmax) then
+!         ccfal=ccx(i)
+!         rvmaxl=rdw(i)
+!        endif
+!        if(ccx(i).gt.ccfar.and.rdw(i).gt.rvmax) then
+!         ccfar=ccx(i)
+!         rvmaxr=rdw(i)
+!        endif
+!       enddo
+!       ccfmx=fitmax
 
-      szon=200.d0
-      spre=2.d0
-      do i=1,100
-       ccfit(i)=ccfmn+spre*((ccfmx-ccfmn)/szon)+((szon-spre-1.d0)/(99.d
-     *0*szon))*(ccfmx-ccfmn)*(i-1)
-       do j=1,nrc
-        if(ccx(j).gt.ccfit(i).and.ccx(j+1).lt.ccfit(i).and.rdw(j).lt.
-     *rvmax.and.rdw(j).gt.rvmaxl) then
-       rv1=rdw(j)+(rdw(j+1)-rdw(j))*(ccfit(i)-ccx(j))/(ccx(j+1)-ccx(j))
-        endif
-        if(ccx(j).lt.ccfit(i).and.ccx(j+1).gt.ccfit(i).and.rdw(j).gt.
-     *rvmax.and.rdw(j).lt.rvmaxr) then
-       rv2=rdw(j)+(rdw(j+1)-rdw(j))*(ccfit(i)-ccx(j))/(ccx(j+1)-ccx(j))
-        endif
-       enddo
-       rvfit(i)=(rv2+rv1)/2.d0
-      enddo
-      close(1)
+!       szon=200.d0
+!       spre=2.d0
+!       do i=1,100
+!        ccfit(i)=ccfmn+spre*((ccfmx-ccfmn)/szon)+((szon-spre-1.d0)/(99.d
+!      *0*szon))*(ccfmx-ccfmn)*(i-1)
+!        do j=1,nrc
+!         if(ccx(j).gt.ccfit(i).and.ccx(j+1).lt.ccfit(i).and.rdw(j).lt.
+!      *rvmax.and.rdw(j).gt.rvmaxl) then
+!        rv1=rdw(j)+(rdw(j+1)-rdw(j))*(ccfit(i)-ccx(j))/(ccx(j+1)-ccx(j))
+!         endif
+!         if(ccx(j).lt.ccfit(i).and.ccx(j+1).gt.ccfit(i).and.rdw(j).gt.
+!      *rvmax.and.rdw(j).lt.rvmaxr) then
+!        rv2=rdw(j)+(rdw(j+1)-rdw(j))*(ccfit(i)-ccx(j))/(ccx(j+1)-ccx(j))
+!         endif
+!        enddo
+!        rvfit(i)=(rv2+rv1)/2.d0
+!       enddo
+!       close(1)
 
-c Bisector span zone limits
-      ccf10=ccfmx-(ccfmx-ccfmn)*0.1d0
-      ccf40=ccfmx-(ccfmx-ccfmn)*0.4d0
-      ccf60=ccfmx-(ccfmx-ccfmn)*0.6d0
-      ccf90=ccfmx-(ccfmx-ccfmn)*0.9d0
+! c Bisector span zone limits
+!       ccf10=ccfmx-(ccfmx-ccfmn)*0.1d0
+!       ccf40=ccfmx-(ccfmx-ccfmn)*0.4d0
+!       ccf60=ccfmx-(ccfmx-ccfmn)*0.6d0
+!       ccf90=ccfmx-(ccfmx-ccfmn)*0.9d0
 
-      bsp1=0.d0
-      bsp2=0.d0
-      ns1=0
-      ns2=0
-      do i=1,100
-       if(ccfit(i).lt.ccf10.and.ccfit(i).gt.ccf40) then
-        bsp1=bsp1+rvfit(i)
-        ns1=ns1+1
-       elseif(ccfit(i).lt.ccf60.and.ccfit(i).gt.ccf90) then
-        bsp2=bsp2+rvfit(i)
-        ns2=ns2+1
-       endif
-      enddo
-      bsp1=bsp1/dfloat(ns1)
-      bsp2=bsp2/dfloat(ns2)
-      bspan=bsp2-bsp1
+!       bsp1=0.d0
+!       bsp2=0.d0
+!       ns1=0
+!       ns2=0
+!       do i=1,100
+!        if(ccfit(i).lt.ccf10.and.ccfit(i).gt.ccf40) then
+!         bsp1=bsp1+rvfit(i)
+!         ns1=ns1+1
+!        elseif(ccfit(i).lt.ccf60.and.ccfit(i).gt.ccf90) then
+!         bsp2=bsp2+rvfit(i)
+!         ns2=ns2+1
+!        endif
+!       enddo
+!       bsp1=bsp1/dfloat(ns1)
+!       bsp2=bsp2/dfloat(ns2)
+!       bspan=bsp2-bsp1
 
-      return
-      end
-! ---------------------------------------------------------------------
+!       return
+!       end
+! ! ---------------------------------------------------------------------
 
 ! ! Compute Bisector
 ! ! Return bisector, not only bisector span
